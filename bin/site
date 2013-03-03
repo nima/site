@@ -1,0 +1,18 @@
+#!/bin/bash
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+maj=${BASH_VERSINFO[0]}
+min=${BASH_VERSINFO[1]}
+: ${PROFILE?}
+
+e=0
+if [ ${maj} -ge 4 -a ${min} -ge 0 ]; then
+    source ~/.site/etc/site.conf
+    core:wrapper $@
+    e=$?
+else
+    e=1
+    echo "Your version of BASH is too old. Get with it."
+fi
+
+exit ${e}

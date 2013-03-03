@@ -1,0 +1,29 @@
+#!/bin/bash
+source ~/.site/etc/site.conf
+
+_site() {
+    COMPREPLY=()
+
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+    local prev="${COMP_WORDS[COMP_CWORD-1]}"
+    case ${prev} in
+        site)
+            local opts
+            for profile in USER_MODULES CORE_MODULES; do
+                eval $(core:dereference profile) #. Will create ${profile}
+                for module in ${!profile[@]}; do
+                    if [ ${profile[${module}]} -eq 1 ]; then
+                        opts="${opts} ${module}"
+                    fi
+                done
+            done
+            COMPREPLY=($(compgen -W "${opts}" -- ${cur}))
+        ;;
+        *)
+            core:softimport ${prev}
+            local names=$(:core:complete ${prev})
+            COMPREPLY=($(compgen -W "${names}" -- ${cur}))
+        ;;
+    esac
+}
+complete -F _site site

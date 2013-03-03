@@ -1,0 +1,46 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+#. Optional alerts
+function example:template:alert() {
+    cat <<!
+TODO A todo note goes here
+WARN And a warning here
+DEPR And maybe deprecation warnings here
+FIXME Some critical issues here
+!
+}
+
+#. Optional shflags function for complicated functions
+function example:template:shflags() {
+    cat <<!
+string dir . <repo-dir> d
+!
+}
+
+#. Optional long help message
+function example:template:help() {
+    cat <<!
+    This function describes template in depth.  First of all, this is ...
+    ...
+!
+}
+
+#. Mandatory short usage
+function example:template:usage() { echo "-d|--dir <dir> <from> <to>"; }
+
+#. Mandatory - the function itself
+function example:template() {
+    : ${FLAGS_dir?}
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 -o $# -eq 2 ]; then
+        local dir=${FLAGS_dir?}; unset FLAGS_dir;
+
+        pushd ${FLAGS_dir}
+        #. ...
+        e=$?
+        popd
+    fi
+
+    return $e
+}
