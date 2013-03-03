@@ -1,0 +1,169 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+core:import hgd
+
+#. Internal Functions -={
+function :ng:resolve() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        e=${CODE_FAILURE}
+        hit=$(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="$1"|wc -l)
+        if [ ${hit} -gt 0 ]; then
+            children=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="$1" memberNisNetgroup|awk '$1~/^memberNisNetgroup:$/{print$2}' ) )
+            for child in ${children[@]}; do
+                :ng:resolve $child
+            done
+            children=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="$1" nisNetgroupTriple|awk '$1~/^nisNetgroupTriple:$/{print$2}' ) )
+            for child in ${children[@]}; do
+                if echo ${child}|grep -q "${USER_TLD}"; then
+                    echo ${child/.${USER_TLD?}/}|tr -d '(),'
+                fi
+            done
+            e=${CODE_SUCCESS}
+        fi
+    fi
+
+    return $e
+}
+#. }=-
+#. Public Functions -={
+g_hn=0
+function ng:host:usage() { echo "<host>"; }
+function ng:host() {
+    local -i e=${CODE_DEFAULT?}
+
+    core:import dns
+    if [ $# -eq 1 ]; then
+        ((g_hn++))
+        #indent=' \'
+        #for i in $(eval echo {1..${g_hn} }); do
+        #    indent="${indent}__"
+        #done
+
+        local -a raw
+        if [ ${g_hn} -eq 1 ]; then
+            local -a hosts
+            if [ -z "${1//[^.]/}" ]; then
+                hosts=( "$(dns:qdn ${1}).${USER_TLD}" )
+            else
+                hosts=( ${1}.${USER_TLD} )
+            fi
+            e=${CODE_SUCCESS}
+            local fqdn
+            local -a raw
+            for fqdn in ${hosts[@]}; do
+                if [ -t 1 ]; then
+                    c a_host ${fqdn}; echo
+                fi
+
+                raw=(
+                    $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(nisNetgroupTriple=\(${fqdn},,\))" cn\
+                        | awk '$1~/cn:/{print$2}')
+                )
+
+                if [ ${#raw[@]} -eq 0 ]; then
+                    c WARN "There are no netgroups with \`${fqdn}' as a member"
+                fi
+                #if [ ${#raw[@]} -eq 0 ]; then
+                #    local -a didumean=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "nisNetgroupTriple~=${fqdn}" nisNetgroupTriple|sed -ne 's/nisNetgroupTriple: *(\(.*\),,)$/\1/p') )
+                #    if [ ${#didumean[@]} -gt 0 ]; then
+                #        printf "? %s\n" ${didumean[@]}
+                #    fi
+                #    e=${CODE_FAILURE}
+                #fi
+            done
+        else
+            local ng=$1
+            raw=(
+                $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(memberNisNetgroup=${ng})" cn\
+                    | awk '$1~/cn:/{print$2}')
+            )
+            e=${CODE_SUCCESS}
+        fi
+
+        for ng in ${raw[@]}; do
+            col='indirect'
+            i=${g_hn}
+            if [ ${g_hn} -eq 1 ]; then
+                col='direct'
+            fi
+            while [ $i -ne 0 ]; do
+                printf '   '
+                ((i--))
+            done
+            c a_netgroup_${col} $ng; echo
+            ng:host $ng
+        done
+        ((g_hn--))
+    fi
+
+    return $e
+}
+
+function ng:summary:usage() { echo "<no-args>"; }
+function ng:summary() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 0 ]; then
+        ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn description\
+            | awk '
+BEGIN{cn="";desc="";}
+$1~/cn:/{cn=$2};
+$1~/description:/{desc=substr($0,13)};
+{
+    if(cn && desc){
+        printf("%-32s %s\n",cn,desc);
+        cn="";desc="";
+    }
+}'
+        e=$?
+    fi
+
+    return $e
+}
+
+function ng:list:usage() { echo "<hgd:%>"; }
+function ng:list() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        local eq=$1
+        [ "${eq:1:1}" == '(' ] || eq="|(${eq})"
+
+        local -a data
+        data=( $(:hgd:resolve ${eq}) )
+        if [ $? -eq 0 ]; then
+            printf '%s\n' "${data[@]}"
+            e=${CODE_SUCCESS?}
+        else
+            c ERR "Invalid argument"
+            e=${CODE_FAILURE?}
+        fi
+    fi
+
+    return $e
+}
+
+function ng:ulist:usage() { echo "<hgd:%>"; }
+function ng:ulist() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        local eq=$1
+        [ "${eq:1:1}" == '(' ] || eq="|(${eq})"
+
+        local -a data
+        data=( $(:hgd:resolve ${eq}) )
+        if [ ${PIPESTATUS[0]} -eq 0 ]; then
+            printf '%s\n' "${data[@]//.*/}"|sort -u
+            e=${CODE_SUCCESS?}
+        else
+            c ERR "Invalid argument"
+            e=${CODE_FAILURE?}
+        fi
+    fi
+
+    return $e
+}
+#. }=-
