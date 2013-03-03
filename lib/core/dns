@@ -1,0 +1,250 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+#. Internal Functions -={
+function :dns:lookup() {
+    #. while read line; do
+    #.     read record context query sdn answer <<< ${line}
+    #.     ...
+    #. done < <(:dns:lookup pP ca ${hostname})
+    #. e=$?
+    #.
+    #. read record context query sdn answer <<< "$(:dns:lookup P a ${hostname})"
+
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 3 ]; then
+        local contexts records hint
+        read contexts records hint <<< $@
+
+        local hn_hint=${hint%%.*}
+        local sd_hint
+        [ "${hn_hint}" == "$hint" ] || sd_hint=${hint#*.}
+
+        local -i i
+        local -a sdns
+        local context
+        if [ -n "${sd_hint}" ]; then
+            sdns=( "${sd_hint}" )
+        else
+            for (( i=0; i<${#contexts}; i++ )); do
+                context=${contexts:$i:1}
+                case ${context} in
+                    p) sdns=( ${sdns[@]} ${USER_PRI_SUBDOMAINS[@]} ) ;;
+                    P) sdns=( ${sdns[@]} ${USER_PUB_SUBDOMAINS[@]} ) ;;
+                    *) core:raise ${EXCEPTION_BAD_FN_CALL} "Expected [pP], not ${context}" ;;
+                esac
+            done
+        fi
+
+        local sdn
+        local result
+        local -A results
+        for sdn in ${sdns[@]}; do
+            local fqdn
+            for (( i=0; i<${#contexts}; i++ )); do
+                context=${contexts:$i:1}
+                case ${context} in
+                    p) fqdn=${hn_hint}.${sdn}.${USER_TLD_MGMT};;
+                    P) fqdn=${hn_hint}.${sdn}.${USER_TLD};;
+                    *) core:raise ${EXCEPTION_BAD_FN_CALL} "Expected [pP], not ${context}" ;;
+                esac
+
+                if [ "${records//a/}" != "${records}" ]; then
+                    result=$(dig +short ${fqdn} a|head -n1)
+                    if [ "${result//[0-9]/}" == '...' ]; then
+                        [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:a:${sdn}:${result}"
+                    fi
+                fi
+                if [ "${records//c/}" != "${records}" ]; then
+                    result=$(dig +short ${fqdn} cname)
+                    [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:c:${sdn}:${result%%.}"
+                fi
+            done
+        done
+
+        local query context record answer
+        if [ ${#results[@]} -gt 0 ]; then
+            for query in ${!results[@]}; do
+                local contexts records sdn answer
+                IFS=: read context record sdn answer <<< "${results[${query}]}"
+                printf "%-3s %-3s %-24s %-32s %s\n" ${record} ${context} ${query} ${sdn} ${answer}
+            done
+            e=${CODE_SUCCESS}
+        fi
+    fi
+
+    return $e
+}
+
+function :dns:fqdn() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local -r hint=$1
+        local -r shn=${hint%%.*}
+        local line record context query sdn answer
+        while read line; do
+            read record context query sdn answer <<< ${line}
+            echo ${query}
+            e=${CODE_SUCCESS}
+        done < <(:dns:lookup P a ${hint})
+    else
+        core:raise ${EXCEPTION_BAD_FN_CALL}
+    fi
+
+    return $e
+}
+#. }=-
+#. Public Functions -={
+function dns:fqdn:usage() { echo "<short-hostname>"; }
+function dns:fqdn() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        :dns:fqdn $1
+        e=$?
+    fi
+
+    return $e
+}
+
+function :dns:qdn() {
+    e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local -r hint=$1
+        local -r shn=${hint%%.*}
+        local line record context query sdn answer
+        while read line; do
+            read record context query sdn answer <<< ${line}
+            echo "${shn}.${sdn}"
+            e=${CODE_SUCCESS}
+        done < <(:dns:lookup P a ${hint})
+    else
+        core:raise ${EXCEPTION_BAD_FN_CALL}
+    fi
+
+    return $e
+}
+
+function dns:qdn:usage() { echo "<hostname-hint>"; }
+function dns:qdn() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        :dns:qdn $1
+        e=$?
+    fi
+
+    return $e
+}
+
+function dns:lookup:usage() { echo "<hostname-hint>"; }
+function dns:lookup() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        hint=$1
+        e=${CODE_FAILURE}
+        local line record context query sdn answer
+        while read line; do
+            read record context query sdn answer <<< ${line}
+            if [ ${record} == 'c' ]; then
+                c blackf "%-32s" "${query}"
+                c cyanf "#. iface:%s, (%s for %s)" "${context}" "CNAME RECORD" "${answer}"
+                e=${CODE_SUCCESS}
+            elif [ ${record} == 'a' ]; then
+                c greenf "%-32s" "${query}"
+                c cyanf "#. iface:%s, (%s for %s)" "${context}" "A RECORD" "${answer}"
+                e=${CODE_SUCCESS}
+            fi
+            echo
+        done < <(:dns:lookup pP ca ${hint})
+    fi
+
+    return $e
+}
+
+function dns:cname:usage() { echo "<hgd:%> <cname-subdomain>"; }
+function dns:cname() {
+    local -i e=${CODE_DEFAULT?}
+
+    core:import ng
+
+    if [ $# -eq 2 ]; then
+        local cnamesd=${2}
+        local hosts_in_ng="$(ng:list ${1})"
+        if [ $? -eq 0 ]; then
+            local -a hosts=( $(sed -e 's/\([^\.]\+\)\..*/\1/' <<< "$hosts_in_ng") )
+            local cnamea=
+            local host record context query sdn answer
+            for host in ${hosts[@]}; do
+                read record context query sdn answer <<< "$(:dns:lookup P a ${host})"
+                if [ $? -eq 0 ]; then
+                    ip="${answer}"
+
+                    cname="${host}.${cnamesd}.${USER_TLD}"
+                    cnamea=$(dig +short ${cname}|head -n1)
+                    cnameip=$(dig +short ${cnamea}|tail -n1)
+                    cnamea=${cnamea//.${USER_TLD}./}
+
+                    c blackf "%-24s" ${host}.${cnamesd}
+                    c cyanf  "%-24s" ${cnamea}
+                    c greenf "%-16s" ${cnameip}
+                    if [[ ${cnamea} =~ ^${host}\..* ]]; then
+                        c HAS_PASSED
+                    else
+                        c HAS_FAILED
+                        e=${CODE_FAILURE}
+                    fi
+                else
+                    c HAS_FAILED
+                    e=${CODE_FAILURE}
+                fi
+            done
+        else
+            c HAS_FAILED
+            e=${CODE_FAILURE}
+        fi
+    fi
+
+    return $e
+}
+
+function dns:ptr:usage() { echo "<hgd:#>"; }
+function dns:ptr() {
+    core:import hgd
+
+    local -i e=${CODE_DEFAULT?}
+    if [ $# -eq 1 ]; then
+        local -a ips=( $(hgd:resolve ${1}) )
+        if [ $? -eq 0 ]; then
+            local ip
+            for ip in ${ips[@]}; do
+                c a_host '%-32s' ${ip}
+                local -i ee=${CODE_FAILURE}
+                arecord=$(dig +short -x ${ip}|grep -oE '[-a-z0-9\.]+')
+                if [ ${PIPESTATUS[0]} -eq 0 ]; then
+                    ipconfirm=$(dig +short ${arecord})
+                    if [ $? -eq 0 ]; then
+                        if [ "${ipconfirm}" == "${ip}" ]; then
+                            c HAS_PASSED "[${arecord}]"
+                            ee=${CODE_SUCCESS}
+                        else
+                            c HAS_FAILED "[A Record Mismatch]"
+                        fi
+                    else
+                        c HAS_FAILED "[No A Record]"
+                    fi
+                else
+                    c HAS_WARNED "[No PTR Record]"
+                fi
+            done
+            #cat x|while read line; do echo -ne ${line}...; nc -z -w1 $line 22; [ $? -eq 0 ] && echo UP || echo DOWN; done
+            e=${CODE_SUCCESS}
+        fi
+    fi
+
+    return $e
+}
+#. }=-
