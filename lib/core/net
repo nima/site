@@ -1,0 +1,135 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+core:import dns
+
+#. IP Networks Internal -={
+#. IPv4: Bits to Netmask
+function :net:b2nm() {
+    #. input  24
+    #. output 0xffffff00
+    local -i e=${CODE_FAILURE?}
+
+    local -i -r nmb=$1
+    if [ $nmb -le 32 ]; then
+        printf "0x%08x\n" $(( ((1<<(32-nmb)) - 1)^0xffffffff ))
+        e=${CODE_SUCCESS?}
+    fi
+
+    return $e
+}
+
+#. IPv4: Bits to Hostmask
+function :net:b2hm() {
+    #. input  24
+    #. output 0x000000ff
+    local -i e=${CODE_FAILURE?}
+
+    local -i -r hmb=$1
+    if [ $hmb -le 32 ]; then
+        printf "0x%08x\n" $(( ((1<<(32-hmb)) - 1)&0xffffffff ))
+        e=${CODE_SUCCESS?}
+    fi
+
+    return $e
+}
+
+#. IPv4: Hex to String
+function :net:h2s() {
+    #. input  0xff00ff00
+    #. output 255.0.255.0
+    local -i e=${CODE_FAILURE?}
+
+    local -ir ip=${1}
+    if (( ip <= 0xffffffff )); then
+        local -a q=(
+            $(( (ip & (0xff << 24)) >> 24 ))
+            $(( (ip & (0xff << 16)) >> 16 ))
+            $(( (ip & (0xff << 8)) >> 8 ))
+            $(( ip & 0xff ))
+        )
+        printf "%d.%d.%d.%d\n" ${q[@]}
+        e=${CODE_SUCCESS?}
+    fi
+
+    return $e
+}
+
+#. IPv4: String to Hex
+function :net:s2h() {
+    #. input  255.0.255.0
+    #. output 0xff00ff00
+    local -i e=${CODE_FAILURE?}
+
+    local -r ips=$1
+    if [ "${ips//[0-9]/}" == '...' ]; then
+        IFS=. read -ir q1 q2 q3 q4 <<< ${ips}
+        printf "0x%02x%02x%02x%02x\n" $q1 $q2 $q3 $q4
+        e=${CODE_SUCCESS?}
+    fi
+
+    return $e
+}
+
+#. IPv4: Interface to String
+function :net:i2s() {
+    #. input  lo
+    #. output 127.0.0.1
+    local -i e=${CODE_FAILURE?}
+
+    core:requires ip
+
+    local -r iface=$1
+    local ip
+    ip=$(ip addr show dev ${iface} permanent|awk '$1~/^inet$/{print$2}' 2>/dev/null)
+    if [ $? -eq 0 ]; then
+        echo ${ip%%/*}
+        e=${CODE_SUCCESS?}
+    fi
+
+    return $e
+}
+
+function :net:hosts() {
+    #. input  123.123.123.123/12
+    #. output (a list of all hosts in the subnet)
+    local -i e=${CODE_SUCCESS?}
+
+    [ "${1//[^.]/}" == '...' ] || e=${CODE_FAILURE?}
+    [ "${1//[^\/]/}" == '/' ] || [ "${1//[^\/]/}" == '' ] || e=${CODE_FAILURE?}
+    if [ $# -eq 1 -a $e -eq ${CODE_SUCCESS} ]; then
+        IFS=/ read -r ips nmb <<< "$1"
+        local -r ipx=$(:net:s2h ${ips})
+        local -r nm=$(:net:b2nm ${nmb})
+        local -r hm=$(:net:b2hm ${nmb})
+        local hb nw ip i=0
+        while [ ${i} -lt $((${hm} - 1)) ]; do
+            ((i++))
+            ip=$(printf "0x%x" $(( ( ipx & nm ) + ${i})))
+            :net:h2s ${ip}
+            e=$?
+        done | xargs
+    fi
+
+    return $e
+}
+
+function :net:firsthost() {
+    #. input  123.123.123.0/24
+    #. ouput  123.123.123.1
+    local -i e=${CODE_SUCCESS?}
+
+    [ "${1//[^.]/}" == '...' ] || e=${CODE_FAILURE?}
+    [ "${1//[^\/]/}" == '/' ] || [ "${1//[^\/]/}" == '' ] || e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 -a $e -eq ${CODE_SUCCESS} ]; then
+        IFS=/ read -r ips nmb <<< "$1"
+        local -r ipx=$(:net:s2h ${ips})
+        local -r nm=$(:net:b2nm ${nmb})
+        local -r nw=0x$(printf "%x" $(( ipx & nm )))
+        local -r fh=$(printf "%x" $(( nw + 1 )))
+        :net:h2s 0x${fh}
+        e=$?
+    fi
+
+    return $e
+}
+#. }=-
