@@ -1,0 +1,154 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+#. HGD Magic Private Functions -={
+function ::hgd:explode() {
+    local -i e=${CODE_FAILURE}
+
+    core:import ng
+    core:import dns
+    core:import net
+
+    #local allowed
+    #local eq
+    #if [ $# -eq 2 ]; then
+    #    local allowed="${1}"
+    #    local eq="${2}"
+    #elif [ $# -eq 1 ]; then
+    #    local allowed="*"
+    #    local eq="${1}"
+    #fi
+    #
+    #if [ "${allowed}" == '*' -o "${allowed//${grouping:0:1}/}" != "${allowed}" ]; then
+
+    if [ $# -eq 1 ]; then
+        e=${CODE_SUCCESS}
+
+        local hgdc="${1:0:1}"
+        local hgdn="${1:1:${#1}}"
+
+        case ${hgdc} in
+            '%')
+                :ng:resolve ${hgdn}
+                [ $? -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
+            ;;
+            '@')
+                local host
+                host=$(:dns:qdn ${hgdn})
+                [ $? -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
+                echo ${host}
+            ;;
+            '#')
+                if [ "${hgdn//[^\/]/}" == "/" ]; then
+                    IFS=/ read subnet netmask <<< "${hgdn}"
+                    if [ -n "${subnet}" -a -n "${netmask}" ]; then
+                        :net:hosts ${subnet}/${netmask}
+                        [ $? -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
+                    fi
+                elif [ "${hgdn//[^\/]/}" == "" ]; then
+                    echo ${hgdn}
+                fi
+            ;;
+            '.')
+                local kn
+                for kh in ${HOME}/.ssh/known_hosts; do
+                    if [ -e "${kh}" ]; then
+                        local -a hosts=(
+                            $(awk -F'[, ]' '$1~/'${hgdn}'\>$/{print$1}' ${kh})
+                        )
+                        if [ ${#hosts[@]} -gt 0 ]; then
+                            echo ${hosts[@]}
+                        else
+                            e=${CODE_FAILURE}
+                        fi
+                    fi
+                done
+            ;;
+            *) e=${CODE_FAILURE};;
+        esac
+    fi
+
+    return $e
+}
+function ::hgd:resolve() {
+    local -i e=${CODE_FAILURE}
+
+    local hgd
+    local -A buffers
+
+    if [ $# -eq 1 ]; then
+        e=${CODE_SUCCESS}
+
+        local eq="$1"
+        read -a hgds <<< $(${SITE_LIBEXEC_CORE}/sets "${eq}")
+
+        local buf;
+        for hgd in ${hgds[@]}; do
+            buf="$(::hgd:explode ${hgd})"
+            if [ $? -eq 0 ]; then
+                buffers[${hgd}]="${buf}"
+            else
+                e=${CODE_FAILURE}
+                break
+            fi
+        done
+    fi
+
+    if [ $e -eq ${CODE_SUCCESS} ]; then
+        for hgd in ${!buffers[@]}; do
+            printf "%s\n" ${hgd}
+            printf "%s\n\n" "${buffers[${hgd}]}"
+        done
+    fi
+
+    return $e
+}
+#. }=-
+#. HGD Magic Internal Functions -={
+function :hgd:resolve() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local eq="$1"
+        local buffer="$(::hgd:resolve $eq)"
+        if [ $? -eq ${CODE_SUCCESS} -a -n "${buffer}" ]; then
+            echo -e "${buffer}" | ${SITE_LIBEXEC_CORE}/sets "$eq"
+            e=$?
+        fi
+    else
+        core:raise ${EXCEPTION_BAD_FN_CALL} "$# arguments given, 1 expected"
+    fi
+
+    return $e
+}
+#. }=-
+#. HGD Magic Public Functions -={
+function hgd:resolve:help() {
+    cat <<!
+    The <host-group-directive> or <hgd> is of the following form:
+
+    %netgroup
+    #<ip-addr>
+    #<subnet>/<submask>
+    .<subdomain>
+    @<hostname>
+!
+}
+function hgd:resolve:usage(){ echo "<hgd:*>"; }
+function hgd:resolve() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        e=${CODE_SUCCESS}
+
+        local eq="$1"
+        [ "${eq:1:1}" == '(' ] || eq="|(${eq})"
+
+        if ! :hgd:resolve "${eq}"; then
+            e=${CODE_FAILURE}
+            c ERR "Bad formula or zero matches with equation: ${eq}"
+        fi
+    fi
+
+    return $e
+}
+#. }=-
