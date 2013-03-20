@@ -1,0 +1,354 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+#. Unit-testing blacklisted functions -={
+declare -g -A BLACKLIST
+BLACKLIST=(
+    [testCoreUnitAllPublic]=1
+    [testCoreUnitAllInternal]=1
+
+    [testCoreGitGetbasedirInternal]=1
+    [testCoreGitCommitallPublic]=1
+    [testCoreGitFilePublic]=1
+    [testCoreGitPlaygroundPublic]=1
+    [testCoreGitRebasesearchstrPublic]=1
+    [testCoreGitRmPublic]=1
+    [testCoreGitServePublic]=1
+    [testCoreGitSizePublic]=1
+    [testCoreGitSplitPublic]=1
+    [testCoreGitUsagePublic]=1
+    [testCoreGitVacuumPublic]=1
+
+    [testCoreLdapModifyInternal]=1
+
+    [testDECCfRunPublic]=1
+
+    [testDECSvnEditPublic]=1
+    [testDECSshConnectPublic]=1
+    [testDECSshClusterPublic]=1
+    [testDECSshConnectInternal]=1
+    [testDECRpmExecPrivate]=1
+)
+#. }=-
+
+#. Unit-test scaffolding -={
+#. Pre/post test scaffolding -={
+oneTimeSetUp() {
+    c a_comment "#############################################################################"; echo
+    c a_comment "Set-up..."
+
+    declare -gi tid=0
+
+    declare -g oD="${SHUNIT_TMPDIR}"
+    mkdir -p "${oD}"
+
+    declare -g stdoutF="${oD}/stdout"
+    declare -g stderrF="${oD}/stderr"
+
+    c HAS_PASSED
+}
+
+oneTimeTearDown() {
+    c a_comment "Tear-down..."
+
+    rm -rf "${oD?}"
+
+    c HAS_PASSED
+}
+
+setUp() {
+    ((tid++))
+    c a_comment "Test ${tid?}: "
+}
+
+tearDown() {
+    :
+}
+#. }=-
+#. Unit-testing coverage test -={
+declare -g g_SCRIPT=${SITE_CACHE?}/unittest.sh
+function testCoverage() {
+    local -i e=0
+    local -i t=0
+    local -i p=0
+    local -i s=0
+
+    :>${g_SCRIPT?}.$$
+
+    local -A fnregexes=(
+        [private]='^function ::%s:[a-z0-9_]+\(\)'
+        [internal]='^function :%s:[a-z0-9_]+\(\)'
+        [public]='^function %s:[a-z0-9_]+\(\)'
+    )
+    for profile in ${PROFILE} core; do
+        if [ -d ${SITE}/lib/${profile} ]; then
+            cd ${SITE}/lib/${profile}
+            local module
+            for module in *; do
+                c a_comment ""
+                c redf ${profile};
+                local context
+                printf ":"; :core:c:module ${module}; printf ' -={'; echo
+                for context in ${!fnregexes[@]}; do
+                    local regex=$(printf "${fnregexes[${context}]}" ${module})
+                    local -i count=$(grep -cE "${regex}" ${module})
+                    printf "    "; :core:c:module ${module};
+                    printf ':'; c magentaf ${context};
+                    printf ':'; c a_int ${count}; echo
+                    if [ $count -gt 0 ]; then
+                        local -a fns=(
+                            $(grep -oE "${regex}" ${module}|sed -e "s/^function :\{0,2\}${module}:\(.*\)()/\1/")
+                        )
+                        for fn in ${fns[@]}; do
+                            local utf="test${profile^}${module^}${fn^}${context^}"
+                            local -i has_static_test=${FALSE}
+                            if [ "$(type -t ${utf})" == 'function' ]; then
+                                printf "      \\___"; :core:c:function "${module}" "${fn}:static"; printf  '; '; c a_fn "${utf}()"; printf '...'
+                                c HAS_PASSED "[Static]"
+                                has_static_test=${TRUE}
+                            fi
+                            printf "      \\___"; :core:c:function "${module}" "${fn}:dynamic"; printf  '; '; c a_fn "${utf}()"; printf '...'
+                            if [ ${BLACKLIST[${utf}]:-0} -eq 0 ]; then
+                                local input
+                                input="$(awk -F\| "\$1~/^${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\$0}" ${SITE_UNITDATA?})"
+                                if [ -n "${input}" ]; then
+                                    local -i i=0
+                                    local line
+                                    while read line; do
+                                        ((i++))
+                                        local ffn=
+                                        case ${context} in
+                                            private)  ffn+=::;;
+                                            internal) ffn+=:;;
+                                        esac
+                                        ffn+=${prefix}${module}:$fn
+                                        cat <<! >> ${g_SCRIPT}.$$
+#. dynamic function ${i} for ${utf} [ ${profile}:${module}:${fn} ] -={
+function ${utf}Dyn${i}() {
+    IFS='|' read profile module fn context stdin arguments stdout stderr exitcode site <<< '${line}'
+
+    c a_comment " \\___site "; :core:c:function \${module} \${fn}; printf -- " \${arguments//%/%%} ";
+    c yellowf -- "-={ "
+    c greenf -- "\${stdout:--}"; c yellowf ' / '; c redf -- "\${stderr:--}"; c yellowf ' / ';
+    [ \${exitcode} -eq 0 ] && c greenf 0 || c redf \${exitcode};
+    c yellowf -- " }=-"
+
+    if [ -z "\${site}" -o "\${site}" == "${PROFILE}" ]; then
+        echo
+        core:softimport ${module}
+        if assertEquals "import ${module}" ${CODE_SUCCESS} \$?; then
+            if assertEquals "function" \$(type -t "${ffn}"); then
+                local -i e
+                if [ -z "\${stdin}" ]; then
+                    ${ffn} \${arguments} >\${stdoutF?} 2>\${stderrF?}
+                    e=\$?
+                else
+                    echo "\${stdin}" | ${ffn} \${arguments} >\${stdoutF?} 2>\${stderrF?}
+                    e=\$?
+                fi
+
+                if assertEquals "exit code" \${exitcode} \$e; then
+                    local stdout_ok=0
+                    if [ -n "\${stdout?}" ]; then
+                        if [ \${#stdout} -eq 32 ]; then
+                            local md5=\$(md5sum \${stdoutF?}|awk '{print\$1}')
+                            if [ \${md5} == "\${stdout?}" ]; then
+                                stdout_ok=1
+                            fi
+                        fi
+                        if [ \${stdout_ok} -eq 0 ]; then
+                            read -r stdout_line <\${stdoutF?}
+                            assertEquals "\${stdout?}" "\${stdout_line?}"
+                        fi
+                    fi
+
+                    local stderr_ok=0
+                    if [ -n "\${stderr}" ]; then
+                        if [ \${#stderr} -eq 32 ]; then
+                            local md5=\$(md5sum \${stderrF}|awk '{print\$1}')
+                            if [ \${md5} == "\${stderr}" ]; then
+                                stderr_ok=1
+                            fi
+                        fi
+                        if [ \${stderr_ok} -eq 0 ]; then
+                            read -r stderr_line <\${stderrF?}
+                            assertEquals "\${stderr?}" "\${stderr_line?}"
+                        fi
+                    fi
+
+                else
+                    echo "Exiting early."
+                fi
+            else
+                echo "Exiting early."
+            fi
+        else
+            echo "Exiting early."
+        fi
+    else
+        c warn " Skipped[\${site}]"; echo
+    fi
+}
+#. }=-
+!
+                                    done <<< "${input}"
+                                    c HAS_PASSED "[Dynamic:$i]"
+                                    ((p++))
+                                else
+                                    if [ ${has_static_test} -eq ${TRUE} ]; then
+                                        c HAS_WARNED "[Has Static]"
+                                        ((s++))
+                                    else
+                                        c HAS_FAILED "[Undefined]"
+                                        ((e++))
+                                    fi
+                                fi
+                            else
+                                c HAS_WARNED "[Blacklisted]"
+                                ((s++))
+                            fi
+                            ((t++))
+                        done
+                    fi
+                done
+                c a_comment ""
+                printf '}=- ';
+                c redf ${profile};
+                printf ":"; :core:c:module ${module};
+                echo
+            done
+            cd ${OLDPWD}
+            echo
+        fi
+    done
+
+    assertEquals "of the $t unit-tests, $p passed, $s skipped, and $e missing; i.e.," $((t-s)) $p
+}
+#. }=-
+#. Unit-test `site' module function -={
+function unit:all:usage() { echo "[cache]"; }
+function unit:all() {
+    local -i e=${CODE_DEFAULT?}
+    local cache=0
+    local valid=0
+
+    if [ $# -eq 1 -a "$1" == "cache" ]; then
+        cache=1
+        valid=1
+        shift
+    elif [ $# -eq 0 ]; then
+        valid=1
+    fi
+
+    if [ ${valid} -eq 1 ]; then
+        if [ -e "${SHUNIT2}" ]; then
+            c a_comment "Part 1 of 2: STATIC unit-testing -={"; echo; (
+                SHUNIT_PARENT=${SITE_LIB_CORE}/unit source ${SHUNIT2}
+            )
+            local -i e1=$?
+            c a_comment "exit:$e1 }=-"; echo
+
+            c a_comment "Regenerating CACHE..."
+            if [ ${cache} -eq 1 -a -e ${g_SCRIPT} ]; then
+                c FALSE
+            else
+                cp ${g_SCRIPT}.$$ ${g_SCRIPT}
+                c TRUE
+            fi
+
+            c a_comment "Part 2 of 2: DYNAMIC unit-testing (${g_SCRIPT}) -={"; echo; (
+                source ${g_SCRIPT}
+                SHUNIT_PARENT=${g_SCRIPT} source ${SHUNIT2}
+            )
+            local -i e2=$?
+            c a_comment "exit:$e2 }=-"; echo
+
+            c a_comment "#############################################################################"
+            ((e=e1|e2))
+            printf "\nUnit-testing overal result..."
+            [ $e -eq 0 ] && c HAS_PASSED || c HAS_FAILED
+        else
+            c ERR_USAGE "${SHUNIT2} is missing."
+            e=${CODE_FAILURE}
+        fi
+    fi
+
+    return $e
+}
+#. }=-
+#. }=-
+
+#. Unit-testing static functions -={
+function testCoreHgdResolvePublic() {
+    core:softimport hgd
+    if assertEquals 0 $?; then
+        hgd:resolve '#10.1.2.3/29' >${stdoutF?} 2>${stderrF?}
+        if assertEquals 0 $?; then
+            for ip in "10.1.2.6" "10.1.2.4" "10.1.2.5" "10.1.2.2" "10.1.2.3" "10.1.2.1"; do
+                grep -qE "\<${ip}\>" ${stdoutF}
+                assertEquals 0 $?
+            done
+        fi
+    fi
+}
+
+function testCoreHgdResolvePrivate() {
+    core:softimport hgd
+    if assertEquals 0 $?; then
+        ::hgd:resolve '&(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
+        if assertEquals 0 $?; then
+            local so=$(echo -e "#10.1.2.3/29\n10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6")
+            assertEquals "${so}" "$(cat ${stdoutF})"
+        fi
+    fi
+}
+
+function testPySetsAND() {
+    cat <<! | ${SITE_LIBEXEC_CORE}/sets '&(nucky,rothstein,waxy)' >${stdoutF?} 2>${stderrF?}
+nucky
+aaa
+bbb
+ccc
+ddd
+
+rothstein
+bbb
+ccc
+ddd
+eee
+
+waxy
+ccc
+ddd
+eee
+fff
+!
+    if assertEquals 0 $?; then
+        assertEquals "ccc ddd" "$(cat ${stdoutF})"
+    fi
+}
+
+function testPySetsOR() {
+    cat <<! | ${SITE_LIBEXEC_CORE}/sets '|(nucky,rothstein,waxy)' >${stdoutF?} 2>${stderrF?}
+nucky
+aaa
+bbb
+ccc
+ddd
+
+rothstein
+bbb
+ccc
+ddd
+eee
+
+waxy
+ccc
+ddd
+eee
+fff
+!
+    if assertEquals 0 $?; then
+        assertEquals "aaa bbb eee fff ccc ddd" "$(cat ${stdoutF})"
+    fi
+}
+#. }=-
