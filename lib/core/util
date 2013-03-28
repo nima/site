@@ -1,0 +1,74 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+#. Optional long help message
+function util:timeout:help() {
+    cat <<EOF
+
+    [-t timeout] [-i interval] [-d delay] command
+    Execute a command with a time-out.
+    Upon time-out expiration SIGTERM (15) is sent to the process. If SIGTERM
+    signal is blocked, then the subsequent SIGKILL (9) terminates it.
+
+    -t timeout
+        Number of seconds to wait for command completion.
+        Default value: $DEFAULT_TIMEOUT seconds.
+
+    -i interval
+        Interval between checks if the process is still alive.
+        Positive integer, default value: $DEFAULT_INTERVAL seconds.
+
+    -d delay
+        Delay between posting the SIGTERM signal and destroying the
+        process by SIGKILL. Default value: $DEFAULT_DELAY seconds.
+
+    Note that Bash does not support floating point arithmetic
+    (sleep does), therefore all delay/time values must be integers.
+EOF
+}
+
+function util:timeout:usage() { echo "[-t|--timeout <timeout>] [-i|--interval <interval>] [-d|--delay <delay>]"; }
+
+function util:timeout:shflags() {
+    # Timeout.
+    local -i DEFAULT_TIMEOUT=9
+    # Interval between checks if the process is still alive.
+    local -i DEFAULT_INTERVAL=1
+    # Delay between posting the SIGTERM signal and destroying the process by SIGKILL.
+    local -i DEFAULT_DELAY=1
+
+    cat <<!
+integer timeout ${DEFAULT_TIMEOUT} <timeout> t
+integer interval ${DEFAULT_INTERVAL} <interval> i
+integer delay ${DEFAULT_DELAY} <delay> d
+!
+}
+
+function util:timeout() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -ge 1 ]; then
+        e=${CODE_FAILURE}
+        local -i delay=${FLAGS_delay?}; unset FLAGS_delay
+        local -i timeout=${FLAGS_timeout?}; unset FLAGS_timeout
+        local -i interval=${FLAGS_interval?}; unset FLAGS_interval
+        (
+            local -i t
+            ((t = timeout))
+            while ((t > 0)); do
+                sleep ${interval}
+                kill -0 $$ || exit 0
+                ((t -= interval))
+            done
+
+            # Be nice, post SIGTERM first.
+            # The 'exit 0' below will be executed if any preceeding command fails.
+            kill -s SIGTERM $$ && kill -0 $$ || exit 0
+            sleep $delay
+            kill -s SIGKILL $$
+        ) 2>/dev/null &
+
+        exec "$@"
+    fi
+
+    return $e
+}
