@@ -27,15 +27,32 @@ function ::hgd:explode() {
         local hgdn="${1:1:${#1}}"
 
         case ${hgdc} in
-            '%')
-                :ng:resolve ${hgdn}
-                [ $? -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
+            '+')
+                local ng
+                ng="$(:ng:resolve recursive ${hgdn})"
+                if [ $? -eq ${CODE_SUCCESS} ]; then
+                    echo "${ng}"
+                else
+                    e=${CODE_FAILURE}
+                fi
+            ;;
+            '=')
+                local ng
+                ng="$(:ng:resolve direct ${hgdn})"
+                if [ $? -eq ${CODE_SUCCESS} ]; then
+                    echo "${ng}"
+                else
+                    e=${CODE_FAILURE}
+                fi
             ;;
             '@')
                 local host
-                host=$(:dns:qdn ${hgdn})
-                [ $? -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
-                echo ${host}
+                host="$(:dns:qdn ${hgdn})"
+                if [ $? -eq ${CODE_SUCCESS} ]; then
+                    echo "${host}"
+                else
+                    e=${CODE_FAILURE}
+                fi
             ;;
             '#')
                 if [ "${hgdn//[^\/]/}" == "/" ]; then
@@ -69,6 +86,7 @@ function ::hgd:explode() {
 
     return $e
 }
+
 function ::hgd:resolve() {
     local -i e=${CODE_FAILURE}
 
@@ -87,6 +105,7 @@ function ::hgd:resolve() {
             if [ $? -eq 0 ]; then
                 buffers[${hgd}]="${buf}"
             else
+                theme ERR "Failed to resolve ${hgd}"
                 e=${CODE_FAILURE}
                 break
             fi
@@ -109,13 +128,16 @@ function :hgd:resolve() {
 
     if [ $# -eq 1 ]; then
         local eq="$1"
-        local buffer="$(::hgd:resolve $eq)"
+        [ "${eq:1:1}" == '(' ] || eq="&(${eq})" #. Default is Logical AND
+
+        local buffer
+        buffer="$(::hgd:resolve $eq)"
         if [ $? -eq ${CODE_SUCCESS} -a -n "${buffer}" ]; then
             echo -e "${buffer}" | ${SITE_LIBEXEC_CORE}/sets "$eq"
             e=$?
         fi
     else
-        core:raise ${EXCEPTION_BAD_FN_CALL} "$# arguments given, 1 expected"
+        core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, 1 expected"
     fi
 
     return $e
@@ -126,11 +148,12 @@ function hgd:resolve:help() {
     cat <<!
     The <host-group-directive> or <hgd> is of the following form:
 
-    %netgroup
-    #<ip-addr>
-    #<subnet>/<submask>
-    .<subdomain>
-    @<hostname>
+    +<netgroup>          //. recursive netgroup resolution
+    =<netgroup>          //. non-recursive (one-level) netgroup resolution
+    @<hostname>          //. a specific hostname (can be one of shn, qdn, fqdm)
+    #<ip-addr>           //. single IP address
+    #<subnet>/<submask>  //. an entire subnet
+    .<subdomain>         //. all hosts in ~/.known_hosts matching the given subdomain
 !
 }
 function hgd:resolve:usage(){ echo "<hgd:*>"; }
@@ -140,12 +163,10 @@ function hgd:resolve() {
     if [ $# -eq 1 ]; then
         e=${CODE_SUCCESS}
 
-        local eq="$1"
-        [ "${eq:1:1}" == '(' ] || eq="|(${eq})"
-
-        if ! :hgd:resolve "${eq}"; then
+        local eq=$1
+        if ! :${FUNCNAME} "${eq}"; then
             e=${CODE_FAILURE}
-            c ERR "Bad formula or zero matches with equation: ${eq}"
+            theme ERR_USAGE "Bad formula or zero matches with equation: ${eq}"
         fi
     fi
 
