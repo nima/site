@@ -36,11 +36,8 @@ function ng:host() {
     core:import dns
     if [ $# -eq 1 ]; then
         ((g_hn++))
-        #indent=' \'
-        #for i in $(eval echo {1..${g_hn} }); do
-        #    indent="${indent}__"
-        #done
 
+        local prefix ng
         local -a raw
         if [ ${g_hn} -eq 1 ]; then
             local -a hosts
@@ -54,7 +51,7 @@ function ng:host() {
             local -a raw
             for fqdn in ${hosts[@]}; do
                 if [ -t 1 ]; then
-                    c a_host ${fqdn}; echo
+                    cpf "%{@fqdn:%s}\n" ${fqdn}
                 fi
 
                 raw=(
@@ -63,7 +60,7 @@ function ng:host() {
                 )
 
                 if [ ${#raw[@]} -eq 0 ]; then
-                    c WARN "There are no netgroups with \`${fqdn}' as a member"
+                    theme WARN "There are no netgroups with \`${fqdn}' as a member"
                 fi
                 #if [ ${#raw[@]} -eq 0 ]; then
                 #    local -a didumean=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "nisNetgroupTriple~=${fqdn}" nisNetgroupTriple|sed -ne 's/nisNetgroupTriple: *(\(.*\),,)$/\1/p') )
@@ -74,7 +71,7 @@ function ng:host() {
                 #fi
             done
         else
-            local ng=$1
+            ng=$1
             raw=(
                 $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(memberNisNetgroup=${ng})" cn\
                     | awk '$1~/cn:/{print$2}')
@@ -83,17 +80,11 @@ function ng:host() {
         fi
 
         for ng in ${raw[@]}; do
-            col='indirect'
-            i=${g_hn}
-            if [ ${g_hn} -eq 1 ]; then
-                col='direct'
-            fi
-            while [ $i -ne 0 ]; do
-                printf '   '
-                ((i--))
-            done
-            c a_netgroup_${col} $ng; echo
-            ng:host $ng
+            local col='indirect'
+            [ ${g_hn} -ne 1 ] || col='direct'
+            prefix="$(printf %$((${g_hn}*2))s ' ')"
+            cpf "${prefix} %{@netgroup_${col}:%s}\n" "${ng}"
+            ng:host "$ng"
         done
         ((g_hn--))
     fi
@@ -123,9 +114,48 @@ $1~/description:/{desc=substr($0,13)};
     return $e
 }
 
-function ng:list:usage() { echo "<hgd:%>"; }
-function ng:list() {
+function ng:report:usage() { echo "<no-args>"; }
+function ng:report() {
     local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 0 ]; then
+        local -a ng_all=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn | awk '$1~/cn:/{print$2}') )
+        local -i progress=0
+        local -i total=${#ng_all[@]}
+        local -a hosts_all
+        local ng
+#        local -i i=0
+        for ng in ${ng_all[@]}; do
+            for host in $(ng:list +$ng); do
+                hosts_all+=( $ng:$host )
+            done
+            progress+=1
+            cpf "\r%d%% (%d/%d) %{@netgroup:%s}" $(( 100 * $progress / ${total} )) ${progress} ${total} ${ng}
+            tput el
+
+#            ((i++))
+#            test $i -eq 15 && break
+        done
+        cpf "\rNetgroup assessment complete"; tput el; echo
+
+        local host item
+        core:import dns
+        for item in ${hosts_all[@]}; do
+            IFS=: read ng host <<< "${item}"
+            looked=$(:dns:lookup pP ca ${host})
+            if [ $? -ne 0 ]; then
+                cpf "%{@host:%32s}@%{@netgroup:%-24s}" ${host} ${ng}
+                theme HAS_FAILED
+            fi
+        done
+        e=0
+    fi
+
+    return $e
+}
+
+function :ng:list() {
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
         local eq=$1
@@ -137,17 +167,29 @@ function ng:list() {
             printf '%s\n' "${data[@]}"
             e=${CODE_SUCCESS?}
         else
-            c ERR "Invalid argument"
-            e=${CODE_FAILURE?}
+            theme ERR "${FUNCNAME}(); Invalid argument: ${eq}"
         fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
 }
 
-function ng:ulist:usage() { echo "<hgd:%>"; }
-function ng:ulist() {
+function ng:list:usage() { echo "<hgd:+>"; }
+function ng:list() {
     local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        :${FUNCNAME} $@
+        e=$?
+    fi
+
+    return $e
+}
+
+function :ng:ulist() {
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
         local eq=$1
@@ -159,11 +201,25 @@ function ng:ulist() {
             printf '%s\n' "${data[@]//.*/}"|sort -u
             e=${CODE_SUCCESS?}
         else
-            c ERR "Invalid argument"
+            theme ERR "${FUNCNAME}(); Invalid argument: ${eq}"
             e=${CODE_FAILURE?}
         fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
 }
+function ng:ulist:usage() { echo "<hgd:+>"; }
+function ng:ulist() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        :${FUNCNAME} $@
+        e=$?
+    fi
+
+    return $e
+}
+
 #. }=-
