@@ -4,6 +4,31 @@ core:import dns
 
 #. Internal Functions -={
 declare -g g_PASSWD_CACHED=
+function :ldap:authenticate() {
+    local -i e=${CODE_FAILURE}
+    if [ ${#g_PASSWD_CACHED} -eq 0 ]; then
+        read -p "Enter LDAP (${USER_LDAPHOST_RW}) Password: " -s g_PASSWD_CACHED
+        ldapsearch -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -b ${USER_UDN} >/dev/null 2>&1
+        if [ $? -eq 0 ]; then
+            e=${CODE_SUCCESS}
+        else
+            g_PASSWD_CACHED=
+        fi
+        echo
+    else
+        e=${CODE_SUCCESS}
+    fi
+    return $e
+}
+
+#. LDAP Return Copes
+#. 0   - LDAP_SUCCESS
+#. 1   - LDAP_OPERATIONS_ERROR
+#. 10  - LDAP_REFERRAL
+#. 16  - LDAP_NO_SUCH_ATTRIBUTE
+#. 19  - LDAP_CONSTRAINT_VIOLATION
+#. 20  - LDAP_TYPE_OR_VALUE_EXISTS
+
 function :ldap:modify() {
     local -i e=${CODE_FAILURE}
     if [ $# -ge 2 ]; then
@@ -12,18 +37,15 @@ function :ldap:modify() {
             user)
                 local username=$2
                 local change=$3
-                local attr=
-                if [ ${#g_PASSWD_CACHED} -eq 0 ]; then
-                    read -p "Enter LDAP Password: " -s g_PASSWD_CACHED
-                    echo
-                fi
-                case ${change} in
-                    delete|add|replace)
-                        #cat <<!
-                        ldapmodify -x -h ${USER_LDAPHOST} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<! >/dev/null 2>&1
+                if :ldap:authenticate; then
+                    case ${change} in
+                        delete|add|replace)
+                            #cat <<! >/dev/stderr
+                            ldapmodify -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<! >/dev/null 2>&1
 dn: uid=${username},${USER_UDN}
 changetype: modify
 $(
+    local attr=
     for ((i=4; i<$#+1; i++)); do
         if [ "${!i}" != "-" -a ${#attr} -gt 0 ]; then
             printf "\n${attr}: ${!i}";
@@ -39,12 +61,44 @@ $(
     printf "\n "
 )
 !
-                        e=$?
-                    ;;
-                esac
+                            e=$?
+                            #echo ${USER_LDAPHOST_RW} $e > /dev/stderr
+                        ;;
+                    esac
+                fi
             ;;
         esac
     fi
+    return $e
+}
+
+function :ldap:eval:search() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -ge 2 ]; then
+        local context=$1
+        local username=$2
+        shift 2
+        case $context in
+            user)
+                local userdata=$(
+                    ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${USER_UDN}" "uid=${username}" ${@}
+                )
+                for attr in $@; do
+                    local r=$(
+                        echo "${userdata}" \
+                            | grep -Po "^${attr}:\s+.*"\
+                            | cut -d' ' -f2\
+                            | tr -d '\n'
+                    )
+                    echo "local ldap_${attr}='${r}';"
+                done
+
+                e=${CODE_SUCCESS}
+            ;;
+        esac
+    fi
+
     return $e
 }
 #. }=-
@@ -62,8 +116,8 @@ function ldap:ngldif() {
                 local hsn
                 for hsn in ${hsns[@]}; do
                     echo -e "nisNetgroupTriple: (${hsn//\.*/},,)"
-                    echo -e "nisNetgroupTriple: (${hsn//\.*/}.${USER_TLD},,)"
-                    echo -e "nisNetgroupTriple: (${hsn//\.*/}.${USER_TLD_MGMT},,)"
+                    echo -e "nisNetgroupTriple: (${hsn}.${USER_TLD},,)"
+                    echo -e "nisNetgroupTriple: (${hsn}.${USER_TLD_MGMT},,)"
                 done
             else
                 e=${CODE_FAILURE}
@@ -82,12 +136,12 @@ function ldap:ping() {
     local -A sync_code
     local -i count
     for lh in ${USER_LDAPHOSTS[@]}; do
-        c a_host '%-32s' "${lh}"
+        cpf "%{@host:%-32s}" "${lh}"
         count=$(ldapsearch -LLL -h "${lh}" -x -b "${USER_UDN}" dn 2>/dev/null|wc -c)
         if [ $? -eq 0 ]; then
-            c HAS_PASSED "[${count}-char dump]"
+            theme HAS_PASSED "${count}-char dump"
         else
-            c HAS_FAILED
+            theme HAS_FAILED
             e=${CODE_FAILURE}
         fi
     done
@@ -96,25 +150,46 @@ function ldap:ping() {
 }
 #. }=-
 
-function ldap:search:usage() { echo "user|group|ng <args> (see man(1) ldapsearch)"; }
-function ldap:search() {
+function :ldap:search() {
     local -i e=${CODE_DEFAULT?}
-
     if [ $# -gt 1 ]; then
         local bdn
         case $1 in
             user)  bdn=${USER_UDN};;
             group) bdn=${USER_GDN};;
             ng)    bdn=${USER_NDN};;
+            *) core:raise EXCEPTION_BAD_FN_CALL;;
         esac
 
         if [ ${#bdn} -gt 0 ]; then
             shift 1
-            ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${bdn}" $@
-            [ $? -ne 0 ] || e=${CODE_SUCCESS}
+
+            local -a attr
+            local token
+            for token in $@; do
+                if ! [[ ${token} =~ .+([\<\>]?=).+ ]]; then
+                    attr+=( ${token} )
+                fi
+            done
+
+            local -i awknf=$((${#attr[@]}*2+2)) #. 2 for dn and value, and 2 for each attr required
+            local awkfields='$4'
+            for ((i=6; i<=${#attr[@]}*2+2; i+=2)); do
+                awkfields+=",\$$i"
+            done
+
+            #. Script-readable dump
+            ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${bdn}" $@\
+                | awk 'BEGIN{RS="\n\n";IFS="[: \n]"}{if(NF=='${awknf}'){print'${awkfields}'}}'
+
+            [ ${PIPESTATUS[0]} -ne 0 ] || e=${CODE_SUCCESS}
         fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
 }
+#function ldap:search:usage() { echo "user|group|ng <args> (see man(1) ldapsearch)"; }
+
 #. }=-
