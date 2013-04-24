@@ -38,17 +38,15 @@ function git:usage() {
             if cd ${gitbasedir} >/dev/null 2>&1; then
                 if [ -d .git/objects/pack ]; then
                     while read sha1 obj size; do
-                        c yellowf '%-6s[%8s]' ${obj} ${size}
-                        c a_hash ' %s' ${sha1}
+                        cpf "%{y:%-6s %8s} %{@hash:%s}" "${obj}" "${size}" "${sha1}"
                         read sha1 path <<< $(git rev-list --objects --all | grep ${sha1})
                         if [ -e "${path}" ]; then
-                            c a_path ' %s' "${path}"
+                            cpf " %{@path:%s}" "${path}"
                         else
-                            c a_bad_path ' %s' "${path}"
+                            cpf " %{@bad_path:%s}" "${path}"
                             in_pack_only=$(git log -- "${path}")
                             if [ -z "${in_pack_only}" ]; then
-                                printf ' '
-                                c alert '[PACK_ONLY]'
+                                cpf " %{@alert:[PACK_ONLY]}"
                             fi
                         fi
                         echo
@@ -61,18 +59,18 @@ function git:usage() {
                     )
                     e=$?
                     if [ -d .git/refs/original/ -o -d .git/logs/ ]; then
-                        c NOTE "You should run git:vacuum to reflect recent changes"
+                        theme NOTE "You should run git:vacuum to reflect recent changes"
                     fi
                 else
-                    c INFO "This repository has no packs"
+                    theme INFO "This repository has no packs"
                     e=${CODE_SUCCESS}
                 fi
             else
-                c ERR_USAGE "Error: could not chdir to ${1}"
+                theme ERR_USAGE "Error: could not chdir to ${1}"
                 e=${CODE_FAILURE}
             fi
         else
-            c ERR_USAGE "Error: that path is not within a git repository."
+            theme ERR_USAGE "Error: that path is not within a git repository."
             e=${CODE_FAILURE}
         fi
     fi
@@ -98,14 +96,14 @@ function git:rm() {
             #        e=$?
             #    fi
             #    if [ $e -eq 0 ]; then
-            #        c INFO "You should run git:vacuum to clean up references to removed objects"; echo
+            #        theme INFO "You should run git:vacuum to clean up references to removed objects"; echo
             #    fi
             #elif [ $# -gt 1 ]; then
                 git filter-branch --force --index-filter "git rm -rf --cached --ignore-unmatch ${*}" -- --all
                 e=$?
             #fi
         else
-            c ERR_USAGE "Error: could not chdir to ${1}"
+            theme ERR_USAGE "Error: could not chdir to ${1}"
             e=${CODE_FAILURE}
         fi
     fi
@@ -122,7 +120,7 @@ function git:size() {
             git count-objects -v
             e=$?
         else
-            c ERR_USAGE "Error: could not chdir to ${1}"
+            theme ERR_USAGE "Error: could not chdir to ${1}"
             e=${CODE_FAILURE}
         fi
     fi
@@ -155,7 +153,7 @@ function git:vacuum() {
                 git:size $1
             fi
         else
-            c ERR_USAGE "Error: could not chdir to ${1}"
+            theme ERR_USAGE "Error: could not chdir to ${1}"
             e=${CODE_FAILURE}
         fi
     fi
@@ -179,7 +177,7 @@ function git:file() {
             done | grep --color '\[.*\] --';
             e=${CODE_SUCCESS}
         else
-            c ERR_USAGE "Error: This is not a git repository"
+            theme ERR_USAGE "Error: This is not a git repository"
             e=${CODE_FAILURE}
         fi
     fi
@@ -211,7 +209,7 @@ function git:split() {
             git reset --mixed HEAD^
             for file in $(git status --porcelain|awk '{print$2}'); do
                 git add ${file}
-                git commit ${file} -m "fixup! ${file}"
+                git commit ${file} -m "... ${file}"
             done
             git rebase --continue
             e=$?
@@ -228,7 +226,7 @@ function git:commitall() {
 
     for file in $(git status --porcelain|awk '{print$2}'); do
         git add ${file}
-        git commit ${file} -m "fixup! ${file}"
+        git commit ${file} -m "... ${file}"
     done
     e=${CODE_SUCCESS}
 
@@ -246,11 +244,11 @@ function git:serve() {
         read gitbasedir gitrelpath <<< $(:git:getbasedir ${repo})
         if [ $? -eq 0 ]; then
             local ip=$(:net:i2s ${iface})
-            c whitef "Serving ${gitbasedir} on git://${ip}:9418/ (${iface})"; echo
+            theme INFO "Serving ${gitbasedir} on git://${ip}:9418/ (${iface})"
             git daemon --verbose --listen=${ip} --reuseaddr --export-all --base-path=${gitbasedir}/.git/
             e=$?
         else
-            c ERR_USAGE "Error: This is not a git repository"
+            theme ERR_USAGE "Error: This is not a git repository"
             e=${CODE_FAILURE}
         fi
     fi
@@ -283,7 +281,7 @@ function git:playground() {
 
             git log --graph --all
         else
-            c ERR_USAGE "Directory $1 already exists; cowardly refusing to create playground."
+            theme ERR_USAGE "Directory $1 already exists; cowardly refusing to create playground."
         fi
     fi
 
