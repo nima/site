@@ -1,0 +1,96 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+core:import dns
+
+function :ssh:connect() {
+    local -i e=${CODE_FAILURE?}
+
+    local SSH_OPTS='-q -o ConnectionAttempts=1 -o ConnectTimeout=1 -o PasswordAuthentication=no'
+    if [ $# -eq 1 ]; then
+        ssh -t ${SSH_OPTS} $*
+        e=$?
+    elif [ $# -ge 2 ]; then
+        ssh -T ${SSH_OPTS} $*
+        e=$?
+    else
+        core:raise ${EXCEPTION_BAD_FN_CALL}
+    fi
+
+    return $e
+}
+
+function ssh:connect:usage() { echo "<hostname>"; }
+function ssh:connect() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -ge 1 ]; then
+        if [[ $1 =~ [^\.]+\. ]]; then
+            :ssh:connect $*
+            e=$?
+        elif [ $# -ge 1 ]; then
+            core:import dns
+
+            local -a hostnames=( $(:dns:qdn ${1}) )
+            local hostname
+
+            if [ ${#hostnames[@]} -gt 0 ]; then
+                shift
+                if [ ${#hostnames[@]} -gt 1 ]; then
+                    cpf WARN "More than one match"
+                    for hostname in ${hostnames[@]}; do
+                        cpf "    - %{@host:%s}\n" ${hostname}
+                    done
+                fi
+                theme INFO "Connecting to ${hostnames[0]}..."
+
+                :ssh:connect ${hostnames[0]} $*
+                e=$?
+                if [ $e -eq 255 ]; then
+                    theme ERR "Failed to connect to \`${hostnames[0]}'"
+                elif [ $e -ne ${CODE_SUCCESS?} ]; then
+                    theme WARN "Connection to ${hostnames[0]} terminated with error code \`$e'"
+                fi
+            elif [ ${#hostnames[@]} -gt 0 ]; then
+                for hostname in ${hostnames[@]}; do
+                    read record context query sdn ip <<< "$(:dns:lookup P a ${hostname})"
+                    printf "$(basename $0) ssh connect %-48s #. %s\n" "${hostname} $*" ${ip}
+                done
+                e=${CODE_SUCCESS}
+            else
+                theme ERR "Failed to resolve any host matching \`$1'"
+                e=${CODE_FAILURE}
+            fi
+        fi
+    fi
+
+    return $e
+}
+
+function ssh:cluster:usage() { echo "<hosthint> [<hosthint> [...]]"; }
+function ssh:cluster() {
+    local -i e=${CODE_DEFAULT?}
+
+    core:import hgd
+
+    if [ $# -eq 1 ]; then
+        local hgd=$1
+        local -a hosts
+        hosts=( $(hgd:resolve ${hgd}) )
+        if [ $? -eq 0 -a ${#hosts[@]} -gt 0 ]; then
+            cssh ${hosts[@]}
+        else
+            theme ERR_USAGE "That <hgd> did not resolve to any hosts."
+            e=${CODE_FAILURE}
+        fi
+    elif [ $# -gt 1 ]; then
+        local -a hostnames
+        local hosthint
+        for hosthint in $@; do
+            hostnames=( ${hostnames[@]} $(:dns:qdn ${hosthint}) )
+        done
+        cssh ${hostnames[@]}
+        e=$?
+    fi
+
+    return $e
+}
