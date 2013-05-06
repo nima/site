@@ -28,19 +28,19 @@ function ::hgd:explode() {
 
         case ${hgdc} in
             '+')
-                local ng
-                ng="$(:ng:resolve recursive ${hgdn})"
+                local hosts
+                hosts="$(:ng:resolve ${hgdn})"
                 if [ $? -eq ${CODE_SUCCESS} ]; then
-                    echo "${ng}"
+                    echo "${hosts}"
                 else
                     e=${CODE_FAILURE}
                 fi
             ;;
             '=')
-                local ng
-                ng="$(:ng:resolve direct ${hgdn})"
+                local hosts
+                hosts="$(:ng:resolve ${hgdn})"
                 if [ $? -eq ${CODE_SUCCESS} ]; then
-                    echo "${ng}"
+                    echo "${hosts}"
                 else
                     e=${CODE_FAILURE}
                 fi

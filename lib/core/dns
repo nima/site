@@ -20,73 +20,75 @@ function :dns:lookup() {
         local sd_hint
         [ "${hn_hint}" == "$hint" ] || sd_hint=${hint#*.}
 
-        local -i i
-        local -a sdns
-        local context
-        if [ -n "${sd_hint}" ]; then
-            sdns=( "${sd_hint}" )
-        else
-            for (( i=0; i<${#contexts}; i++ )); do
-                context=${contexts:$i:1}
-                case ${context} in
-                    p) sdns=( ${sdns[@]} ${USER_PRI_SUBDOMAINS[@]} ) ;;
-                    P) sdns=( ${sdns[@]} ${USER_PUB_SUBDOMAINS[@]} ) ;;
-                    *) core:raise EXCEPTION_BAD_FN_CALL "Expected [pP], not ${context}" ;;
-                esac
-            done
-        fi
-
-        local sdn
-        local fqdn
-        local result
-        local -A results
-        for sdn in ${sdns[@]}; do
-            fqdn=${hn_hint}.${sdn} #. First see if the sdn is actually the entire dn
-            result=$(dig +short ${fqdn} a|head -n1)
-            if [ ${#result} -eq 0 ]; then
+        if [[ ${hn_hint} =~ ^[a-zA-Z]+[-a-zA-Z0-9_\.]+[a-zA-Z0-9]+$ ]]; then
+            local -i i
+            local -a sdns
+            local context
+            if [ -n "${sd_hint}" ]; then
+                sdns=( "${sd_hint}" )
+            else
                 for (( i=0; i<${#contexts}; i++ )); do
                     context=${contexts:$i:1}
                     case ${context} in
-                        p) fqdn=${hn_hint}.${sdn}.${USER_TLD_MGMT};;
-                        P) fqdn=${hn_hint}.${sdn}.${USER_TLD};;
+                        p) sdns=( ${sdns[@]} ${USER_PRI_SUBDOMAINS[@]} ) ;;
+                        P) sdns=( ${sdns[@]} ${USER_PUB_SUBDOMAINS[@]} ) ;;
                         *) core:raise EXCEPTION_BAD_FN_CALL "Expected [pP], not ${context}" ;;
                     esac
+                done
+            fi
 
+            local sdn
+            local fqdn
+            local result
+            local -A results
+            for sdn in ${sdns[@]}; do
+                fqdn=${hn_hint}.${sdn} #. First see if the sdn is actually the entire dn
+                result=$(dig +short ${fqdn} a|head -n1)
+                if [ ${#result} -eq 0 ]; then
+                    for (( i=0; i<${#contexts}; i++ )); do
+                        context=${contexts:$i:1}
+                        case ${context} in
+                            p) fqdn=${hn_hint}.${sdn}.${USER_TLD_MGMT};;
+                            P) fqdn=${hn_hint}.${sdn}.${USER_TLD};;
+                            *) core:raise EXCEPTION_BAD_FN_CALL "Expected [pP], not ${context}" ;;
+                        esac
+
+                        if [ "${records//a/}" != "${records}" ]; then
+                            result=$(dig +short ${fqdn} a|head -n1)
+                            if [ "${result//[0-9]/}" == '...' ]; then
+                                [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:a:${sdn}:${result}"
+                            fi
+                        fi
+                        if [ "${records//c/}" != "${records}" ]; then
+                            result=$(dig +short ${fqdn} cname)
+                            [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:c:${sdn}:${result%%.}"
+                        fi
+                    done
+                else
+                    #. TODO:Incomplete; If so, work backwards
                     if [ "${records//a/}" != "${records}" ]; then
-                        result=$(dig +short ${fqdn} a|head -n1)
-                        if [ "${result//[0-9]/}" == '...' ]; then
+                        if [ ${sdn//${USER_TLD}/} != "${sdn}" ]; then
+                            context=P
+                            sdn=${sdn//.${USER_TLD}/}
+                            [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:a:${sdn}:${result}"
+                        elif [ ${sdn//${USER_TLD_MGMT}/} != "${sdn}" ]; then
+                            context=p
+                            sdn=${sdn//.${USER_TLD_MGMT}/}
                             [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:a:${sdn}:${result}"
                         fi
                     fi
-                    if [ "${records//c/}" != "${records}" ]; then
-                        result=$(dig +short ${fqdn} cname)
-                        [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:c:${sdn}:${result%%.}"
-                    fi
-                done
-            else
-                #. TODO:Incomplete; If so, work backwards
-                if [ "${records//a/}" != "${records}" ]; then
-                    if [ ${sdn//${USER_TLD}/} != "${sdn}" ]; then
-                        context=P
-                        sdn=${sdn//.${USER_TLD}/}
-                        [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:a:${sdn}:${result}"
-                    elif [ ${sdn//${USER_TLD_MGMT}/} != "${sdn}" ]; then
-                        context=p
-                        sdn=${sdn//.${USER_TLD_MGMT}/}
-                        [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:a:${sdn}:${result}"
-                    fi
                 fi
-            fi
-        done
-
-        local query context record answer
-        if [ ${#results[@]} -gt 0 ]; then
-            for query in ${!results[@]}; do
-                local contexts records sdn answer
-                IFS=: read context record sdn answer <<< "${results[${query}]}"
-                printf "%-3s %-3s %-24s %-32s %s\n" ${record} ${context} ${query} ${sdn} ${answer}
             done
-            e=${CODE_SUCCESS}
+
+            local query context record answer
+            if [ ${#results[@]} -gt 0 ]; then
+                for query in ${!results[@]}; do
+                    local contexts records sdn answer
+                    IFS=: read context record sdn answer <<< "${results[${query}]}"
+                    printf "%-3s %-3s %-24s %-32s %s\n" ${record} ${context} ${query} ${sdn} ${answer}
+                done
+                e=${CODE_SUCCESS}
+            fi
         fi
     fi
 
@@ -167,12 +169,12 @@ function dns:lookup() {
         while read line; do
             read record context query sdn answer <<< ${line}
             if [ "${record}" == 'c' ]; then
-                cpf "%{@query:%-48s}" "${query}"
-                cpf "%{@comment:#. iface:%s, (%s for %s)}" "${context}" "CNAME RECORD" "${answer}"
+                cpf "%{@ip:%-48s}" "${query}"
+                cpf "%{@comment:#. iface:%s, (%s for %s)}" "${USER_IFACE[${context}]}" "CNAME RECORD" "${answer}"
                 e=${CODE_SUCCESS}
             elif [ "${record}" == 'a' ]; then
-                cpf "%{@query:%-48s}" "${query}"
-                cpf "%{@comment:#. iface:%s, (%s for %s)}" "${context}" "A RECORD" "${answer}"
+                cpf "%{@host:%-48s}" "${query}"
+                cpf "%{@comment:#. iface:%s, (%s for %s)}" "${USER_IFACE[${context}]}" "A RECORD" "${answer}"
                 e=${CODE_SUCCESS}
             fi
             echo
@@ -182,7 +184,7 @@ function dns:lookup() {
     return $e
 }
 
-function dns:cname:usage() { echo "<hgd:+> <cname-subdomain>"; }
+function dns:cname:usage() { echo "<netgroup> <cname-subdomain>"; }
 function dns:cname() {
     local -i e=${CODE_DEFAULT?}
 
@@ -190,7 +192,7 @@ function dns:cname() {
 
     if [ $# -eq 2 ]; then
         local cnamesd=${2}
-        local hosts_in_ng="$(:ng:list ${1})"
+        local hosts_in_ng="$(:ng:hosts ${1})"
         if [ $? -eq 0 ]; then
             local -a hosts=( $(sed -e 's/\([^\.]\+\)\..*/\1/' <<< "$hosts_in_ng") )
             local cnamea=

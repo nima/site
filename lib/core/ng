@@ -1,15 +1,163 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
-
-core:import hgd
+core:import dns
 
 #. Internal Functions -={
-function :ng:resolve() {
-    local -i e=${CODE_DEFAULT?}
+function ::ng:tree_data() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 -o $# -eq 4 ]; then
+        local -i rflag=${1:-0}
+        local -i hflag=${2:-0}
+        local -i vflag=${3:-0}
+        shift $(($#-1))
+
+        local parent=$1
+        local child
+        local -a children
+
+        children=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="${parent}" memberNisNetgroup|awk '$1~/^memberNisNetgroup:$/{print$2}' ) )
+        for child in ${children[@]}; do
+            if [ ${vflag} -eq 0 ]; then
+                echo ${parent}:?+${child}
+            else
+                local hit=$(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="${child}" memberNisNetgroup nisNetgroupTriple|wc -l)
+                if [ ${hit} -gt 2 ]; then
+                    echo ${parent}:1+${child} #. Child exists and has children
+                elif [ ${hit} -eq 2 ]; then
+                    echo ${parent}:0+${child} #. Child exists but has not children
+                else
+                    echo ${parent}:-+${child} #. Child does not exist
+                fi
+            fi
+
+            if [ ${rflag} -eq 1 ]; then
+                ${FUNCNAME} ${rflag} ${hflag} ${vflag} ${child}
+            fi
+        done
+
+        if [ ${hflag} -eq 1 ]; then
+            children=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="${parent}" nisNetgroupTriple|awk '$1~/^nisNetgroupTriple:$/{print$2}' ) )
+            for child in ${children[@]}; do
+                if echo ${child} | grep -qE ${USER_TLD}; then
+                    child=$(echo ${child}|tr -d '(),')
+                    if [ ${vflag} -eq 0 ]; then
+                        echo ${parent}:?@${child/.${USER_TLD?}/}
+                    else
+                        looked=$(:dns:lookup pP ca ${child})
+                        if [ $? -eq 0 ]; then
+                            echo ${parent}:1@${child/.${USER_TLD?}/}
+                        else
+                            echo ${parent}:-@${child/.${USER_TLD?}/}
+                        fi
+                    fi
+                fi
+            done
+        fi
+
+        e=${CODE_SUCCESS}
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function ::ng:tree_draw() {
+    if [ $1 -eq 0 ]; then
+        cpf "%{@netgroup:%s}\n" "${g_root:2}"
+    fi
+
+    local -i i=$1
+    local prefix=$(printf " %$((${i}*4))s%%{bl:|___ }" ' ')
+    ((i++))
+
+    local child
+    IFS=, read -a children <<< "${g_tree[${2?}]}"
+    for child in ${children[@]}; do
+        if [ ${child:1:1} == '+' ]; then
+            if [ ${child:0:1} == '1' ]; then
+                cpf "${prefix}%{@netgroup:%s}\n" "${child:2}"
+            elif [ ${child:0:1} == '?' ]; then
+                cpf "${prefix}%{@netgroup:%s}\n" "${child:2}"
+            elif [ ${child:0:1} == '0' ]; then
+                cpf "${prefix}%{@netgroup_empty:%s}\n" "${child:2}"
+            elif [ ${child:0:1} == '-' ]; then
+                cpf "${prefix}%{@netgroup_missing:%s}\n" "${child:2}"
+            else
+                theme ERR_INTERNAL "${child} is an invalid entry; ${child:0:1} is unknown"
+                core:raise EXCEPTION_BAD_FN_CALL
+            fi
+            ${FUNCNAME} $i ${child:2}
+        elif [ ${child:1:1} == '@' ]; then
+            if [ ${child:0:1} == '1' ]; then
+                cpf "${prefix}%{@host:%s}\n" "${child:2}"
+            elif [ ${child:0:1} == '-' ]; then
+                cpf "${prefix}%{@host_bad:%s}\n" "${child:2}"
+            elif [ ${child:0:1} == '?' ]; then
+                cpf "${prefix}%{@host:%s}\n" "${child:2}"
+            else
+                theme ERR_INTERNAL "${child} is an invalid entry; ${child:0:1} is unknown"
+                core:raise EXCEPTION_BAD_FN_CALL
+            fi
+        else
+            theme ERR_INTERNAL "${child} is an invalid entry; ${child:1:1} is unknown"
+            core:raise EXCEPTION_BAD_FN_CALL ${child}
+        fi
+    done
+}
+
+function ::ng:tree_build() {
+    : ${g_root:=$1}
+    : ${g_tree}
+
+    local grandparent=$1
+    shift
+
+    local token
+    for token in $@; do
+        IFS=: read parent child <<< "${token}"
+        if [ "${parent}" == "${grandparent:2}" ]; then
+            if [ -n "${g_tree[${grandparent:2}]}" ]; then
+                if ! echo "${g_tree[${grandparent:2}]}"|grep -qE "\<${child}\>"; then
+                    g_tree[${grandparent:2}]+=,${child}
+                fi
+            else
+                g_tree[${grandparent:2}]=${child}
+            fi
+        fi
+    done
+
+    if [ -n "${g_tree[${grandparent:2}]}" ]; then
+        IFS=, read -a children <<< "${g_tree[${grandparent:2}]}"
+        for child in ${children[@]}; do
+            if [ ${child:1:1} == '+' ]; then
+                ${FUNCNAME} ${child} $@
+            fi
+        done
+    fi
+}
+#. }=-
+
+#. Private Functions -={
+
+function :ng:ping() {
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
-        e=${CODE_FAILURE}
         hit=$(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="$1"|wc -l)
-        if [ ${hit} -gt 0 ]; then
+        [ ${hit} -eq 0 ] || e=${CODE_SUCCESS}
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function :ng:resolve() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        if :ng:ping $1; then
             children=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="$1" memberNisNetgroup|awk '$1~/^memberNisNetgroup:$/{print$2}' ) )
             for child in ${children[@]}; do
                 :ng:resolve $child
@@ -22,54 +170,143 @@ function :ng:resolve() {
             done
             e=${CODE_SUCCESS}
         fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
 }
 #. }=-
+
 #. Public Functions -={
-g_hn=0
-function ng:host:usage() { echo "<host>"; }
+function ng:tree:shflags() {
+    cat <<!
+boolean recursive false "traverse-the-netgroup-tree-recursively" R
+boolean showhosts false "show-host-leaf-nodes-in-netgroup-tree"  H
+boolean verifyall false "verify-all-entries"                     V
+!
+}
+function ng:tree:usage() { echo "[-H|--show-hosts] [-R|--recursive] [-V|--verifyall] <netgroup>"; }
+function ng:tree() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -ge 1 ]; then
+        local -i recursive=!${FLAGS_recursive:-1}; unset FLAGS_recursive
+        local -i showhosts=!${FLAGS_showhosts:-1}; unset FLAGS_showhosts
+        local -i verifyall=!${FLAGS_verifyall:-1}; unset FLAGS_verifyall
+
+        declare -g -A g_tree
+        ::ng:tree_build 1+$1 $(::ng:tree_data ${recursive} ${showhosts} ${verifyall} $1)
+        if [ $? -ne ${CODE_SUCCESS} ]; then
+            e=${CODE_FAILURE}
+            theme ERR "No such netgroups \`$1'"
+        else
+            if :ng:ping ${g_root:2}; then
+                ::ng:tree_draw 0 ${g_root:2}
+                e=${CODE_SUCCESS}
+            else
+                e=${CODE_FAILURE}
+                theme ERR "No such netgroups \`${g_root:2}'"
+            fi
+        fi
+        unset g_tree g_root
+    fi
+
+    return $e
+}
+
+function :ng:hosts() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local -a data
+        if :ng:ping $1; then
+            data=( $(:ng:resolve ${1}|sort -u) )
+            printf '%s\n' "${data[@]}"
+            e=${CODE_SUCCESS?}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function ng:hosts:usage() { echo "<netgroup>"; }
+function ng:hosts() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        cpf "Looking up netgroup %{@netgroup:%s}..." ${1}
+        local -a data
+        data=( $(:${FUNCNAME} $1) )
+        if [ $? -eq ${CODE_SUCCESS} ]; then
+            e=${CODE_SUCCESS}
+            if [ ${#data[@]} -eq 0 ]; then
+                theme HAS_WARNED "Empty netgroup"
+            else
+                theme HAS_PASSED
+                local shn
+                for shn in ${data[@]}; do
+                    cpf "    %{@host:%s}\n" ${shn}
+                done
+            fi
+        else
+            e=${CODE_FAILURE}
+            theme HAS_FAILED "No such netgroup"
+        fi
+    fi
+
+    return $e
+}
+
+function ng:host:usage() { echo "<hostname>"; }
 function ng:host() {
     local -i e=${CODE_DEFAULT?}
 
-    core:import dns
-    if [ $# -eq 1 ]; then
-        ((g_hn++))
+    local -i hni
+    : ${hni:=${2:-0}}
+    if [ $# -eq 1 -o $# -eq 2 ]; then
+        ((hni++))
 
         local prefix ng
         local -a raw
-        if [ ${g_hn} -eq 1 ]; then
+        if [ ${hni} -eq 1 ]; then
+            e=${CODE_SUCCESS}
+
+            local fqdn
             local -a hosts
             if [ -z "${1//[^.]/}" ]; then
-                hosts=( "$(dns:qdn ${1}).${USER_TLD}" )
+                fqdn="$(dns:qdn ${1}).${USER_TLD}"
+                if [ $? -eq 0 ]; then
+                    hosts=( "${fqdn}" )
+                else
+                    e=${CODE_FAILURE}
+                fi
             else
-                hosts=( ${1}.${USER_TLD} )
+                hosts=( ${1?}.${USER_TLD} )
             fi
-            e=${CODE_SUCCESS}
-            local fqdn
-            local -a raw
-            for fqdn in ${hosts[@]}; do
-                if [ -t 1 ]; then
-                    cpf "%{@fqdn:%s}\n" ${fqdn}
-                fi
 
-                raw=(
-                    $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(nisNetgroupTriple=\(${fqdn},,\))" cn\
-                        | awk '$1~/cn:/{print$2}')
-                )
+            if [ $e -eq ${CODE_SUCCESS} ]; then
+                local -a raw
+                for fqdn in ${hosts[@]}; do
+                    if [ -t 1 ]; then
+                        cpf "%{@fqdn:%s}\n" ${fqdn}
+                    fi
 
-                if [ ${#raw[@]} -eq 0 ]; then
-                    theme WARN "There are no netgroups with \`${fqdn}' as a member"
-                fi
-                #if [ ${#raw[@]} -eq 0 ]; then
-                #    local -a didumean=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "nisNetgroupTriple~=${fqdn}" nisNetgroupTriple|sed -ne 's/nisNetgroupTriple: *(\(.*\),,)$/\1/p') )
-                #    if [ ${#didumean[@]} -gt 0 ]; then
-                #        printf "? %s\n" ${didumean[@]}
-                #    fi
-                #    e=${CODE_FAILURE}
-                #fi
-            done
+                    raw=(
+                        $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(nisNetgroupTriple=\(${fqdn},,\))" cn\
+                            | awk '$1~/cn:/{print$2}')
+                    )
+
+                    if [ ${#raw[@]} -eq 0 ]; then
+                        theme WARN "There are no netgroups with \`${fqdn}' as a member"
+                        e=${CODE_FAILURE}
+                    fi
+                done
+            else
+                theme HAS_FAILED "No such host ${1}"
+            fi
         else
             ng=$1
             raw=(
@@ -79,20 +316,27 @@ function ng:host() {
             e=${CODE_SUCCESS}
         fi
 
-        for ng in ${raw[@]}; do
-            local col='indirect'
-            [ ${g_hn} -ne 1 ] || col='direct'
-            prefix="$(printf %$((${g_hn}*2))s ' ')"
-            cpf "${prefix} %{@netgroup_${col}:%s}\n" "${ng}"
-            ng:host "$ng"
-        done
-        ((g_hn--))
+        if [ $e -eq ${CODE_SUCCESS} ]; then
+            for ng in ${raw[@]}; do
+                local col='indirect'
+                [ ${hni} -ne 1 ] || col='direct'
+                prefix="$(printf %$((${hni}*2))s ' ')"
+                cpf "${prefix} %{@netgroup_${col}:%s}\n" "${ng}"
+                ${FUNCNAME} "$ng" ${hni}
+            done
+        else
+            local -a didumean=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "nisNetgroupTriple~=${fqdn}" nisNetgroupTriple|sed -ne 's/nisNetgroupTriple: *(\(.*\),,)$/\1/p') )
+            if [ ${#didumean[@]} -gt 0 ]; then
+                printf "? %s\n" ${didumean[@]}
+            fi
+        fi
+
     fi
 
     return $e
 }
 
-function ng:summary:usage() { echo "<no-args>"; }
+function ng:summary:usage() { echo ""; }
 function ng:summary() {
     local -i e=${CODE_DEFAULT?}
 
@@ -114,112 +358,37 @@ $1~/description:/{desc=substr($0,13)};
     return $e
 }
 
-function ng:report:usage() { echo "<no-args>"; }
-function ng:report() {
-    local -i e=${CODE_DEFAULT?}
-
-    if [ $# -eq 0 ]; then
-        local -a ng_all=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn | awk '$1~/cn:/{print$2}') )
-        local -i progress=0
-        local -i total=${#ng_all[@]}
-        local -a hosts_all
-        local ng
-#        local -i i=0
-        for ng in ${ng_all[@]}; do
-            for host in $(ng:list +$ng); do
-                hosts_all+=( $ng:$host )
-            done
-            progress+=1
-            cpf "\r%d%% (%d/%d) %{@netgroup:%s}" $(( 100 * $progress / ${total} )) ${progress} ${total} ${ng}
-            tput el
-
-#            ((i++))
-#            test $i -eq 15 && break
-        done
-        cpf "\rNetgroup assessment complete"; tput el; echo
-
-        local host item
-        core:import dns
-        for item in ${hosts_all[@]}; do
-            IFS=: read ng host <<< "${item}"
-            looked=$(:dns:lookup pP ca ${host})
-            if [ $? -ne 0 ]; then
-                cpf "%{@host:%32s}@%{@netgroup:%-24s}" ${host} ${ng}
-                theme HAS_FAILED
-            fi
-        done
-        e=0
-    fi
-
-    return $e
-}
-
-function :ng:list() {
-    local -i e=${CODE_FAILURE?}
-
-    if [ $# -eq 1 ]; then
-        local eq=$1
-        [ "${eq:1:1}" == '(' ] || eq="|(${eq})"
-
-        local -a data
-        data=( $(:hgd:resolve ${eq}) )
-        if [ $? -eq 0 ]; then
-            printf '%s\n' "${data[@]}"
-            e=${CODE_SUCCESS?}
-        else
-            theme ERR "${FUNCNAME}(); Invalid argument: ${eq}"
-        fi
-    else
-        core:raise EXCEPTION_BAD_FN_CALL
-    fi
-
-    return $e
-}
-
-function ng:list:usage() { echo "<hgd:+>"; }
-function ng:list() {
-    local -i e=${CODE_DEFAULT?}
-
-    if [ $# -eq 1 ]; then
-        :${FUNCNAME} $@
-        e=$?
-    fi
-
-    return $e
-}
-
-function :ng:ulist() {
-    local -i e=${CODE_FAILURE?}
-
-    if [ $# -eq 1 ]; then
-        local eq=$1
-        [ "${eq:1:1}" == '(' ] || eq="|(${eq})"
-
-        local -a data
-        data=( $(:hgd:resolve ${eq}) )
-        if [ ${PIPESTATUS[0]} -eq 0 ]; then
-            printf '%s\n' "${data[@]//.*/}"|sort -u
-            e=${CODE_SUCCESS?}
-        else
-            theme ERR "${FUNCNAME}(); Invalid argument: ${eq}"
-            e=${CODE_FAILURE?}
-        fi
-    else
-        core:raise EXCEPTION_BAD_FN_CALL
-    fi
-
-    return $e
-}
-function ng:ulist:usage() { echo "<hgd:+>"; }
-function ng:ulist() {
-    local -i e=${CODE_DEFAULT?}
-
-    if [ $# -eq 1 ]; then
-        :${FUNCNAME} $@
-        e=$?
-    fi
-
-    return $e
-}
+#function ng:report:usage() { echo "<no-args>"; }
+#function ng:report() {
+#    local -i e=${CODE_DEFAULT?}
+#
+#    if [ $# -eq 0 ]; then
+#        local -a ng_all=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn | awk '$1~/cn:/{print$2}') )
+#        local -i progress=0
+#        local -i total=${#ng_all[@]}
+#        local -a hosts_all
+#        local ng
+#        for ng in ${ng_all[@]}; do
+#            hosts_all+=( $(:ng:resolve 0 1 $ng|awk -F: '$2~/^@/{print}') )
+#            progress+=1
+#            cpf "\r%d%% (%d/%d) %{@netgroup:%s}" $(( 100 * $progress / ${total} )) ${progress} ${total} ${ng}
+#            tput el
+#        done
+#        cpf "\rNetgroup assessment complete"; tput el; echo
+#
+#        local host item
+#        for item in ${hosts_all[@]}; do
+#            IFS=: read ng host <<< "${item}"
+#            looked=$(:dns:lookup pP ca ${host:2})
+#            if [ $? -ne 0 ]; then
+#                cpf "%{@host:%32s}@%{@netgroup:%-24s}" ${host:2} ${ng:2}
+#                theme HAS_FAILED
+#            fi
+#        done
+#        e=${CODE_SUCCESS?}
+#    fi
+#
+#    return $e
+#}
 
 #. }=-
