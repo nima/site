@@ -19,7 +19,7 @@ function :ssh:connect() {
     return $e
 }
 
-function ssh:connect:usage() { echo "<hostname>"; }
+function ssh:connect:usage() { echo "<hosthint>"; }
 function ssh:connect() {
     local -i e=${CODE_DEFAULT?}
 
@@ -66,6 +66,11 @@ function ssh:connect() {
     return $e
 }
 
+function ssh:cluster:alert() {
+    cat <<!
+DEPR This function has been deprecated in favour of tmux.
+!
+}
 function ssh:cluster:usage() { echo "<hosthint> [<hosthint> [...]]"; }
 function ssh:cluster() {
     local -i e=${CODE_DEFAULT?}
@@ -89,6 +94,78 @@ function ssh:cluster() {
             hostnames=( ${hostnames[@]} $(:dns:qdn ${hosthint}) )
         done
         cssh ${hostnames[@]}
+        e=$?
+    fi
+
+    return $e
+}
+
+function ssh:tmux:usage() { echo "<tmux-session> [<hgd:@+>]"; }
+function ssh:tmux() {
+    local -i e=${CODE_DEFAULT?}
+
+    core:requires tmux
+    core:import hgd
+
+    local -i zoning=12 #. Terminals per tab (tmux window)
+    if [ $# -eq 2 ]; then
+        local session=$1
+        local hgd=$2
+        if ! tmux has-session -t "$session" 2>/dev/null; then
+            tmux new-session -d -s "$session"
+
+            local tab
+            local -i pid
+            local -i lpid
+            local -i tid
+            local -i otid
+            local -a hosts=( $(:hgd:resolve ${hgd}) )
+            local -i nodes=${#hosts[@]}
+
+            for ((pid=0; pid<nodes; pid++)); do
+                ((lpid=pid%zoning))
+                ((otid=tid))
+                ((tid=pid/zoning))
+                tab="tab-${tid}"
+                if [ ${pid} -gt 0 ]; then
+                    if [ ${otid} -ne ${tid} ]; then
+                        tmux new-window -t "${session}" -a -n "${tab}"
+                        tmux select-window -t "${session}:${tab}"
+                    fi
+                else
+                    tmux rename-window -t "${session}:0" "${tab}"
+                    tmux select-window -t "${session}:${tab}"
+                fi
+
+                [ ${lpid} -eq 0 ] || tmux split-window -h
+                cpf "Connection %{g:${tab}}:%{@int:${pid}} to %{@host:${hosts[${pid}]}}..."
+                tmux send-keys -t "${lpid}" "ssh ${hosts[${pid}]}" C-m
+                tmux select-layout -t "${session}:${tab}" tiled >/dev/null
+                theme HAS_PASSED "${tab}:${pid}"
+            done
+
+            for tid in $(tmux list-windows -t ${session}|awk -F: '{print$1}'); do
+                tab="tab-${tid}"
+                tmux select-window -t "${session}:${tid}"
+                tmux set synchronize-panes on >/dev/null
+                tmux select-pane   -t "${session}:${tab}.0"
+            done
+
+            tid=0
+            pid=0
+            tab="tab-${tid}"
+            tmux select-window -t "${session}:${tab}"
+            tmux select-pane   -t "${session}:${tab}.0"
+
+            sleep 3
+            tmux attach-session -t "${session}"
+            e=$?
+        else
+            theme ERR_USAGE "That session already exists."
+            e=${CODE_FAILURE}
+        fi
+    elif [ $# -eq 1 ]; then
+        tmux attach-session -t "${session}"
         e=$?
     fi
 
