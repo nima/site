@@ -72,3 +72,97 @@ function util:timeout() {
 
     return $e
 }
+
+function :util:date:i2s() {
+    if [ $# -eq 1 ]; then
+        #. Convert seconds to datestamp
+        date --utc --date "1970-01-01 $1 sec" "+%Y%m%d%H%M%S"
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+}
+
+function :util:date:s2i() {
+    if [ $# -eq 1 ]; then
+        local YYYY=${1:0:4}
+        local mm=${1:4:2}
+        local dd=${1:6:2}
+        local HH=${1:8:2}
+        local MM=${1:10:2}
+        local SS=${1:12:2}
+
+        #. Convert datestamp to seconds
+        date --utc --date "${YYYY}-${mm}-${dd} ${HH}:${MM}:${SS}" "+%s"
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+}
+
+function :util:listify() {
+    if [ $# -gt 0 ]; then
+        #. Method 1
+        IFS=, read -a s <<< "$*"
+        echo ${s[@]}
+        return
+
+        #. Method 2
+        IFS=, read -a s <<< $*
+        echo ${s}
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+}
+
+function :util:uniq() {
+    if [ $# -gt 0 ]; then
+        tr ' ' '\n' <<< "${@}" | sort -u | tr '\n' ' '
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+}
+
+function :util:join() {
+    if [ $# -eq 2 ]; then
+        #. array=( a b c ); :util:join $delim array
+        local IFS=$1
+        eval "echo \"\${${2}[*]}\""
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+}
+
+#function :util:cphash() {
+#    local assoc_array_string=$(local -p $2)
+#    eval "local -A $1=${assoc_array_string#*=}"
+#    echo eval $(local -p $1)
+#}
+#
+#function :util:locald() {
+#    local -pA|awk 'BEGIN{e='${CODE_FAILURE}'};$0~/local .*'$1'=/{e='${CODE_SUCCESS}'};END{exit(e)}'
+#    return $?
+#}
+
+#. Set Operations -={
+#function :util:sets:explode() {
+#    for item in $(eval echo \${$1[@]}); do
+#        echo ${item}
+#    done | sort
+#}
+#
+#function :util:sets:set_union() {
+#    sort -um <( explode $1) <(explode $2)
+#}
+#
+#function :util:sets:set_intersect() {
+#    comm -12 <(explode $1) <(explode $2)
+#}
+#
+#function :util:sets:set_complement() {
+#    comm -23 <(explode $1) <(explode $2)
+#}
+#
+#function :util:sets:set_symdiff() {
+#    sd=( $(comm -3 <(explode $1) <(explode $2)) )
+#    explode sd
+#}
+#. }=-
