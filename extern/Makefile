@@ -3,10 +3,11 @@ SHFLAGS := shflags-1.0.3
 SHUNIT2 := shunit2-2.1.6
 
 WGET := $(shell which wget)
-DLA := ${WGET} -q -O-
-ifeq (${DLA},)
+ifeq (${WGET},)
 CURL := $(shell which curl)
 DLA := ${CURL} -s
+else
+DLA := ${WGET} -q -O-
 endif
 
 ifneq (${DLA},)
@@ -21,7 +22,7 @@ ${SHFLAGS}: ${SHFLAGS}.tgz
 	@touch $@
 ${SHFLAGS}.tgz:
 	@echo "Downloading $@..."
-	@${DLA} http://shflags.googlecode.com/files/$@ > $@
+	${DLA} http://shflags.googlecode.com/files/$@ > $@
 #. }=-
 #. shunit2 -={
 shunit2: ${SHUNIT2}
