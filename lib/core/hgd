@@ -1,6 +1,9 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
+HGD_CACHE=${SITE_CACHE}/hgd.conf
 
-#. HGD Magic Private Functions -={
+core:import util
+
+#. HGD Resolver Functions -={
 function ::hgd:explode() {
     local -i e=${CODE_FAILURE}
 
@@ -88,6 +91,8 @@ function ::hgd:explode() {
 }
 
 function ::hgd:resolve() {
+    core:requires python
+
     local -i e=${CODE_FAILURE}
 
     local hgd
@@ -121,20 +126,29 @@ function ::hgd:resolve() {
 
     return $e
 }
-#. }=-
-#. HGD Magic Internal Functions -={
+
 function :hgd:resolve() {
     local -i e=${CODE_FAILURE}
 
     if [ $# -eq 1 ]; then
-        local eq="$1"
-        [ "${eq:1:1}" == '(' ] || eq="&(${eq})" #. Default is Logical AND
-
-        local buffer
-        buffer="$(::hgd:resolve $eq)"
-        if [ $? -eq ${CODE_SUCCESS} -a -n "${buffer}" ]; then
-            echo -e "${buffer}" | ${SITE_LIBEXEC_CORE}/sets "$eq"
-            e=$?
+        if [ "${1:1:1}" == '(' ]; then
+            local eq="$1"
+            local buffer
+            buffer="$(::hgd:resolve $eq)"
+            if [ $? -eq ${CODE_SUCCESS} -a -n "${buffer}" ]; then
+                echo -e "${buffer}" | ${SITE_LIBEXEC_CORE}/sets "$eq"
+                e=$?
+            else
+                e=${CODE_FAILURE}
+            fi
+        else
+            local session="$1"
+            local -a buflist
+            buflist=( $(awk -F '\t' '$1~/^'${session}'$/{print$0}' ${HGD_CACHE}) )
+            if [ $? -eq ${CODE_SUCCESS} -a ${#buflist[@]} -gt 3 ]; then
+                e=${CODE_SUCCESS}
+                echo ${buflist[@]:3}
+            fi
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, 1 expected"
@@ -142,8 +156,7 @@ function :hgd:resolve() {
 
     return $e
 }
-#. }=-
-#. HGD Magic Public Functions -={
+
 function hgd:resolve:help() {
     cat <<!
     The <host-group-directive> or <hgd> is of the following form:
@@ -161,12 +174,212 @@ function hgd:resolve() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 ]; then
-        e=${CODE_SUCCESS}
-
         local eq=$1
-        if ! :${FUNCNAME} "${eq}"; then
+        if :hgd:resolve "${eq}"; then
+            e=${CODE_SUCCESS}
+        else
             e=${CODE_FAILURE}
             theme ERR_USAGE "Bad formula or zero matches with equation: ${eq}"
+        fi
+    fi
+
+    return $e
+}
+#. }=-
+
+
+#. HGD Magic Internal Functions -={
+function :hgd:load() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local session=$1
+        local hgd=$(awk -F '\t' '$1~/^'${session}'$/{print$3}' ${HGD_CACHE})
+        if [ ${#hgd} -gt 0 ]; then
+            echo ${hgd}
+            e=${CODE_SUCCESS}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, 1 expected"
+    fi
+
+    return $e
+}
+
+
+function :hgd:delete() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local session=$1
+        if [ -s ${HGD_CACHE} ] && grep -qE "^\<${session}\>" ${HGD_CACHE}; then
+            if sed -e "/^\<${session}\>/d" -i ${HGD_CACHE}; then
+                e=${CODE_SUCCESS}
+            fi
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, 1 expected"
+    fi
+
+    return $e
+}
+
+function :hgd:refresh() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local session="$1"
+        local hgd
+        hgd="$(:hgd:load ${session})"
+        if [ $? -eq 0 ]; then
+            local -a hosts
+            hosts=( $(:hgd:resolve ${hgd}) )
+            if [ $? -eq 0 -a ${#hosts[@]} -gt 0 ]; then
+                :hgd:delete ${session}
+                echo -e "${session}\t${NOW}\t${hgd}\t${hosts[@]}" >> ${HGD_CACHE}
+                e=${CODE_SUCCESS}
+            fi
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, 2 expected"
+    fi
+
+    return $e
+}
+
+function :hgd:save() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 2 ]; then
+        local session="$1"
+        local hgd="$2"
+
+        local -a hosts
+        hosts=( $(:hgd:resolve ${hgd}) )
+        if [ $? -eq 0 -a ${#hosts[@]} -gt 0 ]; then
+            :hgd:delete ${session}
+            echo -e "${session}\t${NOW}\t${hgd}\t${hosts[@]}" >> ${HGD_CACHE}
+            e=${CODE_SUCCESS}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, 2 expected"
+    fi
+
+    return $e
+}
+#. }=-
+
+#. HGD Magic Public Functions -={
+function hgd:save:usage(){ echo "<session> <hgd>"; }
+function hgd:save() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 2 ]; then
+        local session="$1"
+        local hgd="$2"
+        if :hgd:save "${session}" "${hgd}"; then
+            e=${CODE_SUCCESS}
+        else
+            theme ERR_USAGE "There is no <hgd> cached by that session name."
+            e=${CODE_FAILURE}
+        fi
+    fi
+
+    return $e
+}
+
+function hgd:refresh:usage(){ echo "<session>"; }
+function hgd:refresh() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        local session="$1"
+        local hgd="$2"
+        if :hgd:refresh "${session}"; then
+            e=${CODE_SUCCESS}
+        else
+            theme ERR_USAGE "There is no <hgd> cached by that session name."
+            e=${CODE_FAILURE}
+        fi
+    fi
+
+    return $e
+}
+
+function hgd:delete:usage(){ echo "<session>"; }
+function hgd:delete() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        :hgd:delete ${1}
+        e=$?
+    fi
+
+    return $e
+}
+
+function :hgd:list() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 0 ]; then
+        if [ -s ${HGD_CACHE} ]; then
+            cat ${HGD_CACHE}
+            e=${CODE_SUCCESS}
+        else
+            e=2
+        fi
+    elif [ $# -eq 1 ]; then
+        if grep -qE "^\<${1}\>" ${HGD_CACHE}; then
+            sed -ne "/^\<${1}\> *.*$/p" ${HGD_CACHE}
+            e=${CODE_SUCCESS}
+        else
+            e=3
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, 0 or 1 expected"
+    fi
+
+    return $e
+}
+
+
+function hgd:list:usage(){ echo "<no-arguments>"; }
+function hgd:list() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 0 -o $# -eq 1 ]; then
+        local data
+        data="$(:hgd:list $@)"
+        e=$?
+        case $e in
+            ${CODE_SUCCESS})
+                while read line; do
+                    read -a data <<< "$line"
+                    cpf '%{y:%-24s} %{@int:%3s} %{bl:%s} %{b:%s}\n' ${data[0]} $((${#data[@]}-3)) $(:util:date:i2s ${data[1]}) ${data[2]}
+                done <<< "${data}"
+            ;;
+            2) theme HAS_FAILED "You have no saved sessions by that name"; e=${CODE_FAILURE};;
+            3) theme HAS_WARNED "You have no saved sessions"; e=${CODE_SUCCESS};;
+            *) core:raise EXCEPTION_UNHANDLED;;
+        esac
+    fi
+
+    return $e
+}
+
+function hgd:load:usage(){ echo "<session>"; }
+function hgd:load() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        local session=$1
+        local hgd=( $(:hgd:load ${session}) )
+        if [ ${#hgd} -gt 0 ]; then
+            echo "${hgd[@]}"
+            e=${CODE_SUCCESS}
+        else
+            theme ERR_USAGE "There is no <hgd> cached by that session name."
+            e=${CODE_FAILURE}
         fi
     fi
 
