@@ -130,21 +130,56 @@ function ldap:ngldif() {
 
 function ldap:ping:usage() { echo " "; }
 function ldap:ping() {
-    local -i e=${CODE_SUCCESS}
+    core:requires colordiff
 
-    local -A sync
-    local -A sync_code
-    local -i count
-    for lh in ${USER_LDAPHOSTS[@]}; do
-        cpf "%{@host:%-32s}" "${lh}"
-        count=$(ldapsearch -LLL -h "${lh}" -x -b "${USER_UDN}" dn 2>/dev/null|wc -c)
-        if [ $? -eq 0 ]; then
-            theme HAS_PASSED "${count}-char dump"
-        else
-            theme HAS_FAILED
-            e=${CODE_FAILURE}
-        fi
-    done
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -eq 0 ]; then
+        local -i e=${CODE_SUCCESS}
+
+        local -A sync
+        local -A sync_code
+        local -A dump
+        local md5
+        local uidc
+        for uidc in {a..z}; do
+
+            cpf "Integrity check for %{c:uid=}%{r:${uidc}*}..."
+            local -A md5s=()
+            for lh in ${USER_LDAPHOSTS[@]}; do
+                dump[${lh}]=$( (ldapsearch -E pr=128/noprompt -S dn -LLL -h "${lh}" -x -b "${USER_UDN}" uid="${uidc}*" modifyTimestamp createTimestamp |grep -v 'pagedresults:' 2>/dev/null))
+                if [ $? -eq 0 ]; then
+                    cpf '.'
+                else
+                    cpf '!'
+                    #core:raise EXCEPTION_UNHANDLED
+                fi
+                md5="$(echo ${dump[${lh}]}|md5sum|awk '{print$1}')"
+                md5s[${md5}]=${lh}
+            done
+
+            local -i len=$(echo "${dump[${USER_LDAPHOST}]}"|wc -c)
+            if [ ${#md5s[@]} -eq 1 ]; then
+                if [ ${len} -gt 1 ]; then
+                    theme HAS_PASSED ${md5}:${len}
+                else
+                    theme HAS_WARNED ${md5}:${len}
+                fi
+            else
+                theme HAS_FAILED "${#md5s[@]} variants in the ${#USER_LDAPHOSTS[@]} hosts"
+                e=${CODE_FAILURE}
+                for lh in ${USER_LDAPHOSTS[@]}; do
+                    if [ ${lh} != ${USER_LDAPHOST} ]; then
+                        cpf "%{@host:${USER_LDAPHOST}} vs %{@host:${lh}}...\n"
+                        colordiff -a -u\
+                            <(echo "${dump[${USER_LDAPHOST}]}") \
+                            <(echo "${dump[${lh}]}")
+                    fi
+                done
+            fi
+        done
+
+    fi
 
     return $e
 }
