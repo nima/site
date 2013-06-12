@@ -191,9 +191,9 @@ function ng:tree() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -ge 1 ]; then
-        local -i recursive=!${FLAGS_recursive:-1}; unset FLAGS_recursive
-        local -i showhosts=!${FLAGS_showhosts:-1}; unset FLAGS_showhosts
-        local -i verifyall=!${FLAGS_verifyall:-1}; unset FLAGS_verifyall
+        local -i recursive=${FLAGS_recursive:0}; ((recursive=!recursive)); unset FLAGS_recursive
+        local -i showhosts=${FLAGS_showhosts:0}; ((showhosts=!showhosts)); unset FLAGS_showhosts
+        local -i verifyall=${FLAGS_verifyall:0}; ((verifyall=!verifyall)); unset FLAGS_verifyall
 
         declare -g -A g_tree
         ::ng:tree_build 1+$1 $(::ng:tree_data ${recursive} ${showhosts} ${verifyall} $1)
@@ -291,17 +291,20 @@ function ng:host() {
                 local -a raw
                 for fqdn in ${hosts[@]}; do
                     if [ -t 1 ]; then
-                        cpf "%{@fqdn:%s}\n" ${fqdn}
+                        cpf "Trying %{@fqdn:%s}..." ${fqdn}
                     fi
 
-                    raw=(
+                    local -a preraw=(
                         $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(nisNetgroupTriple=\(${fqdn},,\))" cn\
                             | awk '$1~/cn:/{print$2}')
                     )
 
-                    if [ ${#raw[@]} -eq 0 ]; then
-                        theme WARN "There are no netgroups with \`${fqdn}' as a member"
-                        e=${CODE_FAILURE}
+                    if [ ${#preraw[@]} -eq 0 ]; then
+                        theme HAS_WARNED "There are no netgroups with \`${fqdn}' as a member"
+                    else
+                        theme HAS_PASSED
+                        raw=( ${preraw[@]} )
+                        break
                     fi
                 done
             else
