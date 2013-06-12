@@ -1,0 +1,27 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+function help:site:usage() { echo "site|<module>"; }
+function help:site() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 0 ]; then
+        local profile
+        for profile in USER_MODULES CORE_MODULES; do
+            eval $(::core:eval:dereference profile) #. Will create ${profile}
+            local module
+            for module in ${!profile[@]}; do
+                :core:usage ${module}
+            done
+            echo
+        done
+        e=${CODE_SUCCESS}
+    elif [ $# -eq 1 ]; then
+        :core:usage ${1}
+        e=$?
+    elif [ $# -eq 2 ]; then
+        :core:usage ${1} ${2}
+        e=$?
+    fi
+
+    return $e
+}
