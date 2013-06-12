@@ -1,6 +1,7 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
 core:import dns
+core:import hgd
 
 function :ssh:connect() {
     local -i e=${CODE_FAILURE?}
@@ -100,20 +101,15 @@ function ssh:cluster() {
     return $e
 }
 
-function ssh:tmux:usage() { echo "<tmux-session> [<hgd:@+>]"; }
-function ssh:tmux() {
-    local -i e=${CODE_DEFAULT?}
+function ::ssh:tmux() {
+    local -i e=${CODE_SUCCESS?}
 
-    core:requires tmux
-    core:import hgd
-
-    local -i zoning=12 #. Terminals per tab (tmux window)
     if [ $# -eq 2 ]; then
         local session=$1
         local hgd=$2
-        if ! tmux has-session -t "$session" 2>/dev/null; then
-            tmux new-session -d -s "$session"
 
+        tmux new-session -d -s "${session}"
+        if [ $? -eq 0 ]; then
             local tab
             local -i pid
             local -i lpid
@@ -139,7 +135,7 @@ function ssh:tmux() {
 
                 [ ${lpid} -eq 0 ] || tmux split-window -h
                 cpf "Connection %{g:${tab}}:%{@int:${pid}} to %{@host:${hosts[${pid}]}}..."
-                tmux send-keys -t "${lpid}" "ssh ${hosts[${pid}]}" C-m
+                tmux send-keys -t "${lpid}" "ssh ${hosts[${pid}]}; exit $?" C-m
                 tmux select-layout -t "${session}:${tab}" tiled >/dev/null
                 theme HAS_PASSED "${tab}:${pid}"
             done
@@ -157,16 +153,65 @@ function ssh:tmux() {
             tmux select-window -t "${session}:${tab}"
             tmux select-pane   -t "${session}:${tab}.0"
 
-            sleep 3
             tmux attach-session -t "${session}"
+            e=$?
+        else
+            core:raise ${EXCEPTION_BAD_FN_CALL}
+        fi
+    else
+        local -i e=${CODE_FAILURE?}
+    fi
+
+    return $e
+}
+
+function ssh:tmux:help() {
+    cat <<!
+    To create a new <tmux-session>, both arguments become mandatory:
+
+        <tmux-session> <hgd:@+>
+
+    Once the <tmux-session> is created however, you can simply connect
+    to it without specifying the second argument:
+
+        <tmux-session>
+
+    Finally, you can also opt to use the last form described above if
+    you'd like to reference an already created <hgd> session, that
+    is the equivalent of specifying two argument with exactly the same
+    value.
+!
+}
+function ssh:tmux:usage() { echo "<tmux-session> [<hgd:@+>]"; }
+function ssh:tmux() {
+    local -i e=${CODE_DEFAULT?}
+
+    core:requires tmux
+    core:import hgd
+
+    local -i zoning=12 #. Terminals per tab (tmux window)
+    local session=$1
+    local hgd=${2:-${session}}
+
+    if [ $# -eq 1 ]; then
+        tmux attach-session -t "${session}" 2>/dev/null
+        e=$?
+        if [ $e -ne 0 ]; then
+            if :hgd:list ${hgd} >/dev/null; then
+                ::ssh:tmux "${hgd}" "${hgd}"
+                e=$?
+            else
+                theme ERR_USAGE "There is no hgd or tmux session by that name."
+            fi
+        fi
+    elif [ $# -eq 2 ]; then
+        if ! tmux has-session -t "${session}" 2>/dev/null; then
+            ::ssh:tmux "${session}" "${hgd}"
             e=$?
         else
             theme ERR_USAGE "That session already exists."
             e=${CODE_FAILURE}
         fi
-    elif [ $# -eq 1 ]; then
-        tmux attach-session -t "${session}"
-        e=$?
     fi
 
     return $e
