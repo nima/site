@@ -48,17 +48,21 @@ core|dns|ptr|public||&(#127.0.0.1)|||0
 core|util|date:i2s|internal||1369369079|20130524041759||0
 core|util|date:s2i|internal||20131230235959|1388447999||0
 core|util|listify|internal||b,a,d,b,e,e,f|b a d b e e f||0
+core|util|uniq|internal||b a d b e e f|a b d e f||0
 #core|util|join|internal
 core|help|site|public|||||0
 #. }=-
 
 #. core@DEC -={
 core|hgd|list|public|||||0|DEC
-core|hgd|save|public||_uth_ &(@um-rhn-s1)|||0|DEC
-core|hgd|save|internal||_uth_ &(@um-rhn-s1)|||0|DEC
-core|hgd|load|public||_uth_|um-rhn-s1.corpdev||0|DEC
-core|hgd|load|internal||_uth_|&(@um-rhn-s1)||0|DEC
-core|hgd|resolve|public||_uth_|um-rhn-s1.corpdev||0|DEC
+core|hgd|save|public||uth &(@um-rhn-s1)|||0|DEC
+core|hgd|save|internal||uth &(@um-rhn-s1)|||0|DEC
+core|hgd|load|public||uth|&(@um-rhn-s1)||0|DEC
+core|hgd|load|internal||uth|&(@um-rhn-s1)||0|DEC
+core|hgd|list|internal||uth|||0|DEC
+core|hgd|refresh|internal||uth|||0|DEC
+core|hgd|refresh|public||uth|||0|DEC
+core|hgd|resolve|public||uth|um-rhn-s1.corpdev||0|DEC
 core|hgd|resolve|internal||&(.autonomy.net.au)|autonomy.net.au git.autonomy.net.au src.autonomy.net.au||0|DEC
 core|ssh|connect|public||um-rhn-s1 exit 0|||0|DEC
 core|ssh|connect|public||um-rhn-s1 exit 3|||3|DEC
@@ -74,6 +78,7 @@ core|ng|tree|public||nosuchng|||1|DEC
 #core|ng|tree_data|private
 #core|ng|tree_draw|private
 #core|ng|tree_build|private
+core|ng|host|internal||um-rhn-s1|||0|DEC
 core|ng|host|public||um-rhn-s1|||0|DEC
 core|ng|list|public||+vip|||0|DEC
 core|ng|ulist|public||+vip|||0|DEC
@@ -83,46 +88,47 @@ core|ldap|ping|public|||||0|DEC
 core|ldap|search|public||user uid=ntalebi|||0|DEC
 core|ldap|search|internal||user uid=ntalebi givenname sn|Nima Talebi||0|DEC
 core|ldap|esearch|internal||user ntalebi|||0|DEC
-core|ldap|eval:search|internal||user ntalebi uid|ec0dc1dc6a3490f942dc096ca6cbf385||0|DEC
+core|ldap|eval:search|internal||user ntalebi uid|5a86e11345e908d03e5c5983c3cc0ff4||0|DEC
 #core|ldap|authenticate|internal
 #core|ssh|connect|public
 #core|ssh|connect|internal
 #core|ssh|cluster|public
 #core|ssh|tmux|public
+#core|ssh|tmux|private
 #. }=-
 
 #. DEC -={
 DEC|doc|commission|public|||||0
 DEC|doc|reminders|public|||||0
 #DEC|rpm|exec|private
-DEC|rpm|arch|public||_uth_|||0
-DEC|rpm|data|public||_uth_|||0
-DEC|rpm|grp|public||_uth_|||0
-DEC|rpm|size|public||_uth_|||0
-DEC|rpm|vendor|public||_uth_|||0
-DEC|rpm|date|public||_uth_|||0
-DEC|rpm|arch|public||_uth_ glibc.x86_64|glibc-2.5-81.el5_8.7.x86_64||0
-DEC|rpm|data|public||_uth_ glibc.x86_64|||0
-DEC|rpm|grp|public||_uth_ glibc.x86_64|System Environment/Libraries||0
-DEC|rpm|size|public||_uth_ glibc.x86_64|11674729||0
-DEC|rpm|vendor|public|Red Hat, Inc.|_uth_ glibc.x86_64|||0
-DEC|rpm|date|public||_uth_ glibc.x86_64|4012159fa730dfe3cea8359989d84555||0
+DEC|rpm|arch|public||uth|||0
+DEC|rpm|data|public||uth|||0
+DEC|rpm|grp|public||uth|||0
+DEC|rpm|size|public||uth|||0
+DEC|rpm|vendor|public||uth|||0
+DEC|rpm|date|public||uth|||0
+DEC|rpm|arch|public||uth glibc.x86_64|glibc-2.5-81.el5_8.7.x86_64||0
+DEC|rpm|data|public||uth glibc.x86_64|||0
+DEC|rpm|grp|public||uth glibc.x86_64|System Environment/Libraries||0
+DEC|rpm|size|public||uth glibc.x86_64|11674729||0
+DEC|rpm|vendor|public|Red Hat, Inc.|uth glibc.x86_64|||0
+DEC|rpm|date|public||uth glibc.x86_64|4012159fa730dfe3cea8359989d84555||0
 #DEC|svn|edit|public
-DEC|cf|age|public||_uth_|||0
-DEC|cf|age|private||um-dir-s1.apps /tmp|||0
 #DEC|ssh|connect|public
 #DEC|ssh|cluster|public
 #DEC|ssh|connect|internal
 DEC|db|dc|public||gw name=itservices|4adb560000166fa7cfe62a2c69600758||0
-DEC|mon|remex|public||_uth_ mem|852ece62077aa52194dcd3b2137966e3||0
-DEC|mon|ng:remote|internal||ut-tt0-as0.appu.test mem|16330372||0
+DEC|db|dc|internal||gw name=itservices|3b5776dfb6bff990b14038284806736a||0
+DEC|mon|remex|public||uth hostname|||0
+DEC|mon|remex|public||uth /mem|852ece62077aa52194dcd3b2137966e3||0
+DEC|mon|remex:serial|internal||uth hostname|rhnsat.unix.mgmt.det||0
 #DEC|user|pwdel|public
 #DEC|user|pwadd|public
 #DEC|user|lock|public
 #DEC|user|unlock|public
 DEC|user|rights|public||ntalebi@um-rhn-s1|||0
 DEC|user|search|public||ntalebi|||0
-DEC|user|filter|public||mail=nima.talebi@det.nsw.edu.au|||0
+DEC|user|filter|public||mail=nima.talebi@det.nsw.edu.au givenname|Nima||0
 DEC|user|access|public||ntalebi@um-rhn-s1|||0
 DEC|user|detail|public||ntalebi|||0
 DEC|user|expiring|public||ntalebi|||0
@@ -130,7 +136,8 @@ DEC|user|dupids|public||ntalebi|||0
 DEC|user|nextuid|public||ntalebi|||0
 DEC|user|lookup|internal||ntalebi|||0
 DEC|user|groups|internal||ntalebi|||0
-DEC|user|access|internal||ntalebi|||0
+DEC|user|access|internal||um-rhn-s1|||1
+DEC|user|access|internal||um-rhn-s1 itdadms|||0
 DEC|user|nextuid|internal||ntalebi|||0
 DEC|user|duplicateids|internal||ntalebi|||0
 DEC|user|validate|internal||ntalebi|||0
@@ -147,4 +154,9 @@ DEC|nfs|access|public||ntalebi@nasub02pnf:/|||1
 #DEC|sap2|cfmain|public
 #DEC|snmp|get|public
 #DEC|snmp|walker|public
+#. }=-
+
+#. core@DEC -={
+#core|hgd|delete|internal||uth|||0|DEC
+#core|hgd|delete|public||uth|||1|DEC
 #. }=-
