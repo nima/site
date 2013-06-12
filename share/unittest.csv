@@ -1,0 +1,150 @@
+#. format: profile|module|function|context|stdin|arguments|stdout|stderr|exitcode
+#. core -={
+#core|unit|all|public
+#core|unit|all|internal
+#core|hgd|resolve|internal||(#10.1.2.3/29)|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
+#core|hgd|resolve|private||(#10.1.2.3/29)|53c0006ef9e5cda4111db1851c960e6e||0
+#core|hgd|resolve|public||#10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
+#core|hgd|explode|private||#10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
+#DEC|cf|run|public
+core|net|b2nm|internal||33|||1
+core|net|b2hm|internal||33|||1
+core|net|b2nm|internal||32|0xffffffff||0
+core|net|b2hm|internal||32|0x00000000||0
+core|net|b2nm|internal||24|0xffffff00||0
+core|net|b2hm|internal||24|0x000000ff||0
+core|net|b2nm|internal||16|0xffff0000||0
+core|net|b2hm|internal||16|0x0000ffff||0
+core|net|b2nm|internal||8|0xff000000||0
+core|net|b2hm|internal||8|0x00ffffff||0
+core|net|h2s|internal||0x00ff00ff|0.255.0.255||0
+core|net|h2s|internal||0xff00ff00|255.0.255.0||0
+core|net|s2h|internal||0.255.0.255|0x00ff00ff||0
+core|net|s2h|internal||255.0.255.0|0xff00ff00||0
+core|net|i2s|internal||lo|127.0.0.1||0
+core|net|hosts|internal||10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
+core|net|firsthost|internal||10.1.3.3/23|10.1.2.1||0
+core|ldap|ngldif|public||foo|||1
+#core|ldap|modify|internal
+core|dns|fqdn|public||notahost|||1
+core|dns|fqdn|internal||notahost|||1
+core|dns|qdn|public||notahost|||1
+core|dns|qdn|internal||notahost|||1
+core|dns|lookup|public||notahost|||1
+core|dns|cname|public||@notahost notadomain|||1
+core|dns|ptr|public||&(#127.0.0.1)|||0
+#core|git|getbasedir|internal
+#core|git|commitall|public
+#core|git|file|public
+#core|git|playground|public
+#core|git|rebasesearchstr|public
+#core|git|rm|public
+#core|git|serve|public
+#core|git|size|public
+#core|git|split|public
+#core|git|usage|public
+#core|git|vacuum|public
+#core|util|timeout|public
+core|util|date:i2s|internal||1369369079|20130524041759||0
+core|util|date:s2i|internal||20131230235959|1388447999||0
+core|util|listify|internal||b,a,d,b,e,e,f|b a d b e e f||0
+#core|util|join|internal
+core|help|site|public|||||0
+#. }=-
+
+#. core@DEC -={
+core|hgd|list|public|||||0|DEC
+core|hgd|save|public||_uth_ &(@um-rhn-s1)|||0|DEC
+core|hgd|save|internal||_uth_ &(@um-rhn-s1)|||0|DEC
+core|hgd|load|public||_uth_|um-rhn-s1.corpdev||0|DEC
+core|hgd|load|internal||_uth_|&(@um-rhn-s1)||0|DEC
+core|hgd|resolve|public||_uth_|um-rhn-s1.corpdev||0|DEC
+core|hgd|resolve|internal||&(.autonomy.net.au)|autonomy.net.au git.autonomy.net.au src.autonomy.net.au||0|DEC
+core|ssh|connect|public||um-rhn-s1 exit 0|||0|DEC
+core|ssh|connect|public||um-rhn-s1 exit 3|||3|DEC
+core|dns|lookup|public||rhn|||0|DEC
+core|dns|lookup|public||nosuchhost|||1|DEC
+core|dns|lookup|internal||pP ca rhn|||0|DEC
+core|ng|resolve|internal||vip|esb.dev||0|DEC
+core|ng|ping|internal||sap2|||0|DEC
+core|ng|ping|internal||nosuchng|||1|DEC
+core|ng|hosts|public||nosuchng|||1|DEC
+core|ng|hosts|internal||nosuchng|||1|DEC
+core|ng|tree|public||nosuchng|||1|DEC
+#core|ng|tree_data|private
+#core|ng|tree_draw|private
+#core|ng|tree_build|private
+core|ng|host|public||um-rhn-s1|||0|DEC
+core|ng|list|public||+vip|||0|DEC
+core|ng|ulist|public||+vip|||0|DEC
+core|ng|summary|public|||||0|DEC
+core|ng|host|public||um-rhn-s1|||0|DEC
+core|ldap|ping|public|||||0|DEC
+core|ldap|search|public||user uid=ntalebi|||0|DEC
+core|ldap|search|internal||user uid=ntalebi givenname sn|Nima Talebi||0|DEC
+core|ldap|esearch|internal||user ntalebi|||0|DEC
+core|ldap|eval:search|internal||user ntalebi uid|ec0dc1dc6a3490f942dc096ca6cbf385||0|DEC
+#core|ldap|authenticate|internal
+#core|ssh|connect|public
+#core|ssh|connect|internal
+#core|ssh|cluster|public
+#core|ssh|tmux|public
+#. }=-
+
+#. DEC -={
+DEC|doc|commission|public|||||0
+DEC|doc|reminders|public|||||0
+#DEC|rpm|exec|private
+DEC|rpm|arch|public||_uth_|||0
+DEC|rpm|data|public||_uth_|||0
+DEC|rpm|grp|public||_uth_|||0
+DEC|rpm|size|public||_uth_|||0
+DEC|rpm|vendor|public||_uth_|||0
+DEC|rpm|date|public||_uth_|||0
+DEC|rpm|arch|public||_uth_ glibc.x86_64|glibc-2.5-81.el5_8.7.x86_64||0
+DEC|rpm|data|public||_uth_ glibc.x86_64|||0
+DEC|rpm|grp|public||_uth_ glibc.x86_64|System Environment/Libraries||0
+DEC|rpm|size|public||_uth_ glibc.x86_64|11674729||0
+DEC|rpm|vendor|public|Red Hat, Inc.|_uth_ glibc.x86_64|||0
+DEC|rpm|date|public||_uth_ glibc.x86_64|4012159fa730dfe3cea8359989d84555||0
+#DEC|svn|edit|public
+DEC|cf|age|public||_uth_|||0
+DEC|cf|age|private||um-dir-s1.apps /tmp|||0
+#DEC|ssh|connect|public
+#DEC|ssh|cluster|public
+#DEC|ssh|connect|internal
+DEC|db|dc|public||gw name=itservices|4adb560000166fa7cfe62a2c69600758||0
+DEC|mon|remex|public||_uth_ mem|852ece62077aa52194dcd3b2137966e3||0
+DEC|mon|ng:remote|internal||ut-tt0-as0.appu.test mem|16330372||0
+#DEC|user|pwdel|public
+#DEC|user|pwadd|public
+#DEC|user|lock|public
+#DEC|user|unlock|public
+DEC|user|rights|public||ntalebi@um-rhn-s1|||0
+DEC|user|search|public||ntalebi|||0
+DEC|user|filter|public||mail=nima.talebi@det.nsw.edu.au|||0
+DEC|user|access|public||ntalebi@um-rhn-s1|||0
+DEC|user|detail|public||ntalebi|||0
+DEC|user|expiring|public||ntalebi|||0
+DEC|user|dupids|public||ntalebi|||0
+DEC|user|nextuid|public||ntalebi|||0
+DEC|user|lookup|internal||ntalebi|||0
+DEC|user|groups|internal||ntalebi|||0
+DEC|user|access|internal||ntalebi|||0
+DEC|user|nextuid|internal||ntalebi|||0
+DEC|user|duplicateids|internal||ntalebi|||0
+DEC|user|validate|internal||ntalebi|||0
+DEC|user|is_locked|internal||ntalebi|||1
+DEC|user|is_expired|internal||ntalebi|||1
+DEC|nfs|filers|public|||||0
+DEC|nfs|filerng|public||nasub02pnf|||0
+DEC|nfs|filerng|public||@nasub02pnf|||1
+DEC|nfs|access|public||ntalebi@nasub02pnf:/|||1
+#DEC|sap2|hostsid|public
+#DEC|sap2|cobble|public
+#DEC|sap2|users|public
+#DEC|sap2|mappings|public
+#DEC|sap2|cfmain|public
+#DEC|snmp|get|public
+#DEC|snmp|walker|public
+#. }=-
