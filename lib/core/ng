@@ -260,6 +260,72 @@ function ng:hosts() {
     return $e
 }
 
+function :ng:host() {
+    #. This function, contrary to the general rule, is not used by it's public version,
+    #. it's simply a copy of it which simply generates non-fancy script-useable output.
+    #.
+    #. Of course all user-friendly crap such as suggestions and such have been removed.
+    local -i e=${CODE_FAILURE?}
+
+    local -i hni
+    : ${hni:=${2:-0}}
+    if [ $# -eq 1 -o $# -eq 2 ]; then
+        ((hni++))
+
+        local prefix ng
+        local -a raw
+        if [ ${hni} -eq 1 ]; then
+            e=${CODE_SUCCESS}
+
+            local fqdn
+            local -a hosts
+            if [ -z "${1//[^.]/}" ]; then
+                fqdn="$(:dns:qdn ${1}).${USER_TLD}"
+                if [ $? -eq 0 ]; then
+                    hosts=( "${fqdn}" )
+                else
+                    e=${CODE_FAILURE}
+                fi
+            else
+                hosts=( ${1?}.${USER_TLD} )
+            fi
+
+            if [ $e -eq ${CODE_SUCCESS} ]; then
+                local -a raw
+                for fqdn in ${hosts[@]}; do
+                    local -a preraw=(
+                        $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(nisNetgroupTriple=\(${fqdn},,\))" cn\
+                            | awk '$1~/cn:/{print$2}')
+                    )
+
+                    if [ ${#preraw[@]} -gt 0 ]; then
+                        raw=( ${preraw[@]} )
+                    fi
+                done
+            fi
+        else
+            ng=$1
+            raw=(
+                $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(memberNisNetgroup=${ng})" cn\
+                    | awk '$1~/cn:/{print$2}')
+            )
+            e=${CODE_SUCCESS}
+        fi
+
+        if [ $e -eq ${CODE_SUCCESS} ]; then
+            for ng in ${raw[@]}; do
+                prefix="$(printf %$((${hni}*2))s ' ')"
+                cpf "${prefix} %s\n" "${ng}"
+                ${FUNCNAME} "$ng" ${hni}
+            done
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
 function ng:host:usage() { echo "<hostname>"; }
 function ng:host() {
     local -i e=${CODE_DEFAULT?}
@@ -277,7 +343,7 @@ function ng:host() {
             local fqdn
             local -a hosts
             if [ -z "${1//[^.]/}" ]; then
-                fqdn="$(dns:qdn ${1}).${USER_TLD}"
+                fqdn="$(:dns:qdn ${1}).${USER_TLD}"
                 if [ $? -eq 0 ]; then
                     hosts=( "${fqdn}" )
                 else
