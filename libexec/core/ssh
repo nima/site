@@ -1,0 +1,192 @@
+#!/usr/bin/env python
+import os, sys, getpass
+import paramiko, base64
+import binascii, socket, errno
+from sha import sha
+from concurrent import futures
+
+MISSING_HKEY = dict()
+#class MHKP(paramiko.MissingHostKeyPolicy):
+class MHKP(paramiko.AutoAddPolicy):
+    def __init__(self, *argv, **kwargs):
+        paramiko.AutoAddPolicy.__init__(self, *argv, **kwargs)
+
+    def missing_host_key(self, client, hostname, key):
+        MISSING_HKEY[hostname]=True
+        #client._host_keys.add(hostname, key.get_name(), key) 
+        #if client._host_keys_filename is not None: 
+        #    client.save_host_keys(client._host_keys_filename) 
+        return None
+
+class EssEssHache:
+    _known_hosts = os.path.expanduser('~/.ssh/known_hosts')
+
+    def __init__(self, threads, timeout=6):
+        self._clients = {}
+        self._threads = threads
+        self._timeout = timeout
+
+    def add_clients(self, qdns):
+        for qdn in qdns:
+            client = paramiko.SSHClient()
+            client.load_host_keys(self._known_hosts)
+            client.set_missing_host_key_policy(MHKP())
+            self._clients[qdn] = client
+
+    def del_client(self, qdn):
+        client = self._clients.pop(qdn)
+        if client._host_keys_filename is not None: 
+            client.save_host_keys(client._host_keys_filename) 
+        client.close()
+        
+    def connect(self, username, qdn, command):
+        client = self._clients[qdn]
+        data = None
+        try:
+            data = (qdn, [], [], 1)
+            try:
+                client.connect(qdn, username=username)
+                stdin, stdout, stderr = client.exec_command(command)
+                data = (qdn, stdout.readlines(), stderr.readlines(), 0)
+            except paramiko.BadHostKeyException as exception:
+                estr = "BadHostKeyException"
+                data = (qdn, [], [estr], 2)
+            except paramiko.SSHException as exception:
+                estr = "UnknownHost"
+                data = (qdn, [], [estr], 2)
+            except socket.error as exception:
+                if exception.errno == errno.EHOSTUNREACH:
+                    estr = "HostUnreacheable"
+                    data = (qdn, [], [estr], 3)
+                elif exception.errno == errno.ETIMEDOUT:
+                    estr = "Timeout"
+                    data = (qdn, [], [estr], 3)
+                elif exception.errno == errno.ECONNRESET:
+                    estr = "Connection Reset"
+                    data = (qdn, [], [estr], 3)
+                else:
+                    estr = "%s: %s" % (exception.__class__, exception)
+                    data = (qdn, [], [estr], 7)
+            except Exception as exception:
+                estr = "%s: %s" % (exception.__class__, exception)
+                data = (qdn, [], [estr], 8)
+            else:
+                self.del_client(qdn)
+
+        except Exception as exception:
+            estr = "%s: %s" % (exception.__class__, exception)
+            data = (qdn, [], [estr], 9)
+
+        return data
+
+
+    def writeMeABASHScript(self, var, username, cmd):
+        with futures.ThreadPoolExecutor(max_workers=self._threads) as executor:
+            sys.stdout.write("local -A %s\n" % var)   #. exit code
+            queue = [
+                (
+                    qdn, executor.submit(
+                        self.connect, username, qdn, cmd
+                    )
+                ) for qdn in self._clients.keys()
+            ]
+            sys.stdout.write("local -A %s_o\n" % var) #. stdout
+            sys.stdout.write("local -A %s_e\n" % var) #. stderr
+            sys.stdout.write("local -A %s_w\n" % var) #. warnings
+
+            for qdn, future in queue:
+                data = None
+                qdn_hash = sha(qdn).hexdigest()
+                try:
+                    data = future.result(timeout=self._timeout)
+                except futures.TimeoutError:
+                    sys.stdout.write("#. %s is taking too long. Oh well.\n" % qdn)
+                    sys.stdout.write("%s[%s]=%d\n" % (var, qdn_hash, 9))
+                    sys.stdout.write("%s_e[%s]='%s'\n" % (var, qdn_hash, 'TIMEOUT'))
+                else:
+                    qdn, stdout, stderr, e = data
+
+                    sys.stdout.write("%s[%s]=%d\n" % (var, qdn_hash, e))
+
+                    if len(stdout) == 1:
+                        if len(stdout[0].strip()) > 0:
+                            oneline = ''.join(stdout).strip()
+                            sys.stdout.write("%s_o[%s]='%s'\n" % (var, qdn_hash, oneline))
+                    elif len(stdout) > 0:
+                        sys.stdout.write("read -r -d '' %s_o[%s] <<-!\n" % (var, qdn_hash))
+                        sys.stdout.write(''.join(stdout).strip())
+                        sys.stdout.write("\n!\n")
+
+                    if len(stderr) == 1:
+                        if len(stderr[0].strip()) > 0:
+                            oneline = ''.join(stderr).strip()
+                            sys.stdout.write("%s_e[%s]='%s'\n" % (var, qdn_hash, oneline))
+                    elif len(stderr) > 0:
+                        sys.stdout.write("read -r -d '' %s_e[%s] <<-!\n" % (var, qdn_hash))
+                        sys.stdout.write(''.join(stderr).strip())
+                        sys.stdout.write("\n!\n")
+
+                    warning = MISSING_HKEY.get(qdn, False);
+                    if warning:
+                        sys.stdout.write("%s_w[%s]='%s'\n" % (var, qdn_hash, warning))
+
+            for qdn, future in queue:
+                data = None
+                qdn_hash = sha(qdn).hexdigest()
+                try:
+                    data = future.result(timeout=self._timeout)
+                except futures.TimeoutError:
+                    sys.stdout.write("#. %s is taking too long. Oh well.\n" % qdn)
+                    sys.stdout.write("%s[%s]=%d\n" % (var, qdn_hash, 9))
+                    sys.stdout.write("%s_e[%s]='%s'\n" % (var, qdn_hash, 'TIMEOUT'))
+                else:
+                    qdn, stdout, stderr, e = data
+
+                    sys.stdout.write("%s[%s]=%d\n" % (var, qdn_hash, e))
+
+                    if len(stdout) == 1:
+                        if len(stdout[0].strip()) > 0:
+                            sys.stdout.write("%s_o[%s]='%s'\n" % (var, qdn_hash, ''.join(stdout).strip()))
+                    elif len(stdout) > 0:
+                        sys.stdout.write("read -r -d '' %s_o[%s] <<-!\n" % (var, qdn_hash))
+                        sys.stdout.write(''.join(stdout).strip())
+                        sys.stdout.write("\n!\n")
+
+                    if len(stderr) == 1:
+                        if len(stderr[0].strip()) > 0:
+                            sys.stdout.write("%s_e[%s]='%s'\n" % (var, qdn_hash, ''.join(stderr).strip()))
+                    elif len(stderr) > 0:
+                        sys.stdout.write("read -r -d '' %s_e[%s] <<-!\n" % (var, qdn_hash))
+                        sys.stdout.write(''.join(stderr).strip())
+                        sys.stdout.write("\n!\n")
+
+                    warning = MISSING_HKEY.get(qdn, False);
+                    if warning:
+                        sys.stdout.write("%s_w[%s]='%s'\n" % (var, qdn_hash, warning))
+
+def main():
+    e=1
+
+    if len(sys.argv) >= 2:
+        threads = sys.argv[1]
+
+        var = None
+        username = None
+        qdns = list()
+        cmd = None
+
+        var, remainder = sys.argv[2].split('=', 1)
+        username, remainder = remainder.split('@', 1)
+        qdns = remainder.split(',')
+        cmd = ' '.join(sys.argv[3:])
+
+        ssh = EssEssHache(threads)
+        ssh.add_clients(qdns)
+        ssh.writeMeABASHScript(var, username, cmd)
+
+        e=0
+
+    return e
+
+if __name__ == '__main__':
+    exit(main())
