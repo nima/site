@@ -258,9 +258,9 @@ function :hgd:save() {
         hosts=( $(:hgd:resolve ${hgd}) )
         if [ $? -eq 0 -a ${#hosts[@]} -gt 0 ]; then
             :hgd:delete ${session}
-            echo -e "${session}\t${NOW}\t${hgd}\t${hosts[@]}" >> ${HGD_CACHE}
-            e=${CODE_SUCCESS}
         fi
+        echo -ne "${session}\t${NOW}\t${hgd}\t${hosts[@]}\n" >> ${HGD_CACHE}
+        e=${CODE_SUCCESS}
     else
         core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, 2 expected"
     fi
