@@ -186,7 +186,7 @@ boolean showhosts false "show-host-leaf-nodes-in-netgroup-tree"  H
 boolean verifyall false "verify-all-entries"                     V
 !
 }
-function ng:tree:usage() { echo "[-H|--show-hosts] [-R|--recursive] [-V|--verifyall] <netgroup>"; }
+function ng:tree:usage() { echo "<flags>"; }
 function ng:tree() {
     local -i e=${CODE_DEFAULT?}
 
