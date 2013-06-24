@@ -13,7 +13,10 @@ FIXME Some critical issues here
 #. Optional shflags function for complicated functions
 function example:template:shflags() {
     cat <<!
+boolean verbose false <verbose> v
 string dir . <repo-dir> d
+integer
+float
 !
 }
 
