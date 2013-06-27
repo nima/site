@@ -47,7 +47,9 @@ class EssEssHache:
             try:
                 client.connect(qdn, username=username)
                 stdin, stdout, stderr = client.exec_command(command)
-                data = (qdn, stdout.readlines(), stderr.readlines(), 0)
+                data = (
+                    qdn, stdout.readlines(), stderr.readlines(), stdout.channel.recv_exit_status()
+                )
             except paramiko.BadHostKeyException as exception:
                 estr = "BadHostKeyException"
                 data = (qdn, [], [estr], 2)
