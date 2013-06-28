@@ -1,26 +1,37 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
 core:import dns
+core:import util
 
-#. Internal Functions -={
+#. Authentication -={
 declare -g g_PASSWD_CACHED=
 function :ldap:authenticate() {
     local -i e=${CODE_FAILURE}
     if [ ${#g_PASSWD_CACHED} -eq 0 ]; then
-        read -p "Enter LDAP (${USER_LDAPHOST_RW}) Password: " -s g_PASSWD_CACHED
+        if which secret >/dev/null 2>&1; then
+            g_PASSWD_CACHED=$(secret LDAP)
+            e=$?
+        fi
+
+        if [ $e -ne 0 ]; then
+            read -p "Enter LDAP (${USER_LDAPHOST_RW}) Password: " -s g_PASSWD_CACHED
+            echo
+        fi
+
         ldapsearch -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -b ${USER_UDN} >/dev/null 2>&1
         if [ $? -eq 0 ]; then
+            export g_PASSWD_CACHED
             e=${CODE_SUCCESS}
         else
             g_PASSWD_CACHED=
         fi
-        echo
     else
         e=${CODE_SUCCESS}
     fi
     return $e
 }
-
+#. }=-
+#. Modification -={
 #. LDAP Return Copes
 #. 0   - LDAP_SUCCESS
 #. 1   - LDAP_OPERATIONS_ERROR
@@ -28,9 +39,9 @@ function :ldap:authenticate() {
 #. 16  - LDAP_NO_SUCH_ATTRIBUTE
 #. 19  - LDAP_CONSTRAINT_VIOLATION
 #. 20  - LDAP_TYPE_OR_VALUE_EXISTS
-
 function :ldap:modify() {
     local -i e=${CODE_FAILURE}
+
     if [ $# -ge 2 ]; then
         local context=$1
         case $context in
@@ -64,45 +75,52 @@ $(
                             e=$?
                             #echo ${USER_LDAPHOST_RW} $e > /dev/stderr
                         ;;
+                        *) core:raise EXCEPTION_BAD_FN_CALL;;
                     esac
                 fi
             ;;
+            *) core:raise EXCEPTION_BAD_FN_CALL;;
         esac
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
+
     return $e
 }
 
-function :ldap:eval:search() {
+function :ldap:add() {
     local -i e=${CODE_FAILURE}
 
-    if [ $# -ge 2 ]; then
-        local context=$1
-        local username=$2
-        shift 2
-        case $context in
-            user)
-                local userdata=$(
-                    ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${USER_UDN}" "uid=${username}" ${@}
-                )
-                for attr in $@; do
-                    local r=$(
-                        echo "${userdata}" \
-                            | grep -Po "^${attr}:\s+.*"\
-                            | cut -d' ' -f2\
-                            | tr -d '\n'
-                    )
-                    echo "local ldap_${attr}='${r}';"
-                done
-
-                e=${CODE_SUCCESS}
-            ;;
-        esac
+    if [ $# -eq 1 ]; then
+        if :ldap:authenticate; then
+            local context=$1
+            case $context in
+                user)
+                    ldapadd -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -f <(
+                        echo "dn: uid=${dstuid},${USER_UDN}"
+                        unset _ldap_dn
+                        for attrs in ${!_ldap_*}; do
+                            local -i i
+                            local -i attrlen=$(eval "echo \${#$attrs[@]}") #. number of attribute definitions
+                            for ((i=0; i<${attrlen}; i++)); do
+                                eval 'echo "${attrs//_ldap_/}: ${'$attrs'[${i}]}"' | sed -e 's/\<'${srcuid}'\>/'${dstuid}'/g'
+                            done
+                        done
+                        echo
+                    ) >/dev/null 2>&1
+                    e=$?
+                ;;
+                *) core:raise EXCEPTION_BAD_FN_CALL;;
+            esac
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
 }
 #. }=-
-#. Public Functions -={
+#. Utility -={
 function ldap:ngldif:usage() { echo "<host> [<host> [...]]"; }
 function ldap:ngldif() {
     local -i e=${CODE_DEFAULT?}
@@ -184,40 +202,132 @@ function ldap:ping() {
     return $e
 }
 #. }=-
+#. Search -={
+function :ldap:eval:search() {
+    #. This function searches for a single object
+    #.
+    #. As all :eval: functions, this function produces code that is to be evaluated by
+    #. another bash instance.
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -ge 2 ]; then
+        local context=$1
+        local username=$2
+        shift 2
+        case $context in
+            user)
+                local userdata=$(
+                    ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${USER_UDN}" "uid=${username}" ${@}
+                )
+                if [ $# -gt 0 ]; then
+                    #. User specified which attrs they want:
+                    for attr in $@; do
+                        #. evaluate the value of the user-data
+                        local r=$(
+                            echo "${userdata}" \
+                                | grep -Po "^${attr}:\s+.*"\
+                                | cut -d' ' -f2\
+                                | tr -d '\n'
+                        )
+                        echo "local _ldap_${attr,,}='${r}';"
+                    done
+                else
+                    #. User asked for a complete dump of the user ldif
+                    local -A ldifdata
+                    while read line; do
+                        local attr="$(echo $line|sed -e 's/^\(.*\): *\(.*\)$/\L\1/')"
+                        local val="$(echo $line|sed -e 's/^\(.*\): *\(.*\)$/\2/')"
+                        if [ -z "${ldifdata[${attr}]}" ]; then
+                            eval "local -a _ldap_${attr,,}=( \"${val}\" )"
+                            ((ldifdata[${attr}]=1))
+                        else
+                            ((ldifdata[${attr}]+=1))
+                            eval "_ldap_${attr,,}+=( '${val}' )"
+                        fi
+                    done <<< "${userdata}"
+
+                    #. Print as eval bash arrays
+                    printf "#. WARNING: If ldap values have double-quotes, they will be stripped.\n"
+                    for attrs in ${!_ldap_*}; do
+                        local -i attrlen=$(eval "echo \${#$attrs[@]}") #. number of attribute definitions
+
+                        printf "local -a ${attrs}=("
+                        for ((i=0; i<${attrlen}; i++)); do
+                            printf ' "'
+                            eval "printf \"\${$attrs[${i}]}\""|tr -d '"'
+                            printf '"'
+                        done
+                        printf " )\n"
+
+                    done
+
+                    #. Print as ldif (bash comments)
+                    for attrs in ${!_ldap_*}; do
+                        local -i attrlen=$(eval "echo \${#$attrs[@]}") #. number of attribute definitions
+                        for ((i=0; i<${attrlen}; i++)); do
+                            eval 'echo "#. ${attrs//_ldap_/}: ${'$attrs'[${i}]}"'
+                        done
+                    done
+                fi
+
+                e=${CODE_SUCCESS}
+            ;;
+        esac
+    fi
+
+    return $e
+}
 
 function :ldap:search() {
-    local -i e=${CODE_DEFAULT?}
+    #. This function seaches for multiple objects
+    local -i e=${CODE_FAILURE?}
+
     if [ $# -gt 1 ]; then
         local bdn
         case $1 in
-            user)  bdn=${USER_UDN};;
-            group) bdn=${USER_GDN};;
-            ng)    bdn=${USER_NDN};;
-            *) core:raise EXCEPTION_BAD_FN_CALL;;
+            user)     bdn=${USER_UDN};;
+            group)    bdn=${USER_GDN};;
+            netgroup) bdn=${USER_NDN};;
+            *) core:raise EXCEPTION_BAD_FN_CALL "user|grouo|netgroup - nothing else allowed";;
         esac
 
         if [ ${#bdn} -gt 0 ]; then
             shift 1
 
-            local -a attr
+            local -a filter
+            local -a display
+
+            #. Look for filter tokens
             local token
             for token in $@; do
-                if ! [[ ${token} =~ .+([\<\>]?=).+ ]]; then
-                    attr+=( ${token} )
+                if [[ ${token} =~ .+([\<\>]?=).+ ]]; then
+                    filter+=( "(${token})" )
+                else
+                    filter+=( "(${token}=*)" )
+                    display+=( ${token} )
                 fi
             done
 
-            local -i awknf=$((${#attr[@]}*2+2)) #. 2 for dn and value, and 2 for each attr required
+            #. 2 for dn_key and dn_value, and 2 for each additional attr key/value pair requested
+            local -i awknf=$((2 + 2*${#display[@]}))
+
             local awkfields='$4'
-            for ((i=6; i<=${#attr[@]}*2+2; i+=2)); do
+            for ((i=6; i<=${awknf}; i+=2)); do
                 awkfields+=",\$$i"
             done
 
             #. Script-readable dump
-            ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${bdn}" $@\
-                | awk 'BEGIN{RS="\n\n";IFS="[: \n]"}{if(NF=='${awknf}'){print'${awkfields}'}}'
+            filterstr="(&$(:util:join '' filter))"
+            local querystr="ldapsearch -LLL -h '${USER_LDAPHOST}' -x -b '${bdn}' '${filterstr}' ${display[@]}"
+            #cpf "%{@cmd:%s}\n" "${querystr}"
 
-            [ ${PIPESTATUS[0]} -ne 0 ] || e=${CODE_SUCCESS}
+            #. TITLE: echo ${display[@]^^}
+            local data
+            data="$(ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${bdn}" "${filterstr}" ${display[@]})"
+            if [ $? -eq 0 ]; then
+                awk 'BEGIN{RS="\n\n";IFS="[: \n]"}{if(NF=='${awknf}'){print'${awkfields}'}}' <<< "${data}"
+                e=$?
+            fi
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -225,6 +335,26 @@ function :ldap:search() {
 
     return $e
 }
-#function ldap:search:usage() { echo "user|group|ng <args> (see man(1) ldapsearch)"; }
 
+function ldap:search:usage() { echo "user|group|ng <args> (see man(1) ldapsearch)"; }
+function ldap:search() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -gt 1 ]; then
+        local bdn
+        case $1 in
+            user)     bdn=${USER_UDN};;
+            group)    bdn=${USER_GDN};;
+            netgroup) bdn=${USER_NDN};;
+            *) core:raise EXCEPTION_BAD_FN_CALL;;
+        esac
+
+        if [ ${#bdn} -gt 0 ]; then
+            :ldap:search $@ | column -t
+            e=${PIPESTATUS[0]}
+        fi
+    fi
+
+    return $e
+}
 #. }=-
