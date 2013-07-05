@@ -140,8 +140,8 @@ function ${utf}Dyn${i}() {
                 fi
 
                 if assertEquals "exit code" \${exitcode} \$e; then
-                    local stdout_ok=0
                     if [ -n "\${stdout?}" ]; then
+                        local stdout_ok=0
                         if [ \${#stdout} -eq 32 ]; then
                             local md5=\$(md5sum \${stdoutF?}|awk '{print\$1}')
                             if [ "\${md5}" == "\${stdout?}" ]; then
@@ -156,8 +156,8 @@ function ${utf}Dyn${i}() {
                         fi
                     fi
 
-                    local stderr_ok=0
                     if [ -n "\${stderr}" ]; then
+                        local stderr_ok=1
                         if [ \${#stderr} -eq 32 ]; then
                             local md5=\$(md5sum \${stderrF}|awk '{print\$1}')
                             if [ "\${md5}" == "\${stderr}" ]; then
@@ -168,7 +168,11 @@ function ${utf}Dyn${i}() {
                         fi
                         if [ \${stderr_ok} -eq 0 ]; then
                             read -r stderr_line <\${stderrF?}
-                            assertEquals "\${stderr?}" "\${stderr_line?}"
+                            if assertEquals "\${stderr?}" "\${stderr_line?}"; then
+                                stderr_ok=0
+                            else
+                                cpf "    %{@warn:WARNING}: Unexpected output to stderr [%{@warn:%s}]\n" "\${stderr}"
+                            fi
                         fi
                     fi
 
