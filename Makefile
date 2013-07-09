@@ -25,13 +25,17 @@ extern:
 	@make -C $@
 	@
 	@mkdir -p $(HOME)/.site/extern
-	@ln -sf $(PWD)/extern/shflags $(HOME)/.site/extern/shflags
-	@ln -sf $(PWD)/extern/shunit2 $(HOME)/.site/extern/shunit2
+	@ln -sf $(PWD)/extern/shflags   $(HOME)/.site/extern/shflags
+	@ln -sf $(PWD)/extern/shunit2   $(HOME)/.site/extern/shunit2
+	@ln -sf $(PWD)/extern/vimcat    $(HOME)/.site/extern/vimcat
+	@ln -sf $(PWD)/extern/vimpager  $(HOME)/.site/extern/vimpager
 
-uninstall:
+clean:
+	@make -C extern $@
+
+uninstall: clean
 	rm -rf $(HOME)/.site
 	rm -rf $(HOME)/bin/site
-	@make -C extern clean
 	@echo "Uninstall complete."
 
-.PHONY: install reinstall uninstall extern
+.PHONY: install reinstall uninstall extern clean
