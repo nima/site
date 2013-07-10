@@ -39,23 +39,13 @@ function :ldap:authenticate() {
 #. 16  - LDAP_NO_SUCH_ATTRIBUTE
 #. 19  - LDAP_CONSTRAINT_VIOLATION
 #. 20  - LDAP_TYPE_OR_VALUE_EXISTS
-function :ldap:modify() {
-    local -i e=${CODE_FAILURE}
 
-    if [ $# -ge 2 ]; then
-        local context=$1
-        case $context in
-            user)
-                local username=$2
-                local change=$3
-                if :ldap:authenticate; then
-                    case ${change} in
-                        delete|add|replace)
-                            #cat <<! >/dev/stderr
-                            ldapmodify -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<! >/dev/null 2>&1
-dn: uid=${username},${USER_UDN}
-changetype: modify
-$(
+function ::ldap:modify() {
+    local username=$1
+    echo "# vim:syntax=ldif"
+    echo "dn: uid=${username},${USER_UDN}"
+    echo "changetype: modify"
+
     local attr=
     for ((i=4; i<$#+1; i++)); do
         if [ "${!i}" != "-" -a ${#attr} -gt 0 ]; then
@@ -70,10 +60,27 @@ $(
         fi
     done;
     printf "\n "
-)
-!
+}
+function :ldap:modify() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -ge 2 ]; then
+        local context=$1
+        case $context in
+            user)
+                local username=$2
+                local change=$3
+                if :ldap:authenticate; then
+                    case ${change} in
+                        delete|add|replace)
+                            shift
+                            local ldif="$(::ldap:modify ${username} ${@})"
+                            ldapmodify -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<< "${ldif}"  >/dev/null 2>&1
                             e=$?
-                            #echo ${USER_LDAPHOST_RW} $e > /dev/stderr
+                            if [ $e -ne ${CODE_SUCCESS} ]; then
+                                cpf "%{@comment:#. } LDIF %{@err:Failed} with status code %{@int:$e}:\n" >&2
+                                ${SITE_LIB_EXTERN}/vimcat <<< "${ldif}" >&2
+                            fi
                         ;;
                         *) core:raise EXCEPTION_BAD_FN_CALL;;
                     esac
@@ -278,7 +285,7 @@ function :ldap:eval:search() {
     return $e
 }
 
-function :ldap:search() {
+function ::ldap:search() {
     #. This function seaches for multiple objects
     local -i e=${CODE_FAILURE?}
 
@@ -288,7 +295,6 @@ function :ldap:search() {
             user)     bdn=${USER_UDN};;
             group)    bdn=${USER_GDN};;
             netgroup) bdn=${USER_NDN};;
-            *) core:raise EXCEPTION_BAD_FN_CALL "user|grouo|netgroup - nothing else allowed";;
         esac
 
         if [ ${#bdn} -gt 0 ]; then
@@ -313,7 +319,7 @@ function :ldap:search() {
 
             local awkfields='$4'
             for ((i=6; i<=${awknf}; i+=2)); do
-                awkfields+=",\$$i"
+                awkfields+=",\"+++\",\$$i"
             done
 
             #. Script-readable dump
@@ -325,7 +331,7 @@ function :ldap:search() {
             local data
             data="$(ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${bdn}" "${filterstr}" ${display[@]})"
             if [ $? -eq 0 ]; then
-                awk 'BEGIN{RS="\n\n";IFS="[: \n]"}{if(NF=='${awknf}'){print'${awkfields}'}}' <<< "${data}"
+                echo -e "${data}\n" | awk 'BEGIN{RS="\n\n";FS="[\n]|: "}{if(NF=='${awknf}'){print'${awkfields}'}}'
                 e=$?
             fi
         fi
@@ -335,8 +341,12 @@ function :ldap:search() {
 
     return $e
 }
+function :ldap:search() {
+    ::ldap:search $@ | column -t -s '+++'
+    return $?
+}
 
-function ldap:search:usage() { echo "user|group|ng <args> (see man(1) ldapsearch)"; }
+function ldap:search:usage() { echo "user|group|netgroup <filters> <show-fields>"; }
 function ldap:search() {
     local -i e=${CODE_DEFAULT?}
 
@@ -350,7 +360,7 @@ function ldap:search() {
         esac
 
         if [ ${#bdn} -gt 0 ]; then
-            :ldap:search $@ | column -t
+            :ldap:search $@
             e=${PIPESTATUS[0]}
         fi
     fi
