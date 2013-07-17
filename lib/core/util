@@ -123,6 +123,21 @@ function :util:uniq() {
     fi
 }
 
+function :util:dups() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 0 ]; then
+        while read line; do
+            echo ${line}
+        done | sort -n | awk 'BEGIN{last=0};$1~/uidNumber/{if(last==$2){print$2};last=$2}' | sort -u
+        e=${CODE_SUCCESS}
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
 function :util:join() {
     if [ $# -eq 2 ]; then
         #. array=( a b c ); :util:join $delim array
