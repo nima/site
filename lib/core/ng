@@ -16,16 +16,20 @@ function ::ng:tree_data() {
         local child
         local -a children
 
-        children=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="${parent}" memberNisNetgroup|awk '$1~/^memberNisNetgroup:$/{print$2}' ) )
+        IFS='|||' read -a children <<< "$(:ldap:search netgroup cn=${parent} memberNisNetgroup)"
         for child in ${children[@]}; do
             if [ ${vflag} -eq 0 ]; then
                 echo ${parent}:?+${child}
             else
-                local hit=$(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="${child}" memberNisNetgroup nisNetgroupTriple|wc -l)
-                if [ ${hit} -gt 2 ]; then
-                    echo ${parent}:1+${child} #. Child exists and has children
-                elif [ ${hit} -eq 2 ]; then
-                    echo ${parent}:0+${child} #. Child exists but has not children
+                local hit="$(:ldap:search netgroup cn=${child} cn)"
+                if [ ${#hit} -gt 0 ]; then
+                    IFS='|||' read -a mnN <<< "$(:ldap:search netgroup cn=${child} memberNisNetgroup)"
+                    IFS='|||' read -a nnT <<< "$(:ldap:search netgroup cn=${child} nisNetgroupTriple)"
+                    if [ ${#mnN[@]} -gt 0 -o ${#nnT[@]} -gt 0 ]; then
+                        echo ${parent}:1+${child} #. Child exists and has children
+                    else
+                        echo ${parent}:0+${child} #. Child exists but has no children
+                    fi
                 else
                     echo ${parent}:-+${child} #. Child does not exist
                 fi
@@ -37,7 +41,7 @@ function ::ng:tree_data() {
         done
 
         if [ ${hflag} -eq 1 ]; then
-            children=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="${parent}" nisNetgroupTriple|awk '$1~/^nisNetgroupTriple:$/{print$2}' ) )
+            IFS='|||' read -a children <<< "$(:ldap:search netgroup cn=${parent} nisNetgroupTriple)"
             for child in ${children[@]}; do
                 if echo ${child} | grep -qE ${USER_TLD}; then
                     child=$(echo ${child}|tr -d '(),')
@@ -145,7 +149,7 @@ function :ng:ping() {
     local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
-        hit=$(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="$1"|wc -l)
+        hit=$(:ldap:search netgroup cn="$1" cn|wc -l)
         [ ${hit} -eq 0 ] || e=${CODE_SUCCESS}
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -159,11 +163,11 @@ function :ng:resolve() {
 
     if [ $# -eq 1 ]; then
         if :ng:ping $1; then
-            children=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="$1" memberNisNetgroup|awk '$1~/^memberNisNetgroup:$/{print$2}' ) )
+            IFS='|||' read -a children <<< "$(:ldap:search netgroup cn=$1 memberNisNetgroup)"
             for child in ${children[@]}; do
                 :ng:resolve $child
             done
-            children=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" cn="$1" nisNetgroupTriple|awk '$1~/^nisNetgroupTriple:$/{print$2}' ) )
+            IFS='|||' read -a children <<< "$(:ldap:search netgroup cn=$1 nisNetgroupTriple)"
             for child in ${children[@]}; do
                 if echo ${child}|grep -q "${USER_TLD}"; then
                     echo ${child/.${USER_TLD?}/}|tr -d '(),'
@@ -294,10 +298,7 @@ function :ng:host() {
             if [ $e -eq ${CODE_SUCCESS} ]; then
                 local -a raw
                 for fqdn in ${hosts[@]}; do
-                    local -a preraw=(
-                        $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(nisNetgroupTriple=\(${fqdn},,\))" cn\
-                            | awk '$1~/cn:/{print$2}')
-                    )
+                    local -a preraw=( $(:ldap:search netgroup nisNetgroupTriple="\(${fqdn},,\)" cn ))
 
                     if [ ${#preraw[@]} -gt 0 ]; then
                         raw=( ${preraw[@]} )
@@ -306,10 +307,7 @@ function :ng:host() {
             fi
         else
             ng=$1
-            raw=(
-                $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(memberNisNetgroup=${ng})" cn\
-                    | awk '$1~/cn:/{print$2}')
-            )
+            raw=( $(:ldap:search netgroup memberNisNetgroup="${ng}" cn ) )
             e=${CODE_SUCCESS}
         fi
 
@@ -361,10 +359,7 @@ function ng:host() {
                         cpf "Trying %{@fqdn:%s}..." ${fqdn}
                     fi
 
-                    local -a preraw=(
-                        $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(nisNetgroupTriple=\(${fqdn},,\))" cn\
-                            | awk '$1~/cn:/{print$2}')
-                    )
+                    local -a preraw=( $(:ldap:search netgroup nisNetgroupTriple="\(${fqdn},,\)" cn) )
 
                     if [ ${#preraw[@]} -eq 0 ]; then
                         theme HAS_WARNED "There are no netgroups with \`${fqdn}' as a member"
@@ -379,10 +374,7 @@ function ng:host() {
             fi
         else
             ng=$1
-            raw=(
-                $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "(memberNisNetgroup=${ng})" cn\
-                    | awk '$1~/cn:/{print$2}')
-            )
+            raw=( $(:ldap:search netgroup memberNisNetgroup="${ng}" cn) )
             e=${CODE_SUCCESS}
         fi
 
@@ -395,7 +387,7 @@ function ng:host() {
                 ${FUNCNAME} "$ng" ${hni}
             done
         else
-            local -a didumean=( $(ldapsearch -h ${USER_LDAPHOST} -LLL -x -b "${USER_NDN}" "nisNetgroupTriple~=${fqdn}" nisNetgroupTriple|sed -ne 's/nisNetgroupTriple: *(\(.*\),,)$/\1/p') )
+            local -a didumean=( $(:ldap:search "nisNetgroupTriple~=${fqdn}" nisNetgroupTriple) )
             if [ ${#didumean[@]} -gt 0 ]; then
                 printf "? %s\n" ${didumean[@]}
             fi
