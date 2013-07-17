@@ -18,7 +18,7 @@ function :ldap:authenticate() {
             echo
         fi
 
-        ldapsearch -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -b ${USER_UDN} >/dev/null 2>&1
+        ldapsearch -x -LLL -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -b ${USER_UDN} >/dev/null 2>&1
         if [ $? -eq 0 ]; then
             export g_PASSWD_CACHED
             e=${CODE_SUCCESS}
@@ -172,7 +172,7 @@ function ldap:ping() {
             cpf "Integrity check for %{c:uid=}%{r:${uidc}*}..."
             local -A md5s=()
             for lh in ${USER_LDAPHOSTS[@]}; do
-                dump[${lh}]=$( (ldapsearch -E pr=128/noprompt -S dn -LLL -h "${lh}" -x -b "${USER_UDN}" uid="${uidc}*" modifyTimestamp createTimestamp |grep -v 'pagedresults:' 2>/dev/null))
+                dump[${lh}]=$( (ldapsearch -x -LLL -E pr=128/noprompt -S dn -h "${lh}" -b "${USER_UDN}" uid="${uidc}*" modifyTimestamp createTimestamp |grep -v 'pagedresults:' 2>/dev/null))
                 if [ $? -eq 0 ]; then
                     cpf '.'
                 else
@@ -224,7 +224,7 @@ function :ldap:eval:search() {
         case $context in
             user)
                 local userdata=$(
-                    ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${USER_UDN}" "uid=${username}" ${@}
+                    ldapsearch -x -LLL -E pr=1024/noprompt -h "${USER_LDAPHOST}" -b "${USER_UDN}" "uid=${username}" ${@}
                 )
                 if [ $# -gt 0 ]; then
                     #. User specified which attrs they want:
@@ -285,8 +285,12 @@ function :ldap:eval:search() {
     return $e
 }
 
-function ::ldap:search() {
+function :ldap:search() {
     #. This function seaches for multiple objects
+    #.
+    #. Usage:
+    #.       IFS='|||' read -a fred <<< "$(site ldap search netgroup cn=jboss_prd nisNetgroupTriple)"
+
     local -i e=${CODE_FAILURE?}
 
     if [ $# -gt 1 ]; then
@@ -306,7 +310,7 @@ function ::ldap:search() {
             #. Look for filter tokens
             local token
             for token in $@; do
-                if [[ ${token} =~ .+([\<\>]?=).+ ]]; then
+                if [[ ${token} =~ [-a-zA-Z0-9_]+([~\<\>]?=).+ ]]; then
                     filter+=( "(${token})" )
                 else
                     filter+=( "(${token}=*)" )
@@ -323,27 +327,46 @@ function ::ldap:search() {
             done
 
             #. Script-readable dump
-            filterstr="(&$(:util:join '' filter))"
-            local querystr="ldapsearch -LLL -h '${USER_LDAPHOST}' -x -b '${bdn}' '${filterstr}' ${display[@]}"
+            local filterstr="(&$(:util:join '' filter))"
+            local -l displaystr=$(:util:join ',' display)
+            local querystr="ldapsearch -x -LLL -E pr=1024/noprompt -h '${USER_LDAPHOST}' -x -b '${bdn}' '${filterstr}' ${display[@]}"
             #cpf "%{@cmd:%s}\n" "${querystr}"
 
             #. TITLE: echo ${display[@]^^}
-            local data
-            data="$(ldapsearch -LLL -h "${USER_LDAPHOST}" -x -b "${bdn}" "${filterstr}" ${display[@]})"
-            if [ $? -eq 0 ]; then
-                echo -e "${data}\n" | awk 'BEGIN{RS="\n\n";FS="[\n]|: "}{if(NF=='${awknf}'){print'${awkfields}'}}'
-                e=$?
-            fi
+            eval ${querystr} | awk -v displaystr=${displaystr} '
+BEGIN{
+    FS="\n";
+    RS="\n\n";
+    split(displaystr,display,",")
+}
+{
+    for(i=1;i<=NF;i++) {
+        if($i && $i!~/^#/) {
+            match($i, /^([^:]+): +(.*)$/, kv);
+            key=tolower(kv[1]);
+            value=kv[2];
+            if(length(data[key])>0) data[key]=data[key] "|||" value;
+            else data[key]=value;
+        }
+    }
+
+    if(data[key]) {
+        for(i=1; i<=length(display); i++) {
+            if(i>1) printf("+++");
+            key = display[i];
+            printf("%s", data[key]);
+        }
+        printf("\n");
+    }
+    delete data;
+}'
+            e=$?
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
-}
-function :ldap:search() {
-    ::ldap:search $@ | column -t -s '+++'
-    return $?
 }
 
 function ldap:search:usage() { echo "user|group|netgroup <filters> <show-fields>"; }
