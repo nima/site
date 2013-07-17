@@ -68,6 +68,7 @@ function ::cpf:theme() {
                     netgroup_missing)    fmt="%{+bo}%{r:${fmt}}%{-bo}";;
                     netgroup_direct)     fmt="%{+bo}%{c:${fmt}}%{-bo}";;
                     netgroup_indirect)   fmt="%{c:${fmt}}";;
+                    code)                fmt="%{c:${fmt}}";;
                     filer)               fmt="%{m:${fmt}}";;
                     timestamp)           fmt="%{g:${fmt}}";;
                     comment)             fmt="%{bl:${fmt}}";;
@@ -386,7 +387,7 @@ function cpf() {
             echo "CPF Failure: mismatched arguments for given format string ( ${substitutions} in fmtstr, ${#args[@]} arguments supplied )" > /dev/stderr
             echo "Formatstr: \`${fmt}'" > /dev/stderr
             echo "Arguments: \`${args[@]}'" > /dev/stderr
-            exit 99
+            #exit 99
         fi
     else
         echo
