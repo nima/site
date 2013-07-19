@@ -183,3 +183,9 @@ function :util:join() {
 #    explode sd
 #}
 #. }=-
+
+#. ANSI2HTML -={
+function :util:ansi2html() {
+    ${SITE_LIBEXEC_CORE}/ansi2html
+}
+#. }=-
