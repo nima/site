@@ -2,6 +2,7 @@
 
 core:import dns
 core:import hgd
+core:import util
 
 function :ssh:connect() {
     local -i e=${CODE_FAILURE?}
@@ -15,6 +16,78 @@ function :ssh:connect() {
         e=$?
     else
         core:raise ${EXCEPTION_BAD_FN_CALL}
+    fi
+
+    return $e
+}
+
+function :ssh:pipewrap() {
+    # This function reads in the input from a terminal and output the same.
+    # The only purpose is to insert PASSWORD for "sudo -S" command.
+    # After initially insert the password, it simply copy input from terminal
+    # and send it to ssh command directly
+    echo $1  # which is password
+    local lockFile=$2;
+    while true; do
+        # The function will exit when output pipe is closed,
+        if [ ! -e $lockFile ]; then
+            return 0
+        fi
+        # i.e., the ssh
+        read -t 1 line
+        if [ $? -eq 0 ]; then
+            # successfully read
+            #echo $line
+            : jej
+        fi
+    done
+}
+
+function :ssh:sudo() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -ge 2 ]; then
+        local passwd
+        passwd="$(:util:secrets SUDO)"
+        if [ $? -eq ${CODE_SUCCESS} ]; then
+            local hostname=$1
+            shift
+
+            local prompt="$(printf ".\r")"
+            local lckfile=$(mktemp)
+            :ssh:pipewrap "${passwd}" "${lckfile}" | (
+                :ssh:connect ${hostname} sudo -p "${prompt}" -S ${*}
+                e=$?
+                rm -f ${lckfile}
+                exit $e
+            )
+            e=$?
+        fi
+    fi
+
+    return $e
+}
+
+function ssh:sudo:usage() { echo "<host-hint> <cmd>"; }
+function ssh:sudo() {
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -ge 2 ]; then
+        local hosthint=$1
+        local -a hostnames=( $(:dns:qdn ${hosthint}) )
+        if [ ${#hostnames[@]} -gt 1 ]; then
+            cpf WARN "More than one match"
+            local hostname
+            for hostname in ${hostnames[@]}; do
+                cpf "    - %{@host:%s}\n" ${hostname}
+            done
+        fi
+        local hostname=${hostnames[0]}
+        shift
+
+        theme INFO "Connecting to ${hostname}..."
+        :ssh:sudo ${hostname} ${*}
+        e=$?
     fi
 
     return $e
