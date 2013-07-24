@@ -1,5 +1,124 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
+
+VAULT=${HOME}/.secrets
+VAULT_TMP=${HOME}/.vault/killme
+VAULT_BACKUP=${HOME}/.vault/vault-$(date +'%Y%m%d')
+
+function ::util:secrets:cleanup() {
+    for vault in ${VAULTS[@]}; do
+        test ! -f ${vault} || chmod 600 ${vault}
+    done
+    mkdir -p $(dirname ${VAULT_BACKUP})
+    chmod 700 $(dirname ${VAULT_BACKUP})
+    test ! -f ${VAULT_BACKUP} || chmod 600 ${VAULT_BACKUP}
+    find ${VAULT_TMP} -type f -exec shred -fuz {} \;
+    rm -f ${VAULT_TMP}.timestamp
+    #rmdir $(dirname ${VAULT_TMP})
+}
+
+#function ::util:secrets:draw() {
+#    ${HOME}/bin/gpg2png $1
+#    cp $1.png ~/vault.png
+#    cp $1-qr.png ~/VAULT-QR.PNG
+#    img2txt ~/vault.png ~/VAULT-QR.PNG
+#}
+
+function :util:secrets() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        ${SITE_LIBEXEC_CORE}/secret $1
+        e=$?
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function util:secrets:usage() { echo "edit|list"; }
+function util:secrets() {
+    local -i e=${CODE_DEFAULT}
+    trap ::util:secrets:cleanup INT
+
+    core:requires gpg
+
+    cpf "Checking your secrets..."
+    if [ -f ${VAULT} ]; then
+        theme HAS_PASSED ${VAULT}
+        cpf "Checking your GPG id..."
+        if [ ${#SITE_GPG_ID} -gt 0 ]; then
+            theme HAS_PASSED ${SITE_GPG_ID}
+            if [ $# -eq 1 ]; then
+                case $1 in
+                    edit)
+                        cpf "Decrypting secrets..."
+                        mkdir -p $(dirname ${VAULT_TMP})
+                        chmod 700 $(dirname ${VAULT_TMP})
+                        gpg -q --batch --use-agent -d -o ${VAULT_TMP} ${VAULT}
+                        e=$?
+                        if [ $e -eq 0 ]; then
+                            theme HAS_PASSED
+                            touch ${VAULT_TMP}.timestamp
+                            ${EDITOR:-vim} -n ${VAULT_TMP}
+                            if [ ${VAULT_TMP} -nt ${VAULT_TMP}.timestamp ]; then
+                                cpf "Encrypting secrets..."
+                                #draw ${VAULT_TMP}
+                                mv ${VAULT} ${VAULT_BACKUP}
+                                gpg -q --use-agent -r ${SITE_GPG_ID} -e -a -o ${VAULT} ${VAULT_TMP}
+                                e=$?
+                                if [ $e -eq 0 ]; then
+                                    theme HAS_PASSED
+                                else
+                                    theme HAS_FAILED "ENCRYPTION"
+                                fi
+                            fi
+                        else
+                            theme HAS_FAILED "DECRYPTION"
+                        fi
+                        ::util:secrets:cleanup
+                    ;;
+                    list)
+                        local -a secrets=(
+                            $(gpg -q --batch --use-agent -d -o - ${VAULT}|awk '$1!~/^[\t ]*#/{print$1}')
+                        )
+                        e=${PIPESTATUS[0]}
+                        if [ $e -eq 0 ]; then
+                            for secret in ${secrets[@]}; do
+                                cpf "%{r:%s}\n" ${secret}
+                            done
+                        fi
+                    ;;
+                esac
+            elif [ $# -eq 2 ]; then
+                case $1 in
+                    read)
+                        local secret=$2
+                        cpf "Checking for secret id %{r:%s}..." ${secret}
+                        local -a secrets=(
+                            $(gpg -q --batch --use-agent -d -o - ${VAULT}|awk '$1~/^\<'${secret}'\>/{print$1}')
+                        )
+                        e=${PIPESTATUS[0]}
+                        if [ $e -eq 0 -a ${#secrets[@]} -eq 1 ]; then
+                            theme HAS_PASSED "SECRET_KEY_VALID"
+                        else
+                            theme HAS_FAILED "NO_SUCH_SECRET_ID"
+                        fi
+                    ;;
+                esac
+            fi
+        else
+            theme HAS_FAILED "SITE_GPG_ID_UNDEFINED"
+        fi
+    else
+        theme HAS_FAILED "NO_SECRETS"
+        e=${CODE_FAILURE}
+    fi
+
+    return $e
+}
+
 #. Optional long help message
 function util:timeout:help() {
     cat <<EOF
