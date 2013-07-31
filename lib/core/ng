@@ -403,7 +403,8 @@ function ng:search() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 ]; then
-        :ldap:search netgroup cn description "|(cn=*$1*)(description=*$1*)"
+        :ldap:search netgroup cn description "|(cn=*$1*)(description=*$1*)" |
+            column -t -s'+++'
         e=$?
     fi
 
