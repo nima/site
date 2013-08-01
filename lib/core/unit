@@ -228,14 +228,62 @@ function ${utf}Dyn${i}() {
 }
 #. }=-
 #. Unit-test `site' module function -={
+
+g_USE_CACHE=0
+function unit:prime:usage() { echo "[cache]"; }
+function unit:prime() {
+    local -i e=${CODE_DEFAULT?}
+    local valid=0
+    if [ $# -eq 1 -a "$1" == "cache" ]; then
+        g_USE_CACHE=1
+        valid=1
+        shift
+    elif [ $# -eq 0 ]; then
+        valid=1
+    fi
+
+    cpf "%{@comment:Part 1 of 2: STATIC unit-testing} %{r:-=[}\n"; (
+        SHUNIT_PARENT=${SITE_LIB_CORE}/unit source ${SHUNIT2}
+    )
+    e=$?
+    if [ ${e} -eq 0 ]; then
+        cpf "%{@comment:exit}:%{g:${e1}} %{r:]=-}\n"
+    else
+        cpf "%{@comment:exit}:%{r:${e1}} %{r:]=-}\n"
+    fi
+
+    cpf "%{@comment:Regenerating CACHE...}"
+    if [ ${g_USE_CACHE} -eq 1 -a -e ${g_SCRIPT} ]; then
+        theme FALSE
+    else
+        cp ${g_SCRIPT}.$$ ${g_SCRIPT}
+        theme TRUE
+    fi
+
+    return $e
+}
+
+function unit:test:usage() { echo "<no-args>"; }
+function unit:test() {
+    cpf "%{@comment:Part 2 of 2: DYNAMIC unit-testing (${g_SCRIPT})} %{r:-=[}\n"; (
+        source ${g_SCRIPT}
+        SHUNIT_PARENT=${g_SCRIPT} source ${SHUNIT2}
+    )
+    local -i e=$?
+    if [ ${e} -eq 0 ]; then
+        cpf "%{@comment:exit}:%{g:${e2}} %{r:]=-}\n"
+    else
+        cpf "%{@comment:exit}:%{r:${e2}} %{r:]=-}\n"
+    fi
+
+    return $e
+}
 function unit:all:usage() { echo "[cache]"; }
 function unit:all() {
     local -i e=${CODE_DEFAULT?}
-    local cache=0
     local valid=0
-
     if [ $# -eq 1 -a "$1" == "cache" ]; then
-        cache=1
+        g_USE_CACHE=1
         valid=1
         shift
     elif [ $# -eq 0 ]; then
@@ -244,34 +292,12 @@ function unit:all() {
 
     if [ ${valid} -eq 1 ]; then
         if [ -e "${SHUNIT2}" ]; then
-            cpf "%{@comment:Part 1 of 2: STATIC unit-testing} %{r:-=[}\n"; (
-                SHUNIT_PARENT=${SITE_LIB_CORE}/unit source ${SHUNIT2}
-            )
+            cpf "%{@comment:#############################################################################}\n"
+            unit:prime
             local -i e1=$?
-            if [ ${e1} -eq 0 ]; then
-                cpf "%{@comment:exit}:%{g:${e1}} %{r:]=-}\n"
-            else
-                cpf "%{@comment:exit}:%{r:${e1}} %{r:]=-}\n"
-            fi
 
-            cpf "%{@comment:Regenerating CACHE...}"
-            if [ ${cache} -eq 1 -a -e ${g_SCRIPT} ]; then
-                theme FALSE
-            else
-                cp ${g_SCRIPT}.$$ ${g_SCRIPT}
-                theme TRUE
-            fi
-
-            cpf "%{@comment:Part 2 of 2: DYNAMIC unit-testing (${g_SCRIPT})} %{r:-=[}\n"; (
-                source ${g_SCRIPT}
-                SHUNIT_PARENT=${g_SCRIPT} source ${SHUNIT2}
-            )
+            unit:test
             local -i e2=$?
-            if [ ${e2} -eq 0 ]; then
-                cpf "%{@comment:exit}:%{g:${e2}} %{r:]=-}\n"
-            else
-                cpf "%{@comment:exit}:%{r:${e2}} %{r:]=-}\n"
-            fi
 
             ((e=e1|e2))
 
