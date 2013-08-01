@@ -1,8 +1,8 @@
 #. format: profile|module|function|context|stdin|arguments|stdout|stderr|exitcode
 #. core -={
+#core|git
 #core|cpf
-#core|unit|all|public
-#core|unit|all|internal
+#core|unit
 #core|hgd|resolve|internal||(#10.1.2.3/29)|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
 #core|hgd|resolve|private||(#10.1.2.3/29)|53c0006ef9e5cda4111db1851c960e6e||0
 #core|hgd|resolve|public||#10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
@@ -35,22 +35,15 @@ core|dns|qdn|internal||notahost|||1
 core|dns|lookup|public||notahost|||1
 core|dns|cname|public||@notahost notadomain|||1
 core|dns|ptr|public||&(#127.0.0.1)|||0
-#core|git|getbasedir|internal
-#core|git|commitall|public
-#core|git|file|public
-#core|git|playground|public
-#core|git|rebasesearchstr|public
-#core|git|rm|public
-#core|git|serve|public
-#core|git|size|public
-#core|git|split|public
-#core|git|usage|public
-#core|git|vacuum|public
 #core|util|timeout|public
 core|util|date:i2s|internal||1369369079|20130524041759||0
 core|util|date:s2i|internal||20131230235959|1388447999||0
 core|util|listify|internal||b,a,d,b,e,e,f|b a d b e e f||0
 core|util|uniq|internal||b a d b e e f|a b d e f||0
+core|util|secrets:cleanup|internal|||||0
+core|util|secrets:cleanup|private|||||0
+#core|util|secrets|public
+#core|util|secrets|internal
 #core|util|dups|internal
 #core|util|join|internal
 #core|util|ansi2html|internal
@@ -70,6 +63,10 @@ core|hgd|resolve|public||uth|um-rhn-s1.corpdev||0|DEC
 core|hgd|resolve|internal||&(.autonomy.net.au)|autonomy.net.au git.autonomy.net.au src.autonomy.net.au||0|DEC
 core|ssh|connect|public||um-rhn-s1 exit 0|||0|DEC
 core|ssh|connect|public||um-rhn-s1 exit 3|||3|DEC
+core|ssh|connect|internal||um-rhn-s1.corpdev exit 2|||2|DEC
+#core|ssh|pipewrap|internal
+core|ssh|sudo|public||um-rhn-s1 whoami|||0|DEC
+core|ssh|sudo|internal||um-rhn-s1.corpdev whoami|root||0|DEC
 core|dns|lookup|public||rhn|||0|DEC
 core|dns|lookup|public||nosuchhost|||1|DEC
 core|dns|lookup|internal||pP ca rhn|||0|DEC
@@ -98,8 +95,6 @@ core|ldap|esearch|internal||user ntalebi|||0|DEC
 core|ldap|eval:search|internal||user ntalebi uid|5a86e11345e908d03e5c5983c3cc0ff4||0|DEC
 #core|ldap|add|internal
 #core|ldap|authenticate|internal
-#core|ssh|connect|public
-#core|ssh|connect|internal
 #core|ssh|cluster|public
 #core|ssh|tmux|public
 #core|ssh|tmux|private
@@ -121,9 +116,7 @@ DEC|rpm|size|public||uth glibc.x86_64|11686637||0
 DEC|rpm|vendor|public|Red Hat, Inc.|uth glibc.x86_64|||0
 DEC|rpm|date|public||uth glibc.x86_64|350698beecb34647b904a7a34175a7bd||0
 #DEC|svn|edit|public
-#DEC|ssh|connect|public
 #DEC|ssh|cluster|public
-#DEC|ssh|connect|internal
 DEC|db|dc|public||gw name=itservices|4adb560000166fa7cfe62a2c69600758||0
 DEC|db|dc|internal||gw name=itservices|3b5776dfb6bff990b14038284806736a||0
 DEC|mon|remex|public||uth hostname|||0
