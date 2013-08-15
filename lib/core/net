@@ -8,10 +8,14 @@ function :net:b2nm() {
     #. output 0xffffff00
     local -i e=${CODE_FAILURE?}
 
-    local -i -r nmb=$1
-    if [ $nmb -le 32 ]; then
-        printf "0x%08x\n" $(( ((1<<(32-nmb)) - 1)^0xffffffff ))
-        e=${CODE_SUCCESS?}
+    if [ $# -eq 1 ]; then
+        local -i -r nmb=$1
+        if [ $nmb -le 32 ]; then
+            printf "0x%08x\n" $(( ((1<<(32-nmb)) - 1)^0xffffffff ))
+            e=${CODE_SUCCESS?}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
@@ -23,10 +27,14 @@ function :net:b2hm() {
     #. output 0x000000ff
     local -i e=${CODE_FAILURE?}
 
-    local -i -r hmb=$1
-    if [ $hmb -le 32 ]; then
-        printf "0x%08x\n" $(( ((1<<(32-hmb)) - 1)&0xffffffff ))
-        e=${CODE_SUCCESS?}
+    if [ $# -eq 1 ]; then
+        local -i -r hmb=$1
+        if [ $hmb -le 32 ]; then
+            printf "0x%08x\n" $(( ((1<<(32-hmb)) - 1)&0xffffffff ))
+            e=${CODE_SUCCESS?}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
@@ -38,16 +46,20 @@ function :net:h2s() {
     #. output 255.0.255.0
     local -i e=${CODE_FAILURE?}
 
-    local -ir ip=${1}
-    if (( ip <= 0xffffffff )); then
-        local -a q=(
-            $(( (ip & (0xff << 24)) >> 24 ))
-            $(( (ip & (0xff << 16)) >> 16 ))
-            $(( (ip & (0xff << 8)) >> 8 ))
-            $(( ip & 0xff ))
-        )
-        printf "%d.%d.%d.%d\n" ${q[@]}
-        e=${CODE_SUCCESS?}
+    if [ $# -eq 1 ]; then
+        local -ir ip=${1}
+        if (( ip <= 0xffffffff )); then
+            local -a q=(
+                $(( (ip & (0xff << 24)) >> 24 ))
+                $(( (ip & (0xff << 16)) >> 16 ))
+                $(( (ip & (0xff << 8)) >> 8 ))
+                $(( ip & 0xff ))
+            )
+            printf "%d.%d.%d.%d\n" ${q[@]}
+            e=${CODE_SUCCESS?}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
@@ -59,11 +71,15 @@ function :net:s2h() {
     #. output 0xff00ff00
     local -i e=${CODE_FAILURE?}
 
-    local -r ips=$1
-    if [ "${ips//[0-9]/}" == '...' ]; then
-        IFS=. read -ir q1 q2 q3 q4 <<< ${ips}
-        printf "0x%02x%02x%02x%02x\n" $q1 $q2 $q3 $q4
-        e=${CODE_SUCCESS?}
+    if [ $# -eq 1 ]; then
+        local -r ips=$1
+        if [ "${ips//[0-9]/}" == '...' ]; then
+            IFS=. read -ir q1 q2 q3 q4 <<< ${ips}
+            printf "0x%02x%02x%02x%02x\n" $q1 $q2 $q3 $q4
+            e=${CODE_SUCCESS?}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
@@ -73,16 +89,20 @@ function :net:s2h() {
 function :net:i2s() {
     #. input  lo
     #. output 127.0.0.1
-    local -i e=${CODE_FAILURE?}
-
     core:requires ip
 
-    local -r iface=$1
-    local ip
-    ip=$(ip addr show dev ${iface} permanent|awk '$1~/^inet$/{print$2}' 2>/dev/null)
-    if [ $? -eq 0 ]; then
-        echo ${ip%%/*}
-        e=${CODE_SUCCESS?}
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local -r iface=$1
+        local ip
+        ip=$(ip addr show dev ${iface} permanent|awk '$1~/^inet$/{print$2}' 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            echo ${ip%%/*}
+            e=${CODE_SUCCESS?}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
@@ -107,6 +127,8 @@ function :net:hosts() {
             :net:h2s ${ip}
             e=$?
         done | xargs
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
@@ -128,8 +150,36 @@ function :net:firsthost() {
         local -r fh=$(printf "%x" $(( nw + 1 )))
         :net:h2s 0x${fh}
         e=$?
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
 }
 #. }=-
+
+function :net:portscan() {
+    core:requires nc
+
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 3 ]; then
+        local tldid=$1
+        local qdn=$2
+        local port=$3
+        local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
+        local tld=${USER_TLDS[${tldid}]}
+        if [ ${#ssh_proxy} -gt 0 ]; then
+            ssh ${SITE_USERNAME}@${ssh_proxy}\
+                nc -zw1 ${qdn}${tld:+.${tld}} ${port} >/dev/null 2>&1
+            e=$?
+        else
+            nc -zqw1 ${qdn}${tld:+.${tld}} ${port}
+            e=$?
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}

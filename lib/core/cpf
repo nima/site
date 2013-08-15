@@ -1,6 +1,6 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
-: ${HAS_TTY?}
+: ${SITE_IN_COLOR?}
 
 function is_fmt() {
     grep -qE '%' <<<"$1"
@@ -154,13 +154,13 @@ function theme() {
             ;;
         esac
 
-        if [ ${HAS_TTY} -eq 1 ]; then
+        if [ ${SITE_IN_COLOR} -eq 1 ]; then
             cpf "${fmt}" "$@" >${dvc}
         else
             cpf "${fmt}" "$@"
         fi
     else
-        if [ ${HAS_TTY} -eq 1 ]; then
+        if [ ${SITE_IN_COLOR} -eq 1 ]; then
             echo >${dvc}
         else
             echo
@@ -308,7 +308,7 @@ function cpf() {
                     @*)
                         read _sym _fmt _arg <<< "$(::cpf:theme "${op}" "${token}")"
                         [ "$_sym" != '0' ] || _sym=
-                        if [ ${HAS_TTY} -eq 1 ]; then
+                        if [ ${SITE_IN_COLOR} -eq 1 ]; then
                             if is_fmt ${_fmt}; then
                                 prefix+=( "${_sym}" )
                                 #echo XXX _fmt $_fmt > /dev/stderr
@@ -330,7 +330,7 @@ function cpf() {
                         fi
                     ;;
                     rv|bl|wh|r|g|y|b|m|c)
-                        if [ ${HAS_TTY} -eq 1 ]; then
+                        if [ ${SITE_IN_COLOR} -eq 1 ]; then
                             #XXX echo xxxxxxxxxxxxx ${op} ${token} > /dev/stderr
                             replacement="${COLORS[${op}]}${token}${COLORS[N]}"
                         fi
@@ -343,7 +343,7 @@ function cpf() {
                         #XXX echo zzzzzzzzzzzzz ${fmtstr} > /dev/stderr
                     ;;
                     ul|st|bo)
-                        if [ ${HAS_TTY} -eq 1 ]; then
+                        if [ ${SITE_IN_COLOR} -eq 1 ]; then
                             replacement="${COLORS[+${op}]}${token}${COLORS[-${op}]}"
                         fi
                         if is_fmt ${replacement}; then
@@ -353,7 +353,7 @@ function cpf() {
                     ;;
                 esac
             elif [[ ${arg} =~ ^%\{([^:]+)}$ ]]; then
-                if [ ${HAS_TTY} -eq 1 ]; then
+                if [ ${SITE_IN_COLOR} -eq 1 ]; then
                     op="${BASH_REMATCH[1]}"
                     replacement="${COLORS[${op}]}"
                 fi
