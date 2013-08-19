@@ -1,24 +1,32 @@
 #!/bin/bash
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
-if [ ${#SITE_SHELL} -gt 0 -a -x "${SITE_SHELL}" ]; then
-    if [ ${SITE_SHELL} != ${BASH} ]; then
-        exec ${SITE_SHELL} $0 $@
+e=0
+[ ! -f ${HOME}/.siterc ] || source ${HOME}/.siterc
+if [ ${#SITE_SHELL} -gt 0 ]; then
+    if [ -x "${SITE_SHELL}" ]; then
+        if [ "${SITE_SHELL}" != "${BASH}" ]; then
+            exec ${SITE_SHELL} $0 $@
+        fi
+    else
+        echo "The request SITE_SHELL is invalid:" ${SITE_SHELL}
+        e=2
     fi
 fi
 
-maj=${BASH_VERSINFO[0]}
-min=${BASH_VERSINFO[1]}
-: ${PROFILE?}
+if [ $e -eq 0 ]; then
+    maj=${BASH_VERSINFO[0]}
+    min=${BASH_VERSINFO[1]}
+    : ${PROFILE?}
 
-e=0
-if [ ${maj} -ge 4 -a ${min} -ge 0 ]; then
-    source ~/.site/etc/site.conf
-    core:wrapper $@
-    e=$?
-else
-    e=1
-    echo "Your version of BASH is too old; export SITE_SHELL to override system bash."
+    if [ ${maj} -ge 4 -a ${min} -ge 0 ]; then
+        source ~/.site/etc/site.conf
+        core:wrapper $@
+        e=$?
+    else
+        e=1
+        echo "Your version of BASH is too old; export SITE_SHELL to override system bash."
+    fi
 fi
 
 exit ${e}
