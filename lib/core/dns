@@ -1,96 +1,112 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
+core:import util
+
 #. Internal Functions -={
 function :dns:lookup() {
     #. while read line; do
-    #.     read record context query sdn answer <<< ${line}
+    #.     read record tldid query sdn answer <<< ${line}
     #.     ...
-    #. done < <(:dns:lookup pP ca ${hostname})
+    #. done < <(:dns:lookup ${tldidstr} ca ${hostname})
     #. e=$?
     #.
-    #. read record context query sdn answer <<< "$(:dns:lookup P a ${hostname})"
+    #. read record tldid query sdn answer <<< "$(:dns:lookup p a ${hostname})"
 
     local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 3 ]; then
-        local contexts records hint
-        read contexts records hint <<< $@
+        local tldids records hint
+        read tldids records hint <<< $@
 
         local hn_hint=${hint%%.*}
         local sd_hint
         [ "${hn_hint}" == "$hint" ] || sd_hint=${hint#*.}
 
-        if [[ ${hn_hint} =~ ^[a-zA-Z]+[-a-zA-Z0-9_\.]+[a-zA-Z0-9]+$ ]]; then
+        local tldid
+        tldid=$(:dns:qualified ${hint})
+        if [ $? -ne ${CODE_SUCCESS} ]; then
             local -i i
             local -a sdns
-            local context
             if [ -n "${sd_hint}" ]; then
                 sdns=( "${sd_hint}" )
             else
-                for (( i=0; i<${#contexts}; i++ )); do
-                    context=${contexts:$i:1}
-                    case ${context} in
-                        p) sdns=( ${sdns[@]} ${USER_PRI_SUBDOMAINS[@]} ) ;;
-                        P) sdns=( ${sdns[@]} ${USER_PUB_SUBDOMAINS[@]} ) ;;
-                        *) core:raise EXCEPTION_BAD_FN_CALL "Expected [pP], not ${context}" ;;
-                    esac
+                for (( i=0; i<${#tldids}; i++ )); do
+                    tldid=${tldids:$i:1}
+                    sdns+=( $(:dns:subdomains ${tldid}) )
                 done
             fi
+        else
+            sdns=( ${sd_hint%%.${USER_TLDS[${tldid}]}} )
+        fi
 
-            local sdn
-            local fqdn
-            local result
-            local -A results
-            for sdn in ${sdns[@]}; do
-                fqdn=${hn_hint}.${sdn} #. First see if the sdn is actually the entire dn
-                result=$(dig +short ${fqdn} a|head -n1)
-                if [ ${#result} -eq 0 ]; then
-                    for (( i=0; i<${#contexts}; i++ )); do
-                        context=${contexts:$i:1}
-                        case ${context} in
-                            p) fqdn=${hn_hint}.${sdn}.${USER_TLD_MGMT};;
-                            P) fqdn=${hn_hint}.${sdn}.${USER_TLD};;
-                            *) core:raise EXCEPTION_BAD_FN_CALL "Expected [pP], not ${context}" ;;
-                        esac
+        local sdn
+        local fqdn
+        local result
+        local -A results
+        for sdn in ${sdns[@]}; do
+            #. First see if the sdn is actually the entire dn
+            qdn=${hn_hint}.${sdn}
+            result=$(dig +short ${qdn} a|head -n1)
 
-                        if [ "${records//a/}" != "${records}" ]; then
-                            result=$(dig +short ${fqdn} a|head -n1)
-                            if [ "${result//[0-9]/}" == '...' ]; then
-                                [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:a:${sdn}:${result}"
-                            fi
-                        fi
-                        if [ "${records//c/}" != "${records}" ]; then
-                            result=$(dig +short ${fqdn} cname)
-                            [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:c:${sdn}:${result%%.}"
-                        fi
-                    done
-                else
-                    #. TODO:Incomplete; If so, work backwards
+            #. If not...
+            if [ ${#result} -eq 0 ]; then
+                #. Check all subnets for that tldid...
+                for (( i=0; i<${#tldids}; i++ )); do
+                    tldid=${tldids:$i:1}
+                    fqdn=${qdn}.${USER_TLDS[${tldid}]}
                     if [ "${records//a/}" != "${records}" ]; then
-                        if [ ${sdn//${USER_TLD}/} != "${sdn}" ]; then
-                            context=P
-                            sdn=${sdn//.${USER_TLD}/}
-                            [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:a:${sdn}:${result}"
-                        elif [ ${sdn//${USER_TLD_MGMT}/} != "${sdn}" ]; then
-                            context=p
-                            sdn=${sdn//.${USER_TLD_MGMT}/}
-                            [ ${#result} -eq 0 ] || results[${fqdn}]="${context}:a:${sdn}:${result}"
+                        result=$(dig +short ${fqdn} a|head -n1)
+                        if [ "${result//[0-9]/}" == '...' ]; then
+                            [ ${#result} -eq 0 ] || results[${fqdn}]="${tldid}:a:${sdn}:${result}"
                         fi
                     fi
-                fi
-            done
-
-            local query context record answer
-            if [ ${#results[@]} -gt 0 ]; then
-                for query in ${!results[@]}; do
-                    local contexts records sdn answer
-                    IFS=: read context record sdn answer <<< "${results[${query}]}"
-                    printf "%-3s %-3s %-24s %-32s %s\n" ${record} ${context} ${query} ${sdn} ${answer}
+                    if [ "${records//c/}" != "${records}" ]; then
+                        result=$(dig +short ${fqdn} cname)
+                        [ ${#result} -eq 0 ] || results[${fqdn}]="${tldid}:c:${sdn}:${result%%.}"
+                    fi
                 done
-                e=${CODE_SUCCESS}
+            else
+                #. If so, work backwards
+                fqdn=${qdn}
+                #. Incomplete?
+                if [ "${records//a/}" != "${records}" ]; then
+                    for tldid in ${!SITE_TLDS[@]}; do
+                        tld=${SITE_TLDS[${tldid}]}
+                        if [ ${sdn//${tld}/} != "${sdn}" ]; then
+                            sdn=${sdn//.${tld}/}
+                            [ ${#result} -eq 0 ] || results[${fqdn}]="${tldid}:a:${sdn}:${result}"
+                            break
+                        fi
+                    done
+                fi
             fi
+        done
+
+        local query record answer records sdn
+        if [ ${#results[@]} -gt 0 ]; then
+            for query in ${!results[@]}; do
+                IFS=: read tldid record sdn answer <<< "${results[${query}]}"
+                printf "%-3s %-3s %-24s %-32s %s\n" ${record} ${tldid} ${query} ${sdn} ${answer}
+            done
+            e=${CODE_SUCCESS}
         fi
     fi
+
+    return $e
+}
+
+function :dns:qualified() {
+    local -i e=${CODE_FAILURE}
+
+    local tldid
+    for tldid in ${!USER_TLDS[@]}; do
+        local tld=${USER_TLDS[${tldid}]}
+        if [ ${1%%.${tld}} != ${1} ]; then
+            e=${CODE_SUCCESS}
+            echo ${tldid}
+            break
+        fi
+    done
 
     return $e
 }
@@ -98,15 +114,16 @@ function :dns:lookup() {
 function :dns:fqdn() {
     local -i e=${CODE_FAILURE}
 
-    if [ $# -eq 1 ]; then
-        local -r hint=$1
+    if [ $# -eq 2 ]; then
+        local -r tldid=$1
+        local -r hint=$2
         local -r shn=${hint%%.*}
-        local line record context query sdn answer
+        local line record _tldid query sdn answer
         while read line; do
-            read record context query sdn answer <<< ${line}
+            read record _tldid query sdn answer <<< ${line}
             echo ${query}
             e=${CODE_SUCCESS}
-        done < <(:dns:lookup P a ${hint})
+        done < <(:dns:lookup ${tldid} a ${hint})
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -115,12 +132,21 @@ function :dns:fqdn() {
 }
 #. }=-
 #. Public Functions -={
-function dns:fqdn:usage() { echo "<short-hostname>"; }
+function dns:fqdn:usage() { echo "<tldid> <hosthint>"; }
 function dns:fqdn() {
     local -i e=${CODE_DEFAULT?}
 
-    if [ $# -eq 1 ]; then
-        :dns:fqdn $1
+    if [ $# -eq 2 ]; then
+        local tldid=$1
+        local hosthint=$2
+        if [ ${#USER_IFACE[${tldid}]} -gt 0 ]; then
+            :dns:fqdn ${tldid} ${hosthint}
+            e=$?
+        else
+            theme HAS_FAILED "No such TLDID \`${tldid}'"
+            e=${CODE_FAILURE}
+        fi
+
         e=$?
     fi
 
@@ -130,15 +156,16 @@ function dns:fqdn() {
 function :dns:qdn() {
     e=${CODE_FAILURE}
 
-    if [ $# -eq 1 ]; then
-        local -r hint=$1
+    if [ $# -eq 2 ]; then
+        local -r tldid=$1
+        local -r hint=$2
         local -r shn=${hint%%.*}
-        local line record context query sdn answer
+        local line record _tldid query sdn answer
         while read line; do
-            read record context query sdn answer <<< ${line}
+            read record _tldid query sdn answer <<< ${line}
             echo "${shn}.${sdn}"
             e=${CODE_SUCCESS}
-        done < <(:dns:lookup P a ${hint})
+        done < <(:dns:lookup ${tldid} a ${hint})
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -146,39 +173,48 @@ function :dns:qdn() {
     return $e
 }
 
-function dns:qdn:usage() { echo "<hostname-hint>"; }
+function dns:qdn:usage() { echo "<tldid> <hosthint>"; }
 function dns:qdn() {
     local -i e=${CODE_DEFAULT?}
 
-    if [ $# -eq 1 ]; then
-        :dns:qdn $1
-        e=$?
+    if [ $# -eq 2 ]; then
+        local tldid=$1
+        local hosthint=$2
+        if [ ${#USER_IFACE[${tldid}]} -gt 0 ]; then
+            :dns:qdn ${tldid} ${hosthint}
+            e=$?
+        else
+            theme HAS_FAILED "No such TLDID \`${tldid}'"
+            e=${CODE_FAILURE}
+        fi
     fi
 
     return $e
 }
 
-function dns:lookup:usage() { echo "<hostname-hint>"; }
+function dns:lookup:usage() { echo "<hosthint>"; }
 function dns:lookup() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 ]; then
         hint=$1
         e=${CODE_FAILURE}
-        local line record context query sdn answer
+        local -a tldids=( ${!USER_TLDS[@]} )
+        local tldidstr=$(:util:join '' tldids)
+        local line record tldid query sdn answer
         while read line; do
-            read record context query sdn answer <<< ${line}
+            read record tldid query sdn answer <<< ${line}
             if [ "${record}" == 'c' ]; then
                 cpf "%{@ip:%-48s}" "${query}"
-                cpf "%{@comment:#. iface:%s, (%s for %s)}" "${USER_IFACE[${context}]}" "CNAME RECORD" "${answer}"
+                cpf "%{@comment:#. iface:%s, (%s for %s)}" "${USER_IFACE[${tldid}]}" "CNAME RECORD" "${answer}"
                 e=${CODE_SUCCESS}
             elif [ "${record}" == 'a' ]; then
                 cpf "%{@host:%-48s}" "${query}"
-                cpf "%{@comment:#. iface:%s, (%s for %s)}" "${USER_IFACE[${context}]}" "A RECORD" "${answer}"
+                cpf "%{@comment:#. iface:%s, (%s for %s)}" "${USER_IFACE[${tldid}]}" "A RECORD" "${answer}"
                 e=${CODE_SUCCESS}
             fi
             echo
-        done < <(:dns:lookup pP ca ${hint})
+        done < <(:dns:lookup ${tldidstr} ca ${hint})
     fi
 
     return $e
@@ -196,10 +232,10 @@ function dns:cname() {
         if [ $? -eq 0 ]; then
             local -a hosts=( $(sed -e 's/\([^\.]\+\)\..*/\1/' <<< "$hosts_in_ng") )
             local cnamea=
-            local host record context query sdn answer
+            local host record tldid query sdn answer
             if [ ${#hosts[@]} -gt 0 ]; then
                 for host in ${hosts[@]}; do
-                    read record context query sdn answer <<< "$(:dns:lookup P a ${host})"
+                    read record tldid query sdn answer <<< "$(:dns:lookup p a ${host})"
                     if [ $? -eq 0 ]; then
                         ip="${answer}"
 
@@ -250,7 +286,8 @@ function dns:ptr() {
                     ipconfirm=$(dig +short ${arecord})
                     if [ $? -eq 0 ]; then
                         if [ "${ipconfirm}" == "${ip}" ]; then
-                            theme HAS_PASSED "${arecord}"
+                            #. Remove the last DNS dot
+                            theme HAS_PASSED "${arecord%.}"
                             ee=${CODE_SUCCESS}
                         else
                             theme HAS_FAILED "A Record Mismatch"
@@ -269,4 +306,60 @@ function dns:ptr() {
 
     return $e
 }
+
+function :dns:subdomains() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local tldid=$1
+        local fN=${SITE_ETC}/subdom-${tldid}.conf
+        if [ -r ${fN} ]; then
+            cat ${fN} && e=${CODE_SUCCESS}
+        else
+            core:raise EXCEPTION_BAD_FN_CALL "No input file found for TLDID"
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function dns:tldids:usage() { echo -n ""; }
+function dns:tldids() {
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -eq 0 ]; then
+        for tldid in ${!USER_TLDS[@]}; do
+            cpf "%{@tldid:%s}: %{@host:%s}\n" ${tldid} ${USER_TLDS[${tldid}]}
+        done
+        e=${CODE_SUCCESS}
+    fi
+
+    return $e
+}
+
+function dns:subdomains:usage() { echo -n "<tldid>"; }
+function dns:subdomains() {
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -eq 1 ]; then
+        local tldid=$1
+        local fN=${SITE_ETC}/subdom-${tldid}.conf
+        local tld=${USER_TLDS[${tldid}]}
+        if [ ${#tld} -gt 0 ]; then
+            if [ -f ${fN} ]; then
+                :dns:subdomains ${tldid} | column -t
+            else
+                theme HAS_FAILED "Missing \`${tldid}' subdomain configuration file"
+            fi
+        else
+            theme HAS_FAILED "No such tldid \`${tldid}'"
+        fi
+        return $?
+    fi
+
+    return $e
+}
+
 #. }=-
