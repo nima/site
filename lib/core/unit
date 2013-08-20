@@ -232,7 +232,7 @@ function ${utf}Dyn${i}() {
 #. }=-
 #. Unit-test `site' module function -={
 
-function :unit:prime() {
+function ::unit:prime() {
     local -i e=${CODE_DEFAULT?}
     local valid=0
     [ $# -ne 0 ] || valid=1
@@ -250,7 +250,7 @@ function :unit:prime() {
     return $e
 }
 
-function :unit:test() {
+function ::unit:test() {
     local -i e=${CODE_FAILURE}
 
     cpf "%{@comment:Part 2 of 2: DYNAMIC unit-testing (${g_SCRIPT})} %{r:-=[}\n";
@@ -293,11 +293,11 @@ function unit:test() {
             #. Only regenerate the script if it doesn't exist, or if it is
             #. older than the input unittest csv file.
             if [ ${#g_MODULES[@]} -eq 0 -a ! -e ${g_SCRIPT} -o ${g_SCRIPT} -ot ${SITE_UNITDATA} ]; then
-                :unit:prime
+                ::unit:prime
                 local -i e1=$?
             fi
 
-            :unit:test
+            ::unit:test
             local -i e2=$?
 
             ((e=e1|e2))
