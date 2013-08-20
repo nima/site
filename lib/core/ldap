@@ -44,7 +44,7 @@ function ldap:mkldif() {
     local -i e=${CODE_DEFAULT}
 
     if [ $# -ge 4 ]; then
-        ::ldap:mkldif $@
+        ${SITE_LIB_EXTERN}/vimcat <<< "$(::ldap:mkldif $@)" >&2
         e=$?
     fi
 
