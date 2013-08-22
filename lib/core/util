@@ -258,8 +258,8 @@ function :util:dups() {
 }
 
 function :util:join() {
+    #. Usage: array=( a b c ); :util:join $delim array
     if [ $# -eq 2 ]; then
-        #. array=( a b c ); :util:join $delim array
         local IFS=$1
         eval "echo \"\${${2}[*]}\""
     else
@@ -308,3 +308,8 @@ function :util:ansi2html() {
     ${SITE_LIBEXEC_CORE}/ansi2html
 }
 #. }=-
+
+function :util:is_int() {
+    [[ $1 =~ ^-?[0-9]+$ ]]
+    return $?
+}
