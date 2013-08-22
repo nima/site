@@ -37,13 +37,14 @@ tearDown() {
 #. }=-
 #. Unit-testing coverage test -={
 declare -g g_SCRIPT=${SITE_CACHE?}/unittest.sh
+declare -g -A g_MODULES
 function testCoverage() {
     local -i e=0
     local -i t=0
     local -i p=0
     local -i s=0
 
-    :>${g_SCRIPT?}.$$
+    :>${g_SCRIPT?}
 
     local -A fnregexes=(
         [private]='^function ::%s:([a-z0-9_]+:)?[a-z0-9_]+\(\)'
@@ -51,54 +52,55 @@ function testCoverage() {
         [public]='^function %s:[a-z0-9_]+\(\)'
     )
 
-    echo "#!/bin/bash" >> ${g_SCRIPT?}.$$
-    echo "#. Generated at $(date)" >> ${g_SCRIPT?}.$$
+    echo "#!/bin/bash" >> ${g_SCRIPT?}
+    echo "#. Generated at $(date)" >> ${g_SCRIPT?}
 
     for profile in core ${PROFILE}; do
         if [ -d ${SITE}/lib/${profile} ]; then
             cd ${SITE}/lib/${profile}
             local module
             for module in *; do
-                local context
-                local blacklisted
-                blacklisted="$(awk -F\| "NF==2&&\$1~/^#${profile}$/&&\$2~/^${module}$/{print\"BLACKLISTED\"}" ${SITE_UNITDATA?})"
-                if [ "${blacklisted}" != "BLACKLISTED" ]; then
-                    cpf "%{@profile:${profile}}: %{!module:${module}} %{r:-=[}\n"
-                    for context in ${!fnregexes[@]}; do
-                        local regex=$(printf "${fnregexes[${context}]}" ${module})
-                        local -i count=$(grep -cE "${regex}" ${module})
-                        cpf "    %{!module:${module}}: %{m:${context}}: %{@int:${count}}\n"
-                        if [ $count -gt 0 ]; then
-                            local -a fns=(
-                                $(grep -oE "${regex}" ${module}|sed -e "s/^function :\{0,2\}${module}:\(.*\)()/\1/")
-                            )
-                            for fn in ${fns[@]}; do
-                                local utf="test${profile^}${module^}${fn^}${context^}"
-                                utf=${utf/:/} #. Remove the colon for shunit2
-                                local -i has_static_test=${FALSE}
-                                if [ "$(type -t ${utf})" == 'function' ]; then
-                                    cpf "      %{@comment:|___} %{!function:${module}:${fn}}:static %{@fn:${utf}}..."
-                                    theme HAS_PASSED "Static"
-                                    has_static_test=${TRUE}
-                                fi
-                                cpf "      %{@comment:|___} %{!function:${module}:${fn}}:dynamic; %{@fn:${utf}}..."
-                                blacklisted="$(awk -F\| "\$1~/^#${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\"BLACKLISTED\"}" ${SITE_UNITDATA?})"
-                                if [ "${blacklisted}" != "BLACKLISTED" ]; then
-                                    local input
-                                    input="$(awk -F\| "\$1~/^${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\$0}" ${SITE_UNITDATA?})"
-                                    if [ -n "${input}" ]; then
-                                        local -i i=0
-                                        local line
-                                        while read line; do
-                                            ((i++))
-                                            local ffn=
-                                            case ${context} in
-                                                private)  ffn+=::;;
-                                                internal) ffn+=:;;
-                                            esac
-                                            ffn+=${prefix}${module}:$fn
-                                            if [ "${context}" == "public" ]; then
-                                                cat <<! >> ${g_SCRIPT}.$$
+                if [ ${#g_MODULES[@]} -eq 0 -o ${g_MODULES[${module}]--1} -eq 1 ]; then
+                    local context
+                    local blacklisted
+                    blacklisted="$(awk -F\| "NF==2&&\$1~/^#${profile}$/&&\$2~/^${module}$/{print\"BLACKLISTED\"}" ${SITE_UNITDATA?})"
+                    if [ "${blacklisted}" != "BLACKLISTED" ]; then
+                        cpf "%{@profile:${profile}}: %{!module:${module}} %{r:-=[}\n"
+                        for context in ${!fnregexes[@]}; do
+                            local regex=$(printf "${fnregexes[${context}]}" ${module})
+                            local -i count=$(grep -cE "${regex}" ${module})
+                            cpf "    %{!module:${module}}: %{m:${context}}: %{@int:${count}}\n"
+                            if [ $count -gt 0 ]; then
+                                local -a fns=(
+                                    $(grep -oE "${regex}" ${module}|sed -e "s/^function :\{0,2\}${module}:\(.*\)()/\1/")
+                                )
+                                for fn in ${fns[@]}; do
+                                    local utf="test${profile^}${module^}${fn^}${context^}"
+                                    utf=${utf/:/} #. Remove the colon for shunit2
+                                    local -i has_static_test=${FALSE}
+                                    if [ "$(type -t ${utf})" == 'function' ]; then
+                                        cpf "      %{@comment:|___} %{!function:${module}:${fn}}:static %{@fn:${utf}}..."
+                                        theme HAS_PASSED "Static"
+                                        has_static_test=${TRUE}
+                                    fi
+                                    cpf "      %{@comment:|___} %{!function:${module}:${fn}}:dynamic; %{@fn:${utf}}..."
+                                    blacklisted="$(awk -F\| "\$1~/^#${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\"BLACKLISTED\"}" ${SITE_UNITDATA?})"
+                                    if [ "${blacklisted}" != "BLACKLISTED" ]; then
+                                        local input
+                                        input="$(awk -F\| "\$1~/^${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\$0}" ${SITE_UNITDATA?})"
+                                        if [ -n "${input}" ]; then
+                                            local -i i=0
+                                            local line
+                                            while read line; do
+                                                ((i++))
+                                                local ffn=
+                                                case ${context} in
+                                                    private)  ffn+=::;;
+                                                    internal) ffn+=:;;
+                                                esac
+                                                ffn+=${prefix}${module}:$fn
+                                                if [ "${context}" == "public" ]; then
+                                                    cat <<! >> ${g_SCRIPT}
 #. dynamic function ${i} for ${utf} (no-arguments) [ ${profile}:${module}:${fn} ] -={
 function ${utf}Dyn${i}NoArgs() {
     #. Check if the function called without any arguments returns CODE_DEFAULT, or otherwise CODE_SUCCESS
@@ -118,7 +120,7 @@ function ${utf}Dyn${i}NoArgs() {
 }
 !
                                             fi
-                                            cat <<! >> ${g_SCRIPT}.$$
+                                            cat <<! >> ${g_SCRIPT}
 function ${utf}Dyn${i}() {
     IFS='|' read profile module fn context stdin arguments stdout stderr exitcode site <<< '${line}'
     : \${exitcode:=-1}
@@ -145,7 +147,7 @@ function ${utf}Dyn${i}() {
                 if assertEquals "exit code" \${exitcode} \$e; then
                     if [ -n "\${stdout?}" ]; then
                         local stdout_ok=0
-                        if [ \${#stdout} -eq 32 ]; then
+                        if [ \${#stdout} -eq 32 -a -z "\${stdout//[0-9a-f]/}" ]; then
                             local md5=\$(md5sum \${stdoutF?}|awk '{print\$1}')
                             if [ "\${md5}" == "\${stdout?}" ]; then
                                 stdout_ok=1
@@ -161,7 +163,7 @@ function ${utf}Dyn${i}() {
 
                     if [ -n "\${stderr}" ]; then
                         local stderr_ok=1
-                        if [ \${#stderr} -eq 32 ]; then
+                        if [ \${#stderr} -eq 32 -a -z "\${stderr//[0-9a-f]/}" ]; then
                             local md5=\$(md5sum \${stderrF}|awk '{print\$1}')
                             if [ "\${md5}" == "\${stderr}" ]; then
                                 stderr_ok=1
@@ -192,31 +194,32 @@ function ${utf}Dyn${i}() {
         theme HAS_WARNED "Skipped (\${site})"
     fi
 }
-#. }=-
 !
-                                        done <<< "${input}"
-                                        theme HAS_PASSED "Dynamic:$i"
-                                        ((p++))
-                                    else
-                                        if [ ${has_static_test} -eq ${TRUE} ]; then
-                                            theme HAS_WARNED "Has Static"
-                                            ((s++))
+#. }=-
+                                            done <<< "${input}"
+                                            theme HAS_PASSED "Dynamic:$i"
+                                            ((p++))
                                         else
-                                            theme HAS_FAILED "Undefined"
-                                            ((e++))
+                                            if [ ${has_static_test} -eq ${TRUE} ]; then
+                                                theme HAS_WARNED "Has Static"
+                                                ((s++))
+                                            else
+                                                theme HAS_FAILED "Undefined"
+                                                ((e++))
+                                            fi
                                         fi
+                                    else
+                                        theme HAS_WARNED "Blacklisted"
+                                        ((s++))
                                     fi
-                                else
-                                    theme HAS_WARNED "Blacklisted"
-                                    ((s++))
-                                fi
-                                ((t++))
-                            done
-                        fi
-                    done
-                    cpf "%{r:]=-} %{@profile:${profile}}: %{!module:${module}}\n"
-                else
-                    cpf "%{@profile:${profile}}: %{!module:${module}} %{r:-=[} %{@warn:BLACKLISTED} %{r:]=-} %{@profile:${profile}}: %{!module:${module}}\n"
+                                    ((t++))
+                                done
+                            fi
+                        done
+                        cpf "%{r:]=-} %{@profile:${profile}}: %{!module:${module}}\n"
+                    else
+                        cpf "%{@profile:${profile}}: %{!module:${module}} %{r:-=[} %{@warn:BLACKLISTED} %{r:]=-} %{@profile:${profile}}: %{!module:${module}}\n"
+                    fi
                 fi
             done
             cd ${OLDPWD}
@@ -229,18 +232,10 @@ function ${utf}Dyn${i}() {
 #. }=-
 #. Unit-test `site' module function -={
 
-g_USE_CACHE=0
-function unit:prime:usage() { echo "[cache]"; }
-function unit:prime() {
+function :unit:prime() {
     local -i e=${CODE_DEFAULT?}
     local valid=0
-    if [ $# -eq 1 -a "$1" == "cache" ]; then
-        g_USE_CACHE=1
-        valid=1
-        shift
-    elif [ $# -eq 0 ]; then
-        valid=1
-    fi
+    [ $# -ne 0 ] || valid=1
 
     cpf "%{@comment:Part 1 of 2: STATIC unit-testing} %{r:-=[}\n"; (
         SHUNIT_PARENT=${SITE_LIB_CORE}/unit source ${SHUNIT2}
@@ -252,51 +247,57 @@ function unit:prime() {
         cpf "%{@comment:exit}:%{r:${e1}} %{r:]=-}\n"
     fi
 
-    cpf "%{@comment:Regenerating CACHE...}"
-    if [ ${g_USE_CACHE} -eq 1 -a -e ${g_SCRIPT} ]; then
-        theme FALSE
-    else
-        cp ${g_SCRIPT}.$$ ${g_SCRIPT}
-        theme TRUE
-    fi
-
     return $e
 }
 
-function unit:test:usage() { echo "<no-args>"; }
-function unit:test() {
-    cpf "%{@comment:Part 2 of 2: DYNAMIC unit-testing (${g_SCRIPT})} %{r:-=[}\n"; (
-        source ${g_SCRIPT}
-        SHUNIT_PARENT=${g_SCRIPT} source ${SHUNIT2}
-    )
-    local -i e=$?
+function :unit:test() {
+    local -i e=${CODE_FAILURE}
+
+    cpf "%{@comment:Part 2 of 2: DYNAMIC unit-testing (${g_SCRIPT})} %{r:-=[}\n";
+    if [ -e ${g_SCRIPT} ]; then
+        (
+            source ${g_SCRIPT}
+            SHUNIT_PARENT=${g_SCRIPT} source ${SHUNIT2}
+        )
+        e=$?
+    fi
+
     if [ ${e} -eq 0 ]; then
-        cpf "%{@comment:exit}:%{g:${e2}} %{r:]=-}\n"
+        cpf "%{@comment:exit}:%{g:${e}} %{r:]=-}\n"
     else
-        cpf "%{@comment:exit}:%{r:${e2}} %{r:]=-}\n"
+        cpf "%{@comment:exit}:%{r:${e}} %{r:]=-}\n"
     fi
 
     return $e
 }
-function unit:all:usage() { echo "[cache]"; }
-function unit:all() {
+function unit:test:usage() { echo "[<module> [<module> [...]]]"; }
+function unit:test() {
     local -i e=${CODE_DEFAULT?}
-    local valid=0
-    if [ $# -eq 1 -a "$1" == "cache" ]; then
-        g_USE_CACHE=1
-        valid=1
-        shift
-    elif [ $# -eq 0 ]; then
-        valid=1
+    local valid=1
+
+    local module
+    if [ $# -gt 0 ]; then
+        for module in ${@}; do
+            if core:softimport ${module}; then
+                g_MODULES[${module}]=1
+            else
+                g_MODULES[${module}]=0
+                valid=0
+            fi
+        done
     fi
 
     if [ ${valid} -eq 1 ]; then
         if [ -e "${SHUNIT2}" ]; then
             cpf "%{@comment:#############################################################################}\n"
-            unit:prime
-            local -i e1=$?
+            #. Only regenerate the script if it doesn't exist, or if it is
+            #. older than the input unittest csv file.
+            if [ ${#g_MODULES[@]} -eq 0 -a ! -e ${g_SCRIPT} -o ${g_SCRIPT} -ot ${SITE_UNITDATA} ]; then
+                :unit:prime
+                local -i e1=$?
+            fi
 
-            unit:test
+            :unit:test
             local -i e2=$?
 
             ((e=e1|e2))
@@ -304,6 +305,13 @@ function unit:all() {
             cpf "%{@comment:#############################################################################}\n"
             cpf "Unit-testing overal result..."
             [ $e -eq 0 ] && theme HAS_PASSED || theme HAS_FAILED
+
+            if [ ${#g_MODULES[@]} -gt 0 ]; then
+                #. No caching allowed when modules supplied, so remove the file
+                mv ${g_SCRIPT} ${g_SCRIPT}.last
+            else
+                cp ${g_SCRIPT} ${g_SCRIPT}.last
+            fi
         else
             theme ERR_USAGE "${SHUNIT2} is missing"
             e=${CODE_FAILURE}
