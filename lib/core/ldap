@@ -3,6 +3,29 @@
 core:import dns
 core:import util
 
+function :ldap:host() {
+    #. Returns a random LDAP host from the pool
+    #. Assumes all hosts are functional
+
+    local -i e=${CODE_FAILURE}
+
+    local user_ldaphost="${USER_LDAPHOSTS[$((${RANDOM}%${#USER_LDAPHOSTS[@]}))]}"
+    echo ${user_ldaphost}
+
+    return $e
+}
+function :ldap:host_rw() {
+    #. Returns a random LDAP host from the pool, that offer rw functionality
+    #. Assumes all hosts are functional
+
+    local -i e=${CODE_FAILURE}
+
+    local user_ldaphost_rw="${USER_LDAPHOSTS_RW[$((${RANDOM}%${#USER_LDAPHOSTS_RW[@]}))]}"
+    echo ${user_ldaphost_rw}
+
+    return $e
+}
+
 #. Authentication -={
 declare -g g_PASSWD_CACHED=
 function :ldap:authenticate() {
@@ -12,12 +35,13 @@ function :ldap:authenticate() {
         g_PASSWD_CACHED="$(:util:secrets LDAP)"
         e=$?
 
+        local ldaphost_rw=$(:ldap:host_rw)
         if [ $e -ne 0 ]; then
-            read -p "Enter LDAP (${USER_LDAPHOST_RW}) Password: " -s g_PASSWD_CACHED
+            read -p "Enter LDAP ($ldaphost_rw}) Password: " -s g_PASSWD_CACHED
             echo
         fi
 
-        ldapsearch -x -LLL -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -b ${USER_UDN} >/dev/null 2>&1
+        ldapsearch -x -LLL -h ${ldaphost_rw} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -b ${USER_UDN} >/dev/null 2>&1
         if [ $? -eq 0 ]; then
             export g_PASSWD_CACHED
             e=${CODE_SUCCESS}
@@ -137,7 +161,8 @@ function :ldap:modify() {
                         delete|add|replace)
                             shift 3
                             local ldif="$(::ldap:mkldif ${change} user ${username} ${@})"
-                            ldapmodify -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<< "${ldif}"  >/dev/null 2>&1
+                            local ldaphost_rw=$(:ldap:host_rw)
+                            ldapmodify -x -h ${ldaphost_rw} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<< "${ldif}"  >/dev/null 2>&1
                             e=$?
                             if [ $e -ne ${CODE_SUCCESS} ]; then
                                 cpf "%{@comment:#. } LDIF %{@err:Failed} with status code %{@int:$e}:\n" >&2
@@ -156,7 +181,8 @@ function :ldap:modify() {
                         modify|delete|add|replace)
                             shift 3
                             local ldif="$(::ldap:mkldif ${change} group ${groupname} ${@})"
-                            ldapmodify -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<< "${ldif}"  >/dev/null 2>&1
+                            local ldaphost_rw=$(:ldap:host_rw)
+                            ldapmodify -x -h ${ldaphost_rw} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<< "${ldif}"  >/dev/null 2>&1
                             e=$?
                             if [ $e -ne ${CODE_SUCCESS} ]; then
                                 cpf "%{@comment:#. } LDIF %{@err:Failed} with status code %{@int:$e}:\n" >&2
@@ -188,7 +214,8 @@ function :ldap:add() {
             local context=$1
             case $context in
                 user)
-                    ldapmodify -a -x -h ${USER_LDAPHOST_RW} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -f <(
+                    local ldaphost_rw=$(:ldap:host_rw)
+                    ldapmodify -a -x -h ${ldaphost_rw} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -f <(
                         echo "dn: uid=${dstuid},${USER_UDN}"
                         unset _ldap_dn
                         for attrs in ${!_ldap_*}; do
@@ -223,7 +250,7 @@ function ldap:ngldif() {
         e=${CODE_SUCCESS}
         for host in $@; do
             local -a hsns
-            hsns=( $(:dns:qdn ${host}) )
+            hsns=( $(:dns:qdn ${host} m) )
             if [ $? -eq 0 ]; then
                 local hsn
                 for hsn in ${hsns[@]}; do
@@ -242,7 +269,7 @@ function ldap:ngldif() {
 
 function ldap:ping:usage() { echo " "; }
 function ldap:ping() {
-    core:requires colordiff
+    core:requires ANY colordiff diff
 
     local -i e=${CODE_DEFAULT}
 
@@ -259,18 +286,19 @@ function ldap:ping() {
             cpf "Integrity check for %{c:uid=}%{r:${uidc}*}..."
             local -A md5s=()
             for lh in ${USER_LDAPHOSTS[@]}; do
-                dump[${lh}]=$( (ldapsearch -x -LLL -E pr=128/noprompt -S dn -h "${lh}" -b "${USER_UDN}" uid="${uidc}*" modifyTimestamp createTimestamp |grep -v 'pagedresults:' 2>/dev/null))
-                if [ $? -eq 0 ]; then
-                    cpf '.'
-                else
-                    cpf '!'
-                    #core:raise EXCEPTION_UNHANDLED
-                fi
+                dump[${lh}]=$(
+                    ldapsearch -x -LLL -E pr=128/noprompt -S dn -h "${lh}" -b "${USER_UDN}"\
+                        uid="${uidc}*" modifyTimestamp createTimestamp |
+                            sed -e 's/^dn:.*/\L&/' |
+                            grep -v 'pagedresults:' 2>/dev/null
+                )
+                [ $? -eq 0 ] && cpf '.' || cpf '!'
                 md5="$(echo ${dump[${lh}]}|md5sum|awk '{print$1}')"
                 md5s[${md5}]=${lh}
             done
 
-            local -i len=$(echo "${dump[${USER_LDAPHOST}]}"|wc -c)
+            local ldaphost=$(:ldap:host)
+            local -i len=$(echo "${dump[${ldaphost}]}"|wc -c)
             if [ ${#md5s[@]} -eq 1 ]; then
                 if [ ${len} -gt 1 ]; then
                     theme HAS_PASSED ${md5}:${len}
@@ -281,10 +309,10 @@ function ldap:ping() {
                 theme HAS_FAILED "${#md5s[@]} variants in the ${#USER_LDAPHOSTS[@]} hosts"
                 e=${CODE_FAILURE}
                 for lh in ${USER_LDAPHOSTS[@]}; do
-                    if [ ${lh} != ${USER_LDAPHOST} ]; then
-                        cpf "%{@host:${USER_LDAPHOST}} vs %{@host:${lh}}...\n"
+                    if [ ${lh} != ${ldaphost} ]; then
+                        cpf "%{@host:${ldaphost}} vs %{@host:${lh}}...\n"
                         colordiff -a -u\
-                            <(echo "${dump[${USER_LDAPHOST}]}") \
+                            <(echo "${dump[${ldaphost}]}") \
                             <(echo "${dump[${lh}]}")
                     fi
                 done
@@ -310,8 +338,9 @@ function :ldap:eval:search() {
         shift 2
         case $context in
             user)
+                local ldaphost=$(:ldap:host)
                 local userdata=$(
-                    ldapsearch -x -LLL -E pr=1024/noprompt -h "${USER_LDAPHOST}" -b "${USER_UDN}" "uid=${username}" ${@}|grep -vE ^#
+                    ldapsearch -x -LLL -E pr=1024/noprompt -h "${ldaphost}" -b "${USER_UDN}" "uid=${username}" ${@}|grep -vE ^#
                 )
                 if [ $# -gt 0 ]; then
                     #. User specified which attrs they want:
@@ -416,7 +445,8 @@ function :ldap:search() {
             #. Script-readable dump
             local filterstr="(&$(:util:join '' filter))"
             local -l displaystr=$(:util:join ',' display)
-            local querystr="ldapsearch -x -LLL -E pr=1024/noprompt -h '${USER_LDAPHOST}' -x -b '${bdn}' '${filterstr}' ${display[@]}"
+            local ldaphost=$(:ldap:host)
+            local querystr="ldapsearch -x -LLL -E pr=1024/noprompt -h '${ldaphost}' -x -b '${bdn}' '${filterstr}' ${display[@]}"
             #cpf "%{@cmd:%s}\n" "${querystr}"
 
             #. TITLE: echo ${display[@]^^}
@@ -470,7 +500,7 @@ function ldap:search() {
         esac
 
         if [ ${#bdn} -gt 0 ]; then
-            :ldap:search $@
+            :ldap:search $@|tr "${SITE_DELIM?}" "\n"
             e=$?
         fi
     fi
