@@ -1,5 +1,5 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
-HGD_CACHE=${SITE_CACHE}/hgd.conf
+g_HGD_CACHE=${SITE_CACHE}/hgd.conf
 
 core:import util
 
@@ -7,21 +7,11 @@ core:import util
 function ::hgd:explode() {
     local -i e=${CODE_FAILURE}
 
+    local tldid=m
+
     core:import ng
     core:import dns
     core:import net
-
-    #local allowed
-    #local eq
-    #if [ $# -eq 2 ]; then
-    #    local allowed="${1}"
-    #    local eq="${2}"
-    #elif [ $# -eq 1 ]; then
-    #    local allowed="*"
-    #    local eq="${1}"
-    #fi
-    #
-    #if [ "${allowed}" == '*' -o "${allowed//${grouping:0:1}/}" != "${allowed}" ]; then
 
     if [ $# -eq 1 ]; then
         e=${CODE_SUCCESS}
@@ -32,7 +22,7 @@ function ::hgd:explode() {
         case ${hgdc} in
             '+')
                 local hosts
-                hosts="$(:ng:resolve ${hgdn})"
+                hosts="$(:ng:resolve ${tldid} ${hgdn})"
                 if [ $? -eq ${CODE_SUCCESS} ]; then
                     echo "${hosts}"
                 else
@@ -41,7 +31,7 @@ function ::hgd:explode() {
             ;;
             '=')
                 local hosts
-                hosts="$(:ng:resolve ${hgdn})"
+                hosts="$(:ng:resolve ${tldid} ${hgdn})"
                 if [ $? -eq ${CODE_SUCCESS} ]; then
                     echo "${hosts}"
                 else
@@ -50,7 +40,7 @@ function ::hgd:explode() {
             ;;
             '@')
                 local host
-                host="$(:dns:qdn ${hgdn})"
+                host="$(:dns:qdn ${tldid} ${hgdn})"
                 if [ $? -eq ${CODE_SUCCESS} ]; then
                     echo "${host}"
                 else
@@ -144,7 +134,7 @@ function :hgd:resolve() {
         else
             local session="$1"
             local -a buflist
-            buflist=( $(awk -F '\t' '$1~/^'${session}'$/{print$0}' ${HGD_CACHE}) )
+            buflist=( $(awk -F '\t' '$1~/^'${session}'$/{print$0}' ${g_HGD_CACHE}) )
             if [ $? -eq ${CODE_SUCCESS} -a ${#buflist[@]} -gt 3 ]; then
                 e=${CODE_SUCCESS}
                 echo ${buflist[@]:3}
@@ -163,7 +153,7 @@ function hgd:resolve:help() {
 
     +<netgroup>          //. recursive netgroup resolution
     =<netgroup>          //. non-recursive (one-level) netgroup resolution
-    @<hostname>          //. a specific hostname (can be one of shn, qdn, fqdm)
+    @<hostname>          //. a specific hostname (can be one of shn, qdn, fqdn)
     #<ip-addr>           //. single IP address
     #<subnet>/<submask>  //. an entire subnet
     .<subdomain>         //. all hosts in ~/.known_hosts matching the given subdomain
@@ -194,7 +184,7 @@ function :hgd:load() {
 
     if [ $# -eq 1 ]; then
         local session=$1
-        local hgd=$(awk -F '\t' '$1~/^'${session}'$/{print$3}' ${HGD_CACHE})
+        local hgd=$(awk -F '\t' '$1~/^'${session}'$/{print$3}' ${g_HGD_CACHE})
         if [ ${#hgd} -gt 0 ]; then
             echo ${hgd}
             e=${CODE_SUCCESS}
@@ -212,8 +202,8 @@ function :hgd:delete() {
 
     if [ $# -eq 1 ]; then
         local session=$1
-        if [ -s ${HGD_CACHE} ] && grep -qE "^\<${session}\>" ${HGD_CACHE}; then
-            if sed -e "/^\<${session}\>/d" -i ${HGD_CACHE}; then
+        if [ -s ${g_HGD_CACHE} ] && grep -qE "^\<${session}\>" ${g_HGD_CACHE}; then
+            if sed -e "/^\<${session}\>/d" -i ${g_HGD_CACHE}; then
                 e=${CODE_SUCCESS}
             fi
         fi
@@ -236,7 +226,7 @@ function :hgd:refresh() {
             hosts=( $(:hgd:resolve ${hgd}) )
             if [ $? -eq 0 -a ${#hosts[@]} -gt 0 ]; then
                 :hgd:delete ${session}
-                echo -e "${session}\t${NOW}\t${hgd}\t${hosts[@]}" >> ${HGD_CACHE}
+                echo -e "${session}\t${NOW}\t${hgd}\t${hosts[@]}" >> ${g_HGD_CACHE}
                 e=${CODE_SUCCESS}
             fi
         fi
@@ -259,7 +249,7 @@ function :hgd:save() {
         if [ $? -eq 0 -a ${#hosts[@]} -gt 0 ]; then
             :hgd:delete ${session}
         fi
-        echo -ne "${session}\t${NOW}\t${hgd}\t${hosts[@]}\n" >> ${HGD_CACHE}
+        echo -ne "${session}\t${NOW}\t${hgd}\t${hosts[@]}\n" >> ${g_HGD_CACHE}
         e=${CODE_SUCCESS}
     else
         core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, 2 expected"
@@ -322,15 +312,15 @@ function :hgd:list() {
     local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 0 ]; then
-        if [ -s ${HGD_CACHE} ]; then
-            cat ${HGD_CACHE}
+        if [ -s ${g_HGD_CACHE} ]; then
+            cat ${g_HGD_CACHE}
             e=${CODE_SUCCESS}
         else
             e=2
         fi
     elif [ $# -eq 1 ]; then
-        if grep -qE "^\<${1}\>" ${HGD_CACHE}; then
-            sed -ne "/^\<${1}\> *.*$/p" ${HGD_CACHE}
+        if grep -qE "^\<${1}\>" ${g_HGD_CACHE}; then
+            sed -ne "/^\<${1}\> *.*$/p" ${g_HGD_CACHE}
             e=${CODE_SUCCESS}
         else
             e=3
