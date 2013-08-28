@@ -6,12 +6,20 @@ from select import select
 from sha import sha
 from concurrent import futures
 
+from time import sleep
+from random import random
+
 import signal
 g_interrupted = False
 def signal_handler(signum, frame):
     global g_interrupted
     g_interrupted = True
 signal.signal(signal.SIGINT, signal_handler)
+
+import logging
+ll = logging.FATAL
+logging.basicConfig(level=ll)
+#logging.getLogger("paramiko").setLevel(ll)
 
 #class MHKP(paramiko.MissingHostKeyPolicy):
 class MHKP(paramiko.AutoAddPolicy):
@@ -60,12 +68,30 @@ class EssEssHache:
         client.close()
         
     def connect(self, username, qdn, command, stdin=[]):
+        #sleep(2 * random())
+
         client = self._clients[qdn]
         data = None
         try:
             data = (qdn, [], [], 1)
             try:
-                client.connect(qdn, username=username)
+                ssh_proxy = os.environ.get('USER_SSH_PROXY', None)
+                tld = os.environ.get('USER_TLD', None)
+                #sys.stdout.write("%s=%s\n" % ('ssh_proxy', ssh_proxy))
+                #sys.stdout.write("%s=%s\n" % ('tld', tld))
+
+                if ssh_proxy is None:
+                    sys.stdout.write("#. queued up %s\n" % qdn)
+                    client.connect(qdn, username=username)
+                else:
+                    sys.stdout.write("#. queued up %s via proxy %s\n" % (qdn, ssh_proxy))
+                    proxy_command = paramiko.ProxyCommand(
+                        "ssh %s@%s nc %s.%s 22" % (
+                            username, ssh_proxy, qdn, tld
+                        )
+                    )
+                    client.connect(qdn, username=username, sock=proxy_command)
+
                 stdout = []
                 stderr = []
                 ecode = -1
@@ -151,26 +177,35 @@ class EssEssHache:
                 cmd = """sudo -S %s""" % cmd
                 stdindata.append(password)
 
-            queue = [
+            queue = (
                 (
                     qdn, executor.submit(
                         self.connect, username, qdn, cmd, stdindata
                     )
                 ) for qdn in self._clients.keys()
-            ]
+            )
+
             sys.stdout.write("local -A %s_o\n" % var) #. stdout
             sys.stdout.write("local -A %s_e\n" % var) #. stderr
             sys.stdout.write("local -A %s_w\n" % var) #. warnings
 
+            i = 0
+            total = len(self._clients.keys())
             for qdn, future in queue:
+                i += 1
                 data = None
                 qdn_hash = sha(qdn).hexdigest()
                 try:
+                    sys.stdout.write(
+                        "#. Query with host %s (%d of %d)...\n" % (
+                            qdn, i, total
+                        )
+                    )
                     data = future.result(timeout=self._timeout)
                 except futures.TimeoutError:
                     sys.stdout.write("#. %s is taking too long. Oh well.\n" % qdn)
-                    sys.stdout.write("%s[%s]=%d\n" % (var, qdn_hash, 9))
-                    sys.stdout.write("%s_e[%s]='%s'\n" % (var, qdn_hash, 'TIMEOUT'))
+                    #sys.stdout.write("%s[%s]=%d\n" % (var, qdn_hash, 9))
+                    #sys.stdout.write("%s_e[%s]='%s'\n" % (var, qdn_hash, 'TIMEOUT'))
                 else:
                     qdn, stdout, stderr, e = data
 
@@ -197,6 +232,7 @@ class EssEssHache:
                     #warning = MISSING_HKEY.get(qdn, False);
                     #if warning:
                     #    sys.stdout.write("%s_w[%s]='%s'\n" % (var, qdn_hash, warning))
+            sys.stdout.write("#. All done.\n")
 
 def main():
     '''
