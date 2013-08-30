@@ -21,6 +21,7 @@ if [ $e -eq 0 ]; then
 
     if [ ${maj} -ge 4 -a ${min} -ge 0 ]; then
         source ~/.site/etc/site.conf
+        rm -f ${SITE_DEADMAN?}
         core:wrapper $@
         e=$?
     else
