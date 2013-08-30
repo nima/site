@@ -63,6 +63,7 @@ function ::cpf:theme() {
                     note)                fmt="%{m:${fmt}}";;
                     link)                fmt="%{b:${fmt}}";;
                     loc)                 fmt="%{c:${fmt}}";;
+                    tldid)               fmt="%{m:<${fmt}>}";;
                     netgroup)            fmt="%{c:${fmt}}";;
                     netgroup_empty)      fmt="%{+bo}%{bl:${fmt}}%{-bo}";;
                     netgroup_missing)    fmt="%{+bo}%{r:${fmt}}%{-bo}";;
@@ -77,6 +78,7 @@ function ::cpf:theme() {
                     hash)                fmt="%{b:${fmt}}";;
                     fqdn)                fmt="%{y:${fmt}}";;
                     host)                fmt="%{y:${fmt}}";;
+                    port)                fmt="%{g:${fmt}}";;
                     host_bad)            fmt="%{r:${fmt}}";;
                     ip)                  fmt="%{b:${fmt}}";;
                     cmd)                 fmt="%{c:${fmt}}";;
@@ -360,7 +362,6 @@ function cpf() {
                 prefix+=( "" )
                 fmtstr="${fmtstr//${arg}/${replacement}}"
             fi
-            ((i++))
         done < <(echo "${fmtstr}"|grep -oE '%{[^}]+}')
 
         #echo "XXX fmt >>> ${fmtstr} <<<" > /dev/stderr
@@ -370,6 +371,7 @@ function cpf() {
         #echo "XXX [ ${substitutions} == ${#args[@]} ]" > /dev/stderr
         if [ ${substitutions} -eq ${#args[@]} ]; then
             if ! echo "${fmtstr}"|grep -qE '%{'; then
+                local -i i
                 for ((i=0; i<${#args[@]}; i++)); do
                     #echo "XXX pre-change arg $i  >>> ${args[$i]}" > /dev/stderr
                     args[${i}]="${prefix[$i]}${args[${i}]}"
