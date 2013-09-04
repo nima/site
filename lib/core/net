@@ -158,27 +158,58 @@ function :net:firsthost() {
 }
 #. }=-
 
-function :net:portscan() {
+function :net:portping() {
     core:requires nc
 
     local -i e=${CODE_FAILURE}
-
-    if [ $# -eq 3 ]; then
-        local tldid=$1
-        local qdn=$2
-        local port=$3
-        local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
-        local tld=${USER_TLDS[${tldid}]}
-        if [ ${#ssh_proxy} -gt 0 ]; then
-            ssh ${SITE_USERNAME}@${ssh_proxy}\
-                nc -zw1 ${qdn}${tld:+.${tld}} ${port} >/dev/null 2>&1
-            e=$?
+    if [ $# -eq 2 ]; then
+        local fqdn=$1
+        local tldid
+        tldid=$(:dns:qualified ${fqdn})
+        if [ $? -eq ${CODE_SUCCESS} ]; then
+            local port=$2
+            local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
+            local tld=${USER_TLDS[${tldid}]}
+            if [ ${#ssh_proxy} -gt 0 ]; then
+                ssh ${SITE_USERNAME}@${ssh_proxy}\
+                    nc -zw1 ${fqdn} ${port} >/dev/null 2>&1
+                e=$?
+            else
+                nc -zqw1 ${fqdn} ${port}
+                e=$?
+            fi
         else
-            nc -zqw1 ${qdn}${tld:+.${tld}} ${port}
-            e=$?
+            core:raise EXCEPTION_INVALID_FQDN
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function net:portping:usage() { echo "<host> <port>"; }
+function net:portping() {
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -eq 2 ]; then
+        local tldid
+        local fqdn=$1
+        local port=$2
+        cpf "Testing TCP connectivity to %{@host:%s}:%{@port:%s}..." ${fqdn} ${port}
+        tldid=$(:dns:qualified ${fqdn})
+        if [ $? -eq ${CODE_SUCCESS} ]; then
+            if :net:portping ${fqdn} ${port}; then
+                theme HAS_PASSED "CONNECTED"
+                e=${CODE_SUCCESS}
+            else
+                theme HAS_WARNED "NO_CONN"
+                e=${CODE_FAILURE}
+            fi
+        else
+            theme HAS_FAILED "Invalid/Unknown FQDN"
+            e=${CODE_FAILURE}
+        fi
     fi
 
     return $e
