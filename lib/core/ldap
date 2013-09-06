@@ -288,7 +288,7 @@ function ldap:ping() {
             for lh in ${USER_LDAPHOSTS[@]}; do
                 dump[${lh}]=$(
                     ldapsearch -x -LLL -E pr=128/noprompt -S dn -h "${lh}" -b "${USER_UDN}"\
-                        uid="${uidc}*" modifyTimestamp createTimestamp |
+                        uid="${uidc}*" ${USER_LDAP_SYNC_ATTRS[@]} |
                             sed -e 's/^dn:.*/\L&/' |
                             grep -v 'pagedresults:' 2>/dev/null
                 )
@@ -311,7 +311,8 @@ function ldap:ping() {
                 for lh in ${USER_LDAPHOSTS[@]}; do
                     if [ ${lh} != ${ldaphost} ]; then
                         cpf "%{@host:${ldaphost}} vs %{@host:${lh}}...\n"
-                        colordiff -a -u\
+                        #colordiff -y -a \
+                        colordiff -T -a -U3 \
                             <(echo "${dump[${ldaphost}]}") \
                             <(echo "${dump[${lh}]}")
                     fi
@@ -405,12 +406,14 @@ function :ldap:search() {
     #. This function seaches for multiple objects
     #.
     #. Usage:
-    #.       IFS='|||' read -a fred <<< "$(site ldap search netgroup cn=jboss_prd nisNetgroupTriple)"
+    #.       IFS='|||' read -a fred <<< "$(:ldap:search netgroup cn=jboss_prd nisNetgroupTriple)"
 
     local -i e=${CODE_FAILURE?}
 
     if [ $# -gt 1 ]; then
         local bdn
+        local ldaphost=$(:ldap:host)
+
         case $1 in
             user)     bdn=${USER_UDN};;
             group)    bdn=${USER_GDN};;
@@ -420,15 +423,17 @@ function :ldap:search() {
         if [ ${#bdn} -gt 0 ]; then
             shift 1
 
+            #. Look for filter tokens
             local -a filter
             local -a display
-
-            #. Look for filter tokens
             local token
             for token in $@; do
                 if [[ ${token} =~ [-a-zA-Z0-9_]+([~\<\>]?=).+ ]]; then
                     filter+=( "(${token})" )
                 else
+                    #. Unfortunately, for now it is mandatory that all attributes
+                    #. requested must exist, otherwise the caller doesn't know
+                    #. which ones are missing.
                     filter+=( "(${token}=*)" )
                     display+=( ${token} )
                 fi
@@ -445,8 +450,7 @@ function :ldap:search() {
             #. Script-readable dump
             local filterstr="(&$(:util:join '' filter))"
             local -l displaystr=$(:util:join ',' display)
-            local ldaphost=$(:ldap:host)
-            local querystr="ldapsearch -x -LLL -E pr=1024/noprompt -h '${ldaphost}' -x -b '${bdn}' '${filterstr}' ${display[@]}"
+            local querystr="ldapsearch -x -LLL -h '${ldaphost}' -x -b '${bdn}' '${filterstr}' ${display[@]}"
             #cpf "%{@cmd:%s}\n" "${querystr}"
 
             #. TITLE: echo ${display[@]^^}
@@ -467,8 +471,15 @@ BEGIN{
         }
     }
 
-    if(data[key]) {
-        for(i=1; i<=length(display); i++) {
+    total=length(display);
+    hits=0;
+    for(i=1;i<=total;i++) {
+        key=display[i];
+        if(length(data[key])) hits++;
+    }
+
+    if(hits==total) {
+        for(i=1;i<=total;i++) {
             if(i>1) printf("'${SITE_DELIM?}'");
             key = display[i];
             printf("%s", data[key]);
@@ -486,7 +497,7 @@ BEGIN{
     return $e
 }
 
-function ldap:search:usage() { echo "user|group|netgroup <filters>/<show-fields>"; }
+function ldap:search:usage() { echo "<ldap-host> user|group|netgroup <filters>/<show-fields>"; }
 function ldap:search() {
     local -i e=${CODE_DEFAULT?}
 
@@ -496,13 +507,51 @@ function ldap:search() {
             user)     bdn=${USER_UDN};;
             group)    bdn=${USER_GDN};;
             netgroup) bdn=${USER_NDN};;
-            *) core:raise EXCEPTION_BAD_FN_CALL;;
         esac
 
         if [ ${#bdn} -gt 0 ]; then
-            :ldap:search $@|tr "${SITE_DELIM?}" "\n"
+            local data=$(:ldap:search $@)
             e=$?
+
+            if [ ${e} -eq ${CODE_SUCCESS} ]; then
+                #. Look for filter tokens
+                local -a filter
+                local -a display
+                local token
+                for token in ${@:3}; do
+                    if [[ ${token} =~ [-a-zA-Z0-9_]+([~\<\>]?=).+ ]]; then
+                        filter+=( "(${token})" )
+                    else
+                        #. Unfortunately, for now it is mandatory that all attributes
+                        #. requested must exist, otherwise the caller doesn't know
+                        #. which ones are missing.
+                        filter+=( "(${token}=*)" )
+                        display+=( ${token} )
+                    fi
+                done
+
+                IFS="${SITE_DELIM}" read ${display[@]} <<< "${data}"
+
+                for attr in ${display[@]}; do
+                    local value=${!attr}
+                    if [ ${#value} -gt 0 ]; then
+                        cpf "%{@key:%-32s}%{@val:%s}\n" "${attr}" "${value}"
+                    else
+                        cpf "%{@key:%-32s}%{@err:%s}\n" "${attr}" "ERROR"
+                        e=${CODE_FAILURE}
+                    fi
+                done
+            fi
         fi
+    fi
+
+    if [ ${e} -ne ${CODE_SUCCESS} ]; then
+        echo
+        cat <<!
+Note: if any of the specified attributes are missing, every attribute will
+      fail.  This can be fixed, but at relatively great expense as each
+      attribute will result in a dedicated ldap query.
+!
     fi
 
     return $e
