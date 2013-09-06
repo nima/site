@@ -1,0 +1,24 @@
+#. Copy this file to ~/.siterc, and set/uncomment variables as required.
+PROFILE="SITE01"
+
+SITE_USERNAME="tyrion"
+SITE_FULLNAME="Tyrion Lannister"
+SITE_EMAIL="tyrion.lannister@lannister.casterlyrock.com"
+SITE_GPG_ID="0xBADB00B5"
+SITE_SCM_CFENGINE="${HOME}/SCM/cfengine"
+
+#. Executable Overrides -={
+#. Override your BASH if it's old, on Mac OS X, get the GNU utilities via
+#. brew; brew install coreutils findutils:
+
+#. The bash binary itself:
+#SITE_SHELL=/bin/bash
+
+#. Other important binaries:
+#function grep() {    /bin/grep "$@"; return $?; }
+#function sed()  {     /bin/sed "$@"; return $?; }
+#function awk()  { /usr/bin/awk "$@"; return $?; }
+#function anything() { ...; }
+#. }=-
+
+#. vim:syntax=sh
