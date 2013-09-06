@@ -1,13 +1,14 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
-function help:site:usage() { echo "site|<module>"; }
-function help:site() {
+function help:all:usage() { echo "#. no-args"; }
+function help:all() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 0 ]; then
         local profile
         for profile in USER_MODULES CORE_MODULES; do
-            eval $(::core:eval:dereference profile) #. Will create ${profile}
+            #. Initialize the ${profile} variable
+            eval $(::core:eval:dereference profile)
             local module
             for module in ${!profile[@]}; do
                 :core:usage ${module}
@@ -15,12 +16,25 @@ function help:site() {
             echo
         done
         e=${CODE_SUCCESS}
-    elif [ $# -eq 1 ]; then
+    fi
+
+    return $e
+}
+
+function help:module:usage() { echo "<module> [<function>]"; }
+function help:module() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
         :core:usage ${1}
         e=$?
     elif [ $# -eq 2 ]; then
-        :core:usage ${1} ${2}
-        e=$?
+        if core:softimport ${1}; then
+            :core:usage ${1} ${2} --long
+            e=$?
+        else
+            e=${CODE_FAILURE}
+        fi
     fi
 
     return $e
