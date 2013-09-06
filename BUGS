@@ -1,0 +1,16 @@
+# Known Bugs
+
+1. CPF Failure:
+
+    site help all|cat
+
+2. Global flags difficult to retrieve:
+
+    site help (vs site ldap ping --help)
+
+3. site net portping 122.106.34.4 8080
+
+    This should realize that the argument is an IP address, and not treat it
+    as an fqdn.
+
+######. vim:syntax=markdown
