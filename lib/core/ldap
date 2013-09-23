@@ -1,26 +1,85 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
+:<<[core:docstring]
+The site LDAP module
+[core:docstring]
+
+#. https://access.redhat.com/site/documentation/en-US/Red_Hat_Directory_Server/8.2/html-single/Administration_Guide/index.html#Managing_Replication-Replicating-Password-Attributes
+g_MAXDATA=20380119031407Z
+
 core:import dns
 core:import util
 
 function :ldap:host() {
-    #. Returns a random LDAP host from the pool
-    #. Assumes all hosts are functional
+    #. <arguments> = -1:
+    #.    Returns a random LDAP host from the pool
+    #.
+    #. {no-argument} or <arguments> = -2:
+    #.    Returns a random LDAP host from the pool, unless global option for
+    #.    a specific <lhi> has been set, in which case that ldap host is
+    #.    returned.
+    #.
+    #. <arguments> = 0..
+    #.    Returns a specific LDAP host if 1 argument is supplied which is
+    #.    positive and less than the number of ldap hosts defined.
+    #.
+    #. Throws an exception otherwise.
 
     local -i e=${CODE_FAILURE}
 
-    local user_ldaphost="${USER_LDAPHOSTS[$((${RANDOM}%${#USER_LDAPHOSTS[@]}))]}"
-    echo ${user_ldaphost}
+    local user_ldaphost=
+    if [ $# -eq 1 ]; then
+        local -i lhi=$1
+        if [ ${lhi} -lt ${#USER_LDAPHOSTS[@]} ]; then
+            if [ ${lhi} -ge 0 ]; then
+                user_ldaphost="${USER_LDAPHOSTS[${lhi}]}"
+                e=${CODE_SUCCESS}
+            elif [ ${lhi} -eq -1 ]; then
+                e=${CODE_SUCCESS}
+            elif [ ${lhi} -eq -2 ]; then
+                [ ${g_LDAPHOST} -ge 0 ] || g_LDAPHOST=-1
+                user_ldaphost=$(:ldap:host ${g_LDAPHOST})
+                e=$?
+            fi
+        else
+            core:raise EXCEPTION_BAD_FN_CALL "BAD_INDEX"
+        fi
+    elif [ $# -eq 0 ]; then
+        [ ${g_LDAPHOST} -ge 0 ] || g_LDAPHOST=-1
+        user_ldaphost=$(:ldap:host ${g_LDAPHOST})
+        e=$?
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    if [ $e -eq ${CODE_SUCCESS} ]; then
+        if [ ${#user_ldaphost} -eq 0 ]; then
+            user_ldaphost="${USER_LDAPHOSTS[$((${RANDOM}%${#USER_LDAPHOSTS[@]}))]}"
+        fi
+        echo ${user_ldaphost}
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
 
     return $e
 }
+
 function :ldap:host_rw() {
     #. Returns a random LDAP host from the pool, that offer rw functionality
     #. Assumes all hosts are functional
 
     local -i e=${CODE_FAILURE}
 
-    local user_ldaphost_rw="${USER_LDAPHOSTS_RW[$((${RANDOM}%${#USER_LDAPHOSTS_RW[@]}))]}"
+    local user_ldaphost_rw
+    if [ "${g_LDAPHOST}" -lt 0 ]; then
+        user_ldaphost_rw="${USER_LDAPHOSTS_RW[$((${RANDOM}%${#USER_LDAPHOSTS_RW[@]}))]}"
+        e=${CODE_SUCCESS}
+    elif [ ${g_LDAPHOST} -lt ${#USER_LDAPHOSTS_RW[@]} ]; then
+        user_ldaphost_rw="${USER_LDAPHOSTS_RW[${g_LDAPHOST}]}"
+        e=${CODE_SUCCESS}
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
     echo ${user_ldaphost_rw}
 
     return $e
@@ -89,7 +148,7 @@ function ::ldap:mkldif() {
             [modify]=modify
             [add]=modify
             [replace]=modify
-            [delete]=delete
+            [delete]=modify
         )
         local change=${changes[${action}]}
 
@@ -250,7 +309,7 @@ function ldap:ngldif() {
         e=${CODE_SUCCESS}
         for host in $@; do
             local -a hsns
-            hsns=( $(:dns:qdn ${host} m) )
+            hsns=( $(:dns:qdn m ${host}) )
             if [ $? -eq 0 ]; then
                 local hsn
                 for hsn in ${hsns[@]}; do
@@ -334,12 +393,13 @@ function :ldap:eval:search() {
     local -i e=${CODE_FAILURE}
 
     if [ $# -ge 2 ]; then
-        local context=$1
-        local username=$2
-        shift 2
+        local -i lhi=$1
+        local context=$2
+        local username=$3
+        shift 3
         case $context in
             user)
-                local ldaphost=$(:ldap:host)
+                local ldaphost=$(:ldap:host ${lhi})
                 local userdata=$(
                     ldapsearch -x -LLL -E pr=1024/noprompt -h "${ldaphost}" -b "${USER_UDN}" "uid=${username}" ${@}|grep -vE ^#
                 )
@@ -406,29 +466,32 @@ function :ldap:search() {
     #. This function seaches for multiple objects
     #.
     #. Usage:
-    #.       IFS='|||' read -a fred <<< "$(:ldap:search netgroup cn=jboss_prd nisNetgroupTriple)"
+    #.       IFS='|||' read -a fred <<< "$(:ldap:search <lhi> netgroup cn=jboss_prd nisNetgroupTriple)"
 
     local -i e=${CODE_FAILURE?}
 
-    if [ $# -gt 1 ]; then
+    if [ $# -gt 2 ]; then
         local bdn
-        local ldaphost=$(:ldap:host)
+        local -i lhi=${1}
+        local ldaphost=$(:ldap:host ${lhi})
 
-        case $1 in
+        case $2 in
             user)     bdn=${USER_UDN};;
             group)    bdn=${USER_GDN};;
             netgroup) bdn=${USER_NDN};;
         esac
 
         if [ ${#bdn} -gt 0 ]; then
-            shift 1
+            shift 2
 
             #. Look for filter tokens
             local -a filter
             local -a display
             local token
             for token in $@; do
-                if [[ ${token} =~ [-a-zA-Z0-9_]+([~\<\>]?=).+ ]]; then
+                if [[ ${token} =~ \([-a-zA-Z0-9_]+([~\<\>]?=).+\) ]]; then
+                    filter+=( "${token}" )
+                elif [[ ${token} =~ [-a-zA-Z0-9_]+([~\<\>]?=).+ ]]; then
                     filter+=( "(${token})" )
                 else
                     #. Unfortunately, for now it is mandatory that all attributes
@@ -488,7 +551,9 @@ BEGIN{
     }
     delete data;
 }'
-            e=$?
+            e=${PIPESTATUS[0]}
+        else
+            core:raise EXCEPTION_BAD_FN_CALL
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -497,8 +562,13 @@ BEGIN{
     return $e
 }
 
-function ldap:search:usage() { echo "<ldap-host> user|group|netgroup <filters>/<show-fields>"; }
+function ldap:search:usage() { echo "user|group|netgroup <filters>/<show-fields>"; }
 function ldap:search() {
+    #. NOTE
+    #. If any of the specified attributes are missing, every attribute will
+    #. fail.  This can be fixed, but at relatively great expense as each
+    #. attribute will result in a dedicated ldap query.
+
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -gt 1 ]; then
@@ -510,7 +580,7 @@ function ldap:search() {
         esac
 
         if [ ${#bdn} -gt 0 ]; then
-            local data=$(:ldap:search $@)
+            local data=$(:ldap:search -2 $@)
             e=$?
 
             if [ ${e} -eq ${CODE_SUCCESS} ]; then
@@ -543,15 +613,6 @@ function ldap:search() {
                 done
             fi
         fi
-    fi
-
-    if [ ${e} -ne ${CODE_SUCCESS} ]; then
-        echo
-        cat <<!
-Note: if any of the specified attributes are missing, every attribute will
-      fail.  This can be fixed, but at relatively great expense as each
-      attribute will result in a dedicated ldap query.
-!
     fi
 
     return $e
