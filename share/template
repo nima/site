@@ -1,5 +1,10 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
+#. Docstring for this module; keep this to a single line
+:<<[core:docstring]
+This module does X, Y and Z
+[core:docstring]
+
 #. Optional alerts
 function module:func:alert() {
     cat <<!
