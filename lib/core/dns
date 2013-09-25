@@ -1,5 +1,9 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
+:<<[core:docstring]
+Core DNS module
+[core:docstring]
+
 core:import util
 
 #. Internal Functions -={
@@ -132,21 +136,14 @@ function :dns:fqdn() {
 }
 #. }=-
 #. Public Functions -={
-function dns:fqdn:usage() { echo "<tldid> <hosthint>"; }
+function dns:fqdn:usage() { echo "-T|--tldid <tldid> <hosthint>"; }
 function dns:fqdn() {
     local -i e=${CODE_DEFAULT?}
 
-    if [ $# -eq 2 ]; then
-        local tldid=$1
-        local hosthint=$2
-        if [ ${#USER_IFACE[${tldid}]} -gt 0 ]; then
-            :dns:fqdn ${tldid} ${hosthint}
-            e=$?
-        else
-            theme HAS_FAILED "No such TLDID \`${tldid}'"
-            e=${CODE_FAILURE}
-        fi
-
+    local tldid=${g_TLDID}
+    if [ $# -eq 1 -a ${#tldid} -gt 0 ]; then
+        local hosthint=$1
+        :dns:fqdn ${tldid} ${hosthint}
         e=$?
     fi
 
@@ -173,20 +170,15 @@ function :dns:qdn() {
     return $e
 }
 
-function dns:qdn:usage() { echo "<tldid> <hosthint>"; }
+function dns:qdn:usage() { echo "-T|--tldid <tldid> <hosthint>"; }
 function dns:qdn() {
     local -i e=${CODE_DEFAULT?}
 
-    if [ $# -eq 2 ]; then
-        local tldid=$1
-        local hosthint=$2
-        if [ ${#USER_IFACE[${tldid}]} -gt 0 ]; then
-            :dns:qdn ${tldid} ${hosthint}
-            e=$?
-        else
-            theme HAS_FAILED "No such TLDID \`${tldid}'"
-            e=${CODE_FAILURE}
-        fi
+    local tldid=${g_TLDID}
+    if [ $# -eq 1 -a ${#tldid} -gt 0 ]; then
+        local hosthint=$1
+        :dns:qdn ${tldid} ${hosthint}
+        e=$?
     fi
 
     return $e
@@ -220,15 +212,18 @@ function dns:lookup() {
     return $e
 }
 
-function dns:cname:usage() { echo "<netgroup> <cname-subdomain>"; }
+function dns:cname:usage() { echo "-T|--tldid <tldid> <netgroup> <cname-subdomain>"; }
 function dns:cname() {
     local -i e=${CODE_DEFAULT?}
 
     core:import ng
 
-    if [ $# -eq 2 ]; then
+    local tldid=${g_TLDID}
+    if [ $# -eq 2 -a ${#tldid} -gt 0 ]; then
+        local ng=$1
         local cnamesd=${2}
-        local hosts_in_ng="$(:ng:hosts ${1})"
+        local hosts_in_ng
+        hosts_in_ng="$(:ng:hosts ${tldid} ${ng} )"
         if [ $? -eq 0 ]; then
             local -a hosts=( $(sed -e 's/\([^\.]\+\)\..*/\1/' <<< "$hosts_in_ng") )
             local cnamea=
@@ -325,7 +320,6 @@ function :dns:subdomains() {
     return $e
 }
 
-function dns:tldids:usage() { echo -n ""; }
 function dns:tldids() {
     local -i e=${CODE_DEFAULT}
 
@@ -339,22 +333,18 @@ function dns:tldids() {
     return $e
 }
 
-function dns:subdomains:usage() { echo -n "<tldid>"; }
+function dns:subdomains:usage() { echo -n "-T|--tldid <tldid>"; }
 function dns:subdomains() {
     local -i e=${CODE_DEFAULT}
 
-    if [ $# -eq 1 ]; then
-        local tldid=$1
+    local tldid=${g_TLDID?}
+    if [ $# -eq 0 -a ${#tldid} -gt 0 ]; then
         local fN=${SITE_ETC}/subdom-${tldid}.conf
         local tld=${USER_TLDS[${tldid}]}
-        if [ ${#tld} -gt 0 ]; then
-            if [ -f ${fN} ]; then
-                :dns:subdomains ${tldid} | column -t
-            else
-                theme HAS_FAILED "Missing \`${tldid}' subdomain configuration file"
-            fi
+        if [ -f ${fN} ]; then
+            :dns:subdomains ${tldid} | column -t
         else
-            theme HAS_FAILED "No such tldid \`${tldid}'"
+            theme HAS_FAILED "Missing \`${tldid}' subdomain configuration file"
         fi
         return $?
     fi
