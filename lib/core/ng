@@ -1,4 +1,8 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
+:<<[core:docstring]
+Core Netgroup module
+[core:docstring]
+
 core:import dns
 core:import ldap
 
@@ -32,15 +36,15 @@ function ::ng:tree_data() {
     #. }=-
 
         #. Netgroup->Netgroup via memberNisNetgroup
-        IFS='|||' read -a children <<< "$(:ldap:search netgroup cn=${parent} memberNisNetgroup)"
+        IFS='|||' read -a children <<< "$(:ldap:search -1 netgroup cn=${parent} memberNisNetgroup)"
         for child in ${children[@]}; do
             if [ ${vflag} -eq 0 ]; then
                 echo ${parent}:?+${child}:-
             else
-                local hit="$(:ldap:search netgroup cn=${child} cn)"
+                local hit="$(:ldap:search -1 netgroup cn=${child} cn)"
                 if [ ${#hit} -gt 0 ]; then
-                    IFS='|||' read -a mnN <<< "$(:ldap:search netgroup cn=${child} memberNisNetgroup)"
-                    IFS='|||' read -a nnT <<< "$(:ldap:search netgroup cn=${child} nisNetgroupTriple)"
+                    IFS='|||' read -a mnN <<< "$(:ldap:search -1 netgroup cn=${child} memberNisNetgroup)"
+                    IFS='|||' read -a nnT <<< "$(:ldap:search -1 netgroup cn=${child} nisNetgroupTriple)"
                     if [ ${#mnN[@]} -gt 0 -o ${#nnT[@]} -gt 0 ]; then
                         echo ${parent}:1+${child}:- #. Child exists and has children
                     else
@@ -58,7 +62,7 @@ function ::ng:tree_data() {
 
         #. Netgroup->Host
         if [ ${hflag} -eq 1 ]; then
-            IFS='|||' read -a children <<< "$(:ldap:search netgroup cn=${parent} nisNetgroupTriple)"
+            IFS='|||' read -a children <<< "$(:ldap:search -1 netgroup cn=${parent} nisNetgroupTriple)"
             local -a tldids
             if [ ${tldid} == '-' ]; then
                 tldids=( ${!USER_TLDS[@]} )
@@ -256,7 +260,7 @@ function :ng:ping() {
     local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
-        hit=$(:ldap:search netgroup cn="$1" cn|wc -l)
+        hit=$(:ldap:search -1 netgroup cn="$1" cn|wc -l)
         [ ${hit} -eq 0 ] || e=${CODE_SUCCESS}
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -275,12 +279,12 @@ function :ng:resolve() {
         if :ng:ping ${ng}; then
             local tld=${USER_TLDS[${tldid}]}
             if [ ${#tld} -gt 0 ]; then
-                IFS='|||' read -a children <<< "$(:ldap:search netgroup cn=${ng} memberNisNetgroup)"
+                IFS='|||' read -a children <<< "$(:ldap:search -1 netgroup cn=${ng} memberNisNetgroup)"
                 for child in ${children[@]}; do
                     ${FUNCNAME} ${tldid} ${child}
                 done
 
-                IFS='|||' read -a children <<< "$(:ldap:search netgroup cn=${ng} nisNetgroupTriple)"
+                IFS='|||' read -a children <<< "$(:ldap:search -1 netgroup cn=${ng} nisNetgroupTriple)"
                 for child in ${children[@]}; do
                     if echo ${child}|grep -q "${tld}"; then
                         echo ${child/.${tld}/}|tr -d '(),'
@@ -302,13 +306,12 @@ function :ng:resolve() {
 #. Public Functions -={
 function ng:tree:shflags() {
     cat <<!
-boolean recursive false "traverse-the-netgroup-tree-recursively" R
-boolean showhosts false "show-host-leaf-nodes-in-netgroup-tree"  H
-boolean verifyall false "verify-all-entries"                     V
-string  tldid     -     "tldid"                                  T
+boolean recursive false "traverse-the-netgroup-tree-recursively" r
+boolean showhosts false "show-host-leaf-nodes-in-netgroup-tree"  h
+boolean verifyall false "verify-all-entries"                     v
 !
 }
-function ng:tree:usage() { echo "<netgroup>"; }
+function ng:tree:usage() { echo "-T|--tldid <tldid> <netgroup>"; }
 function ng:tree:formats() { echo "dot png"; }
 function ng:tree() {
     local -i e=${CODE_DEFAULT?}
@@ -319,11 +322,11 @@ function ng:tree() {
         core:requires feh
     fi
 
-    if [ $# -eq 1 ]; then
+    local tldid=${g_TLDID}
+    if [ $# -eq 1 -a ${#tldid} -gt 0 ]; then
         local -i recursive=${FLAGS_recursive:-0}; ((recursive=!recursive)); unset FLAGS_recursive
         local -i showhosts=${FLAGS_showhosts:-0}; ((showhosts=!showhosts)); unset FLAGS_showhosts
         local -i verifyall=${FLAGS_verifyall:-0}; ((verifyall=!verifyall)); unset FLAGS_verifyall
-        local tldid=${FLAGS_tldid:--}; unset FLAGS_tldid
 
         declare -g -A g_TREE
         declare -g -A g_PROCESSED_NETGROUP
@@ -383,13 +386,13 @@ function :ng:hosts() {
     return $e
 }
 
-function ng:hosts:usage() { echo "<tldid> <netgroup>"; }
+function ng:hosts:usage() { echo "-T|--tldid <tldid> <netgroup>"; }
 function ng:hosts() {
     local -i e=${CODE_DEFAULT?}
 
-    if [ $# -eq 2 ]; then
-        local tldid=$1
-        local ng=$2
+    local tldid=${g_TLDID}
+    if [ $# -eq 1 -a ${#tldid} -gt 0 ]; then
+        local ng=$1
         cpf "Looking up %{@tldid:%s} entries for netgroup %{@netgroup:%s}..." ${tldid} ${ng}
 
         local -a data
@@ -458,7 +461,7 @@ function :ng:host() {
             if [ $e -eq ${CODE_SUCCESS} ]; then
                 local -a raw
                 for fqdn in ${hosts[@]}; do
-                    local -a preraw=( $(:ldap:search netgroup nisNetgroupTriple="\(${fqdn},,\)" cn ))
+                    local -a preraw=( $(:ldap:search -1 netgroup nisNetgroupTriple="\(${fqdn},,\)" cn ))
 
                     if [ ${#preraw[@]} -gt 0 ]; then
                         raw=( ${preraw[@]} )
@@ -467,7 +470,7 @@ function :ng:host() {
             fi
         else
             local ng=$1
-            raw=( $(:ldap:search netgroup memberNisNetgroup="${ng}" cn) )
+            raw=( $(:ldap:search -1 netgroup memberNisNetgroup="${ng}" cn) )
             e=${CODE_SUCCESS}
         fi
 
@@ -523,7 +526,7 @@ function ng:host() {
                 for fqdn in ${hosts[@]}; do
                     [ ! -t 1 ] || cpf "Trying %{@fqdn:%s}..." ${fqdn}
 
-                    local -a preraw=( $(:ldap:search netgroup nisNetgroupTriple="\(${fqdn},,\)" cn) )
+                    local -a preraw=( $(:ldap:search -1 netgroup nisNetgroupTriple="\(${fqdn},,\)" cn) )
 
                     if [ ${#preraw[@]} -eq 0 ]; then
                         theme HAS_WARNED "There are no netgroups with \`${fqdn}' as a member"
@@ -538,7 +541,7 @@ function ng:host() {
             fi
         else
             local ng=$1
-            raw=( $(:ldap:search netgroup memberNisNetgroup="${ng}" cn) )
+            raw=( $(:ldap:search -1 netgroup memberNisNetgroup="${ng}" cn) )
             e=${CODE_SUCCESS}
         fi
 
@@ -567,7 +570,7 @@ function ng:search() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 ]; then
-        :ldap:search netgroup cn description "|(cn=*$1*)(description=*$1*)" |
+        :ldap:search -1 netgroup cn description "|(cn=*$1*)(description=*$1*)" |
             column -t -s'+++'
         e=$?
     fi
@@ -575,12 +578,11 @@ function ng:search() {
     return $e
 }
 
-function ng:summary:usage() { echo ""; }
 function ng:summary() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 0 ]; then
-        :ldap:search netgroup cn description
+        :ldap:search -1 netgroup cn description
         e=$?
     fi
 
