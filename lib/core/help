@@ -1,6 +1,8 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
+:<<[core:docstring]
+Core help module
+[core:docstring]
 
-function help:all:usage() { echo "#. no-args"; }
 function help:all() {
     local -i e=${CODE_DEFAULT?}
 
