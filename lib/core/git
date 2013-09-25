@@ -1,4 +1,8 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
+:<<[core:docstring]
+Auxiliary Git helper module
+[core:docstring]
+
 core:requires git
 
 #. Internal Functions -={
@@ -98,7 +102,9 @@ function git:rm() {
             #        theme INFO "You should run git:vacuum to clean up references to removed objects"; echo
             #    fi
             #elif [ $# -gt 1 ]; then
-                git filter-branch --force --index-filter "git rm -rf --cached --ignore-unmatch ${*}" -- --all
+                git filter-branch --force --index-filter \
+                    "git rm -rf --cached --ignore-unmatch ${*}" \
+                        --prune-empty --tag-name-filter cat -- --all
                 e=$?
             #fi
         else
@@ -196,7 +202,6 @@ function git:rebasesearchstr() {
     return $e
 }
 
-function git:split:usage() { : pass; }
 function git:split() {
     local -i e=${CODE_DEFAULT?}
 
@@ -219,7 +224,6 @@ function git:split() {
     return $e
 }
 
-function git:commitall:usage() { : pass; }
 function git:commitall() {
     local -i e=${CODE_DEFAULT?}
 
