@@ -1,4 +1,8 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
+:<<[core:docstring]
+Core HGD (host-group directive) module
+[core:docstring]
+
 g_HGD_CACHE=${SITE_CACHE}/hgd.conf
 
 core:import util
@@ -333,7 +337,6 @@ function :hgd:list() {
 }
 
 
-function hgd:list:usage(){ echo "<no-arguments>"; }
 function hgd:list() {
     local -i e=${CODE_DEFAULT?}
 
