@@ -1,7 +1,12 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 core:import dns
 
-#. IP Networks Internal -={
+:<<[core:docstring]
+Core networking module
+[core:docstring]
+
+#. -={
+#. TCP/IP Networking Utility Functions -={
 #. IPv4: Bits to Netmask
 function :net:b2nm() {
     #. input  24
@@ -157,29 +162,23 @@ function :net:firsthost() {
     return $e
 }
 #. }=-
-
+#. PortPing -={
 function :net:portping() {
     core:requires nc
 
     local -i e=${CODE_FAILURE}
     if [ $# -eq 2 ]; then
         local fqdn=$1
-        local tldid
-        tldid=$(:dns:qualified ${fqdn})
-        if [ $? -eq ${CODE_SUCCESS} ]; then
-            local port=$2
-            local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
-            local tld=${USER_TLDS[${tldid}]}
-            if [ ${#ssh_proxy} -gt 0 ]; then
-                ssh ${SITE_USERNAME}@${ssh_proxy}\
-                    nc -zw1 ${fqdn} ${port} >/dev/null 2>&1
-                e=$?
-            else
-                nc -zqw1 ${fqdn} ${port}
-                e=$?
-            fi
+        local port=$2
+        local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
+        local tld=${USER_TLDS[${tldid}]}
+        if [ ${#ssh_proxy} -gt 0 ]; then
+            ssh ${SITE_USERNAME}@${ssh_proxy}\
+                nc -zw1 ${fqdn} ${port} >/dev/null 2>&1
+            e=$?
         else
-            core:raise EXCEPTION_INVALID_FQDN
+            nc -zqw1 ${fqdn} ${port}
+            e=$?
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -188,17 +187,31 @@ function :net:portping() {
     return $e
 }
 
-function net:portping:usage() { echo "<host> <port>"; }
+function net:portping:usage() { echo "<hnh> <port>"; }
 function net:portping() {
     local -i e=${CODE_DEFAULT}
 
     if [ $# -eq 2 ]; then
-        local tldid
-        local fqdn=$1
+        local hnh=$1
         local port=$2
-        cpf "Testing TCP connectivity to %{@host:%s}:%{@port:%s}..." ${fqdn} ${port}
-        tldid=$(:dns:qualified ${fqdn})
-        if [ $? -eq ${CODE_SUCCESS} ]; then
+
+        cpf "Testing TCP connectivity to %{@host:%s}:%{@port:%s}..." ${hnh} ${port}
+
+        local fqdn
+        local tldid
+        tldid=$(:dns:qualified ${hnh})
+        if [ $? -ne ${CODE_SUCCESS} ]; then
+            tldid=${g_TLDID}
+            fqdn=$(:dns:fqdn ${tldid} ${hnh})
+            if [ $? -ne ${CODE_SUCCESS} ]; then
+                theme HAS_FAILED "INVALID_FQDN"
+                e=${CODE_FAILURE}
+            fi
+        else
+            fqdn=${hnh}
+        fi
+
+        if [ $e -ne ${CODE_FAILURE} ]; then
             if :net:portping ${fqdn} ${port}; then
                 theme HAS_PASSED "CONNECTED"
                 e=${CODE_SUCCESS}
@@ -206,11 +219,10 @@ function net:portping() {
                 theme HAS_WARNED "NO_CONN"
                 e=${CODE_FAILURE}
             fi
-        else
-            theme HAS_FAILED "Invalid/Unknown FQDN"
-            e=${CODE_FAILURE}
         fi
     fi
 
     return $e
 }
+#. }=-
+#. }=-
