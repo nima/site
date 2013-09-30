@@ -7,7 +7,6 @@
 #core|hgd|resolve|private||(#10.1.2.3/29)|53c0006ef9e5cda4111db1851c960e6e||0
 #core|hgd|resolve|public||#10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
 #core|hgd|explode|private||#10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
-#DEC|cf|run|public
 core|net|b2nm|internal||33|||1
 core|net|b2hm|internal||33|||1
 core|net|b2nm|internal||32|0xffffffff||0
@@ -33,18 +32,18 @@ core|ldap|mkldif|public||add user freddy/fatass balls one-medium one-large - shl
 core|ldap|mkldif|private||add user freddy/fatass balls one-medium one-large - shlong high-girth very-short|55d303f117d5e1b7b4772b4a36aa3c3e||0
 #core|ldap|modify|internal
 #core|ldap|modify|private
-core|dns|fqdn|public||p um-rhn-s1|um-rhn-s1.corpdev.det.nsw.edu.au||0
+core|dns|fqdn|public||-T p um-rhn-s1|um-rhn-s1.corpdev.det.nsw.edu.au||0
 core|dns|fqdn|internal||p um-rhn-s1|um-rhn-s1.corpdev.det.nsw.edu.au||0
 core|dns|fqdn|internal||m um-rhn-s1|um-rhn-s1.unix.mgmt.det||0
-core|dns|qdn|public||p um-rhn-s1|||0
+core|dns|qdn|public||-T p um-rhn-s1|||0
 core|dns|qdn|internal||p um-rhn-s1|um-rhn-s1.corpdev||0
 core|dns|qdn|internal||m um-rhn-s1|um-rhn-s1.unix||0
 core|dns|lookup|public||notahost|||1
-core|dns|cname|public||@notahost notadomain|||1
+core|dns|cname|public||-T p @notahost notadomain|||1
 core|dns|ptr|public||&(#127.0.0.1)|||0
-core|dns|subdomains|public||p|||0
+core|dns|subdomains|public||-T p|||0
 core|dns|subdomains|internal||p|||0
-core|dns|tldids|public|||528540ee79d2cc3c30d0a450ba8b66b0||0
+core|dns|tldids|public|||fe8f1ce743e355dd68c348838137be3b||0
 #core|util|timeout|public
 core|util|date:i2s|internal||1369369079|20130524041759||0
 core|util|date:s2i|internal||20131230235959|1388447999||0
@@ -77,21 +76,25 @@ core|hgd|refresh|internal||uth|||0|DEC
 core|hgd|refresh|public||uth|||0|DEC
 core|hgd|resolve|public||uth|um-rhn-s1||0|DEC
 core|hgd|resolve|internal||&(.autonomy.net.au)|autonomy.net.au git.autonomy.net.au src.autonomy.net.au||0|DEC
-core|ssh|connect|public||m um-rhn-s1 exit 0|||0|DEC
-core|ssh|connect|public||p um-rhn-s1 exit 0|||0|DEC
-core|ssh|connect|public||p um-rhn-s1 exit 2|||2|DEC
-core|ssh|connect|public||m um-rhn-s1 exit 3|||3|DEC
-core|ssh|connect|internal||m epenguin2-3 echo ${SSH_CONNECTION:0:14}|192.168.80.163||0|DEC
-core|ssh|connect|internal||p epenguin2-3 echo ${SSH_CONNECTION:0:14}|153.107.94.112||0|DEC
-#core|ssh|pipewrap|internal
-core|ssh|sudo|public||m um-rhn-s1 whoami|||0|DEC
-core|ssh|sudo|public||p um-rhn-s1 whoami|||0|DEC
-core|ssh|sudo|internal||m um-rhn-s1 whoami|root||0|DEC
-core|ssh|sudo|internal||p um-rhn-s1 whoami|root||0|DEC
-#core|ssh|cluster|public
-#core|ssh|tmux|public
-#core|ssh|tmux|private
-#core|ssh|copy|internal
+#core|remote|cfrun|public
+core|remote|mon|public||uth hostname|||0|DEC
+core|remote|mon|public||uth @mem|765a5b98c6942485ce7a2894f21df456||0|DEC
+core|remote|serialmon|private||uth hostname|rhnsat.unix.mgmt.det||0|DEC
+core|remote|connect|public||-T m um-rhn-s1 exit 0|||0|DEC
+core|remote|connect|public||-T p um-rhn-s1 exit 0|||0|DEC
+core|remote|connect|public||-T p um-rhn-s1 exit 2|||2|DEC
+core|remote|connect|public||-T m um-rhn-s1 exit 3|||3|DEC
+core|remote|connect|internal||m epenguin2-3 echo ${SSH_CONNECTION:0:14}|192.168.80.163||0|DEC
+core|remote|connect|internal||p epenguin2-3 echo ${SSH_CONNECTION:0:14}|153.107.94.112||0|DEC
+#core|remote|pipewrap|internal
+core|remote|sudo|public||-T m um-rhn-s1 whoami|||0|DEC
+core|remote|sudo|public||-T p um-rhn-s1 whoami|||0|DEC
+core|remote|sudo|internal||m um-rhn-s1 whoami|root||0|DEC
+core|remote|sudo|internal||p um-rhn-s1 whoami|root||0|DEC
+#core|remote|cluster|public
+#core|remote|tmux|public
+#core|remote|tmux|private
+#core|remote|copy|internal
 core|dns|lookup|public||rhn|||0|DEC
 core|dns|lookup|public||nosuchhost|||1|DEC
 core|dns|lookup|internal||pm ca rhn|||0|DEC
@@ -102,10 +105,10 @@ core|dns|qualified|internal||um-rhn-s1.corpdev.det.nsw.edu.au|||0|DEC
 core|ng|resolve|internal||p vip|esb.dev||0|DEC
 core|ng|ping|internal||sap2|||0|DEC
 core|ng|ping|internal||nosuchng|||1|DEC
-core|ng|hosts|public||m nosuchng|||1|DEC
-core|ng|hosts|public||m odl|53745e0bab9fa00b95edf4a0242a9108||0|DEC
+core|ng|hosts|public||-T m nosuchng|||1|DEC
+core|ng|hosts|public||-T m odl|6c4d746aeae042e7f9fe863aae3b7240||0|DEC
 core|ng|hosts|internal||m nosuchng|||1|DEC
-core|ng|tree|public||nosuchng|||1|DEC
+core|ng|tree|public||-T m nosuchng|||1|DEC
 #core|ng|tree_data|private
 #core|ng|tree_draw|private
 #core|ng|tree_build|private
@@ -119,10 +122,10 @@ core|ng|search|public||edia|||0|DEC
 core|ng|host|public||um-rhn-s1|||0|DEC
 core|ldap|ping|public|||||0|DEC
 core|ldap|search|public||user uid=ntalebi|||0|DEC
-core|ldap|search|internal||user uid=ntalebi cn|Nima Talebi||0|DEC
-core|ldap|search|private||user uid=ntalebi cn|Nima Talebi||0|DEC
-core|ldap|esearch|internal||user ntalebi|||0|DEC
-core|ldap|eval:search|internal||user ntalebi uid|5a86e11345e908d03e5c5983c3cc0ff4||0|DEC
+core|ldap|search|internal||-1 user uid=ntalebi cn|Nima Talebi||0|DEC
+core|ldap|search|private||-1 user uid=ntalebi cn|Nima Talebi||0|DEC
+core|ldap|search|internal||-1 user ntalebi|||0|DEC
+core|ldap|eval:search|internal||-1 user ntalebi uid|5a86e11345e908d03e5c5983c3cc0ff4||0|DEC
 core|ldap|host|internal||||||0|DEC
 core|ldap|host_rw|internal||||||0|DEC
 #core|ldap|add|internal
@@ -144,13 +147,10 @@ DEC|rpm|grp|public||uth glibc.x86_64|System Environment/Libraries||0
 DEC|rpm|size|public||uth glibc.x86_64|11686637||0
 DEC|rpm|vendor|public|Red Hat, Inc.|uth glibc.x86_64|||0
 DEC|rpm|date|public||uth glibc.x86_64|350698beecb34647b904a7a34175a7bd||0
-#DEC|svn|locate|public
-#DEC|ssh|cluster|public
-DEC|db|dc|public||gw name=itservices|25921162b74ef5027d79588c42340b6f||0
+#DEC|remote|cluster|public
+#. itservices               gw: 153.107.22.1
+DEC|db|dc|public||gw name=itservices|3751bcba8458aaa0e022f9a038e2901f||0
 DEC|db|dc|internal||gw name=itservices|3b5776dfb6bff990b14038284806736a||0
-DEC|mon|remex|public||uth hostname|||0
-DEC|mon|remex|public||uth @mem|5154bd9849d791dff5f02ee64db78839||0
-DEC|mon|remex:serial|private||uth hostname|rhnsat.unix.mgmt.det||0
 #DEC|user|pwdel|public
 #DEC|user|pwadd|public
 #DEC|user|lock|public
@@ -160,7 +160,7 @@ DEC|user|search|public||ntalebi|||0
 DEC|user|filter|public||mail=nima.talebi@det.nsw.edu.au givenname|Nima||0
 DEC|user|access|public||ntalebi@um-rhn-s1|||0
 DEC|user|detail|public||ntalebi|||0
-DEC|user|expiring|public||ntalebi|||0
+DEC|user|expiring|public||7|||0
 DEC|user|dupids|public|||||0
 DEC|user|nextuid|public|||||0
 DEC|user|lookup|internal||ntalebi|||0
@@ -182,14 +182,9 @@ DEC|user|expired|internal||hyalamanchili|||0
 #DEC|user|enmember|public
 #DEC|user|regroup|public
 DEC|nfs|filers|public|||||0
-DEC|nfs|filerng|public||nasub02pnf|||0
-DEC|nfs|filerng|public||@nasub02pnf|||1
-DEC|nfs|access|public||ntalebi@nasub02pnf:/|||1
-#DEC|sap2|hostsid|public
-#DEC|sap2|cobble|public
-#DEC|sap2|users|public
-#DEC|sap2|mappings|public
-#DEC|sap2|cfmain|public
+DEC|nfs|filerng|public||-T m nasub02pnf|||0
+DEC|nfs|filerng|public||-T p nasub02pnf|||0
+DEC|nfs|access|public||-T m ntalebi@nasub02pnf:/|||1
 #DEC|snmp|get|public
 #DEC|snmp|walker|public
 #. }=-
