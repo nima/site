@@ -1,4 +1,5 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
+
 :<<[core:docstring]
 Auxiliary Git helper module
 [core:docstring]
@@ -285,6 +286,22 @@ function git:playground() {
             git log --graph --all
         else
             theme ERR_USAGE "Directory $1 already exists; cowardly refusing to create playground."
+        fi
+    fi
+
+    return $e
+}
+
+function git:gource:usage() { echo "<git-repo-dir>"; }
+function git:gource() {
+    core:requires gource
+
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ] && [ -d $1 ] || [ $# -eq 0 ]; then
+        gource --multi-sampling -s 3 --dont-stop ${1:-${SITE_SCM}}
+        if [ $? -eq 0 ]; then
+            e=${CODE_SUCCESS}
         fi
     fi
 
