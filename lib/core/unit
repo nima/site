@@ -1,6 +1,10 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
-#. Unit-test scaffolding -={
+:<<[core:docstring]
+Core Unit-Testing Module
+[core:docstring]
+
+#. -={
 #. Pre/post test scaffolding -={
 oneTimeSetUp() {
     cpf "%{@comment:#############################################################################}\n"
@@ -98,16 +102,16 @@ function testCoverage() {
                                                     private)  ffn+=::;;
                                                     internal) ffn+=:;;
                                                 esac
-                                                ffn+=${prefix}${module}:$fn
+                                                ffn+=${prefix}${module}:${fn}
                                                 if [ "${context}" == "public" ]; then
                                                     cat <<! >> ${g_SCRIPT}
-#. dynamic function ${i} for ${utf} (no-arguments) [ ${profile}:${module}:${fn} ] -={
+#. dynamic function ${i} for ${utf} {no-args} [ ${profile}:${module}:${fn} ] -={
 function ${utf}Dyn${i}NoArgs() {
     #. Check if the function called without any arguments returns CODE_DEFAULT, or otherwise CODE_SUCCESS
     #. TODO: At the moment, no way to tell automatically if its CODE_DEFAULT or CODE_SUCCESS we expect
     #. TODO: so this either/or approach will have to do.
     core:softimport ${module}
-    cpf " %{@comment ___site} %{!function:${module}:${fn}} <no-arguments> "
+    cpf " %{@comment ___site} %{!function:${module}:${fn}} {no-args} "
     if assertEquals "import ${module}" ${CODE_SUCCESS} \$?; then
         ${ffn} >/dev/null 2>&1
         ((e=\$? % ${CODE_DEFAULT})) #. See why above
@@ -119,8 +123,8 @@ function ${utf}Dyn${i}NoArgs() {
     fi
 }
 !
-                                            fi
-                                            cat <<! >> ${g_SCRIPT}
+                                                fi
+                                                cat <<! >> ${g_SCRIPT}
 function ${utf}Dyn${i}() {
     IFS='|' read profile module fn context stdin arguments stdout stderr exitcode site <<< '${line}'
     : \${exitcode:=-1}
@@ -136,13 +140,28 @@ function ${utf}Dyn${i}() {
         if assertEquals "import ${module}" ${CODE_SUCCESS} \$?; then
             if assertEquals "function" \$(type -t "${ffn}"); then
                 local -i e
-                if [ -z "\${stdin}" ]; then
-                    ${ffn} \${arguments} >\${stdoutF?} 2>\${stderrF?}
-                    e=\$?
+                if [ "${context}" == "public" ]; then
+                    if [ -z "\${stdin}" ]; then
+                        #. We go via the outer core wrapper to ensure user short
+                        #. and long options are resovled properly for public functions.
+                        core:wrapper ${module} ${fn} \${arguments} >\${stdoutF?} 2>\${stderrF?}
+                    else
+                        echo "\${stdin}" | core:wrapper ${module} ${fn} \${arguments} >\${stdoutF?} 2>\${stderrF?}
+                        e=\$?
+                    fi
                 else
-                    echo "\${stdin}" | ${ffn} \${arguments} >\${stdoutF?} 2>\${stderrF?}
-                    e=\$?
+                    if [ -z "\${stdin}" ]; then
+                        #. No need to worry about such -a|--argument style options
+                        #. for non-public function calls as they do not support
+                        #. this, only public functions do, so we can call the
+                        #. inner functions directly.
+                        ${ffn} \${arguments} >\${stdoutF?} 2>\${stderrF?}
+                    else
+                        echo "\${stdin}" | ${ffn} \${arguments} >\${stdoutF?} 2>\${stderrF?}
+                        e=\$?
+                    fi
                 fi
+                e=\$?
 
                 if assertEquals "exit code" \${exitcode} \$e; then
                     if [ -n "\${stdout?}" ]; then
@@ -321,8 +340,6 @@ function unit:test() {
     return $e
 }
 #. }=-
-#. }=-
-
 #. Unit-testing static functions -={
 function testCoreHgdResolvePublic() {
     core:softimport hgd
@@ -397,4 +414,5 @@ fff
         assertEquals "aaa bbb eee fff ccc ddd" "$(cat ${stdoutF})"
     fi
 }
+#. }=-
 #. }=-
