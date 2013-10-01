@@ -1,28 +1,176 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
+:<<[core:docstring]
+Core utilities module
+[core:docstring]
 
-VAULT=${HOME}/.secrets
-VAULT_TMP=${HOME}/.vault/killme
-VAULT_BACKUP=${HOME}/.vault/vault-$(date +'%Y%m%d')
+: ${SITE_GPG_ID:=UNSET}
+g_GPG_KEY_PATH=${HOME}/.gnupg/${SITE_USERNAME}.${PROFILE}.${SITE_GPG_ID}
 
-function ::util:secrets:cleanup() {
-    for vault in ${VAULTS[@]}; do
-        test ! -f ${vault} || chmod 600 ${vault}
-    done
-    mkdir -p $(dirname ${VAULT_BACKUP})
-    chmod 700 $(dirname ${VAULT_BACKUP})
-    test ! -f ${VAULT_BACKUP} || chmod 600 ${VAULT_BACKUP}
-    find ${VAULT_TMP} -type f -exec shred -fuz {} \;
-    rm -f ${VAULT_TMP}.timestamp
-    #rmdir $(dirname ${VAULT_TMP})
+#. GPG -={
+function :util:gpgkeygen() {
+    : ${PROFILE?}
+    : ${SITE_USERNAME?}
+    : ${SITE_FULLNAME?}
+    : ${SITE_EMAIL?}
+    core:requires gpg2
+
+    local -i e=${CODE_FAILURE}
+
+    mkdir -p ~/.gnupg
+    chmod 700 ~/.gnupg
+
+    cat <<! >${g_GPG_KEY_PATH}.conf
+Key-Type: RSA
+Key-Length: 3072
+Subkey-Type: ELG-E
+Subkey-Length: 3072
+Name-Real: ${SITE_FULLNAME?}
+Name-Comment: ${SITE_USERNAME?} profile key generated via site
+Name-Email: ${SITE_EMAIL?}
+Expire-Date: 0
+%ask-passphrase
+%pubring ${g_GPG_KEY_PATH}.pub
+%secring ${g_GPG_KEY_PATH}.sec
+%commit
+!
+    cpf "   * Generate some entropy via %{@code:ls -R /}..."
+    ( ls -R / >/dev/null 2>&1 )&
+    theme HAS_PASSED "Backgrounded"
+
+    local tmp_GPG_KEY_PATH=${g_GPG_KEY_PATH}
+
+    gpg2 -q --batch --gen-key ${g_GPG_KEY_PATH}.conf 2>&1|sed -e '/^$/d' -e 's/^/   * /'
+    if [ $? -eq 0 ]; then
+        if [ -e ${g_GPG_KEY_PATH}.sec -a -e ${g_GPG_KEY_PATH}.pub ]; then
+            export SITE_GPG_ID=0x$(
+                gpg2 --no-default-keyring \
+                    --secret-keyring ${g_GPG_KEY_PATH}.sec\
+                    --keyring ${g_GPG_KEY_PATH}.pub\
+                    --list-secret-keys | awk -F '[ /]+' '$1~/^sec/{print$3}'
+            )
+            export g_GPG_KEY_PATH=${HOME}/.gnupg/${SITE_USERNAME}.${PROFILE}.${SITE_GPG_ID}
+            mv ${tmp_GPG_KEY_PATH}.sec ${g_GPG_KEY_PATH}.sec
+            mv ${tmp_GPG_KEY_PATH}.pub ${g_GPG_KEY_PATH}.pub
+            if gpg -q --batch --import ${g_GPG_KEY_PATH}.sec; then
+                if gpg -q --batch --import ${g_GPG_KEY_PATH}.pub; then
+                    e=${CODE_SUCCESS}
+                    cpf "   * Now set %{@code:SITE_GPG_ID=\"${SITE_GPG_ID}\"} in %{@path:~/.siterc}\n"
+                fi
+            fi
+        fi
+    fi
+
+    rm -f ${tmp_GPG_KEY_PATH}.conf
+
+    return $e
 }
 
+function util:gpg:usage() { echo "info|create | delete <gpg-key>"; }
+function util:gpg() {
+    : ${PROFILE?}
+    : ${SITE_USERNAME?}
+    : ${SITE_EMAIL?}
+    core:requires gpg2
+
+    local -i e=${CODE_DEFAULT}
+
+    case $#:$1 in
+        1:info)
+            cpf "Examining %{@path:${g_GPG_KEY_PATH}}..."
+            if [ "${SITE_GPG_ID}" != "UNSET" ]; then
+                if [ -e ${g_GPG_KEY_PATH}.sec -a -e ${g_GPG_KEY_PATH}.pub ]; then
+                    gpg2 --no-default-keyring \
+                        --secret-keyring ${g_GPG_KEY_PATH}.sec\
+                        --keyring ${g_GPG_KEY_PATH}.pub\
+                        --list-secret-keys >/dev/null 2>&1
+                    if [ $? -eq 0 ]; then
+                        theme HAS_PASSED
+                        e=${CODE_SUCCESS}
+                    else
+                        theme HAS_FAILED
+                        e=${CODE_FAILURE}
+                    fi
+                else
+                    theme HAS_FAILED
+                    e=${CODE_FAILURE}
+                fi
+            else
+                theme HAS_FAILED "You have not yet set your GPG key"
+                e=${CODE_FAILURE}
+            fi
+        ;;
+
+        1:create)
+            if [ ${SITE_GPG_ID} == "UNSET" ]; then
+                cpf "#. Generating an RSA/ELG-E GPG key for you (%{@user:%s}@%{@profile:%s}) %{r:%s}\n" "${SITE_USERNAME}" "${PROFILE}" "-=["
+                if :util:gpgkeygen; then
+                    cpf "#. %{r:%s} GPG Key Generation..." "]=-"
+                    theme HAS_PASSED "${g_GPG_KEY_PATH}.*"
+                    util:gpg info
+                    e=${CODE_SUCCESS}
+                else
+                    cpf "#. %{r:%s} GPG Key Generation..." "]=-"
+                    theme HAS_FAILED
+                    e=${CODE_FAILURE}
+                fi
+            else
+                cpf "You already have your key for this profile:\n"
+                util:gpg info
+                e=${CODE_FAILURE}
+            fi
+        ;;
+
+        2:delete)
+            cpf "%{@comment:%s}\n" "#. First remove the secret keys..."
+            local gpgkid=$2
+            local -a secretkeys=(
+                $(
+                    gpg --list-secret-keys --with-colons --fingerprint |
+                        sed -n 's/^fpr:::::::::\([[:alnum:]]\+\):/\1/p'
+                )
+            )
+            for sk in ${secretkeys[@]}; do
+                cpf "gpg --batch --yes --delete-secret-key ${sk}\n"
+            done
+
+            cpf "%{@comment:%s}\n" "#. Then the public...\n"
+            echo gpg -q --batch --yes --delete-key ${gpgkid}
+
+            cpf "%{@comment:%s}\n" "#. Then the files...\n"
+            echo rm -f ${HOME}/.gnupg/${SITE_USERNAME}.${PROFILE}.${gpgkid}.pub
+            echo rm -f ${HOME}/.gnupg/${SITE_USERNAME}.${PROFILE}.${gpgkid}.sec
+
+            e=${CODE_SUCCESS}
+        ;;
+    esac
+
+    return $e
+}
+#. }=-
+
+g_VAULT=${HOME}/.secrets
+g_VAULT_TMP=${HOME}/.vault/killme
+g_VAULT_BACKUP=${HOME}/.vault/vault-$(date +'%Y%m%d')
+#. Secrets -={
 #function ::util:secrets:draw() {
 #    ${HOME}/bin/gpg2png $1
 #    cp $1.png ~/vault.png
-#    cp $1-qr.png ~/VAULT-QR.PNG
-#    img2txt ~/vault.png ~/VAULT-QR.PNG
+#    cp $1-qr.png ~/g_VAULT-QR.PNG
+#    img2txt ~/vault.png ~/g_VAULT-QR.PNG
 #}
+
+function ::util:secrets:cleanup() {
+    for vault in ${g_VAULTS[@]}; do
+        test ! -f ${vault} || chmod 600 ${vault}
+    done
+    mkdir -p $(dirname ${g_VAULT_BACKUP})
+    chmod 700 $(dirname ${g_VAULT_BACKUP})
+    test ! -f ${g_VAULT_BACKUP} || chmod 600 ${g_VAULT_BACKUP}
+    find ${g_VAULT_TMP} -type f -exec shred -fuz {} \;
+    rm -f ${g_VAULT_TMP}.timestamp
+    #rmdir $(dirname ${g_VAULT_TMP})
+}
 
 function :util:secrets() {
     local -i e=${CODE_FAILURE}
@@ -44,29 +192,37 @@ function util:secrets() {
 
     core:requires gpg
 
-    cpf "Checking your secrets..."
-    if [ -f ${VAULT} ]; then
-        theme HAS_PASSED ${VAULT}
-        cpf "Checking your GPG id..."
-        if [ ${#SITE_GPG_ID} -gt 0 ]; then
-            theme HAS_PASSED ${SITE_GPG_ID}
-            if [ $# -eq 1 ]; then
-                case $1 in
-                    edit)
+    cpf "Checking your GPG id..."
+    if [ "${SITE_GPG_ID}" != "UNSET" ]; then
+        theme HAS_PASSED ${SITE_GPG_ID}
+
+        if [ ! -f ${g_VAULT} ]; then
+            cpf "Generating blank secrets file..."
+            echo "XXX" | gpg -q --batch --use-agent -r ${SITE_GPG_ID} -e -a -o ${g_VAULT}
+            theme HAS_PASSED ${g_VAULT}
+        fi
+
+        if [ $# -eq 1 ]; then
+            case $1 in
+                edit)
+                    cpf "Checking for GPG keys..."
+                    if [ -e ${g_GPG_KEY_PATH}.pub ]; then
+                        theme HAS_PASSED
+
                         cpf "Decrypting secrets..."
-                        mkdir -p $(dirname ${VAULT_TMP})
-                        chmod 700 $(dirname ${VAULT_TMP})
-                        gpg -q --batch --use-agent -d -o ${VAULT_TMP} ${VAULT}
+                        mkdir -p $(dirname ${g_VAULT_TMP})
+                        chmod 700 $(dirname ${g_VAULT_TMP})
+                        gpg -q --batch --use-agent -d --default-key ${SITE_GPG_ID} -o ${g_VAULT_TMP} ${g_VAULT}
                         e=$?
                         if [ $e -eq 0 ]; then
                             theme HAS_PASSED
-                            touch ${VAULT_TMP}.timestamp
-                            ${EDITOR:-vim} -n ${VAULT_TMP}
-                            if [ ${VAULT_TMP} -nt ${VAULT_TMP}.timestamp ]; then
+                            touch ${g_VAULT_TMP}.timestamp
+                            ${EDITOR:-vim} -n ${g_VAULT_TMP}
+                            if [ ${g_VAULT_TMP} -nt ${g_VAULT_TMP}.timestamp ]; then
                                 cpf "Encrypting secrets..."
-                                #draw ${VAULT_TMP}
-                                mv ${VAULT} ${VAULT_BACKUP}
-                                gpg -q --use-agent -r ${SITE_GPG_ID} -e -a -o ${VAULT} ${VAULT_TMP}
+                                #draw ${g_VAULT_TMP}
+                                mv ${g_VAULT} ${g_VAULT_BACKUP}
+                                gpg -q --batch --use-agent -r ${SITE_GPG_ID} -e -a -o ${g_VAULT} ${g_VAULT_TMP}
                                 e=$?
                                 if [ $e -eq 0 ]; then
                                     theme HAS_PASSED
@@ -78,47 +234,50 @@ function util:secrets() {
                             theme HAS_FAILED "DECRYPTION"
                         fi
                         ::util:secrets:cleanup
-                    ;;
-                    list)
-                        local -a secrets=(
-                            $(gpg -q --batch --use-agent -d -o - ${VAULT}|awk '$1!~/^[\t ]*#/{print$1}')
-                        )
-                        e=${PIPESTATUS[0]}
-                        if [ $e -eq 0 ]; then
-                            for secret in ${secrets[@]}; do
-                                cpf "%{r:%s}\n" ${secret}
-                            done
-                        fi
-                    ;;
-                esac
-            elif [ $# -eq 2 ]; then
-                case $1 in
-                    read)
-                        local secret=$2
-                        cpf "Checking for secret id %{r:%s}..." ${secret}
-                        local -a secrets=(
-                            $(gpg -q --batch --use-agent -d -o - ${VAULT}|awk '$1~/^\<'${secret}'\>/{print$1}')
-                        )
-                        e=${PIPESTATUS[0]}
-                        if [ $e -eq 0 -a ${#secrets[@]} -eq 1 ]; then
-                            theme HAS_PASSED "SECRET_KEY_VALID"
-                        else
-                            theme HAS_FAILED "NO_SUCH_SECRET_ID"
-                        fi
-                    ;;
-                esac
-            fi
-        else
-            theme HAS_FAILED "SITE_GPG_ID_UNDEFINED"
+                    else
+                        theme HAS_FAILED "Missing ${g_GPG_KEY_PATH}.pub"
+                        e=${CODE_FAILURE}
+                    fi
+                ;;
+                list)
+                    local -a secrets=(
+                        $(gpg -q --batch --use-agent -d -o - ${g_VAULT}|awk '$1!~/^[\t ]*#/{print$1}')
+                    )
+                    e=${PIPESTATUS[0]}
+                    if [ $e -eq 0 ]; then
+                        for secret in ${secrets[@]}; do
+                            cpf "%{r:%s}\n" ${secret}
+                        done
+                    fi
+                ;;
+            esac
+        elif [ $# -eq 2 ]; then
+            case $1 in
+                read)
+                    local secret=$2
+                    cpf "Checking for secret id %{r:%s}..." ${secret}
+                    local -a secrets=(
+                        $(gpg -q --batch --use-agent -d -o - ${g_VAULT}|awk '$1~/^\<'${secret}'\>/{print$1}')
+                    )
+                    e=${PIPESTATUS[0]}
+                    if [ $e -eq 0 -a ${#secrets[@]} -eq 1 ]; then
+                        theme HAS_PASSED "SECRET_KEY_VALID"
+                    else
+                        theme HAS_FAILED "NO_SUCH_SECRET_ID"
+                    fi
+                ;;
+            esac
         fi
     else
-        theme HAS_FAILED "NO_SECRETS"
+        theme HAS_FAILED "SITE_GPG_ID_UNDEFINED"
         e=${CODE_FAILURE}
     fi
 
     return $e
 }
+#. }=-
 
+#. Timeout -={
 #. Optional long help message
 function util:timeout:help() {
     cat <<EOF
@@ -191,7 +350,9 @@ function util:timeout() {
 
     return $e
 }
+#. }=-
 
+#. Date -={
 function :util:date:i2s() {
     if [ $# -eq 1 ]; then
         #. Convert seconds to datestamp
@@ -218,7 +379,9 @@ function :util:date:s2i() {
         core:raise EXCEPTION_BAD_FN_CALL
     fi
 }
+#. }=-
 
+#. Misc -={
 function :util:listify() {
     if [ $# -gt 0 ]; then
         #. Method 1
@@ -257,6 +420,10 @@ function :util:dups() {
     return $e
 }
 
+function :util:undelimit() {
+    tr "${SITE_DELIM?}" "\n"
+}
+
 function :util:join() {
     #. Usage: array=( a b c ); :util:join $delim array
     if [ $# -eq 2 ]; then
@@ -265,6 +432,11 @@ function :util:join() {
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
+}
+
+function :util:is_int() {
+    [[ $1 =~ ^-?[0-9]+$ ]]
+    return $?
 }
 
 #function :util:cphash() {
@@ -277,6 +449,13 @@ function :util:join() {
 #    local -pA|awk 'BEGIN{e='${CODE_FAILURE}'};$0~/local .*'$1'=/{e='${CODE_SUCCESS}'};END{exit(e)}'
 #    return $?
 #}
+#. }=-
+
+#. ANSI2HTML -={
+function :util:ansi2html() {
+    ${SITE_LIBEXEC_CORE}/ansi2html
+}
+#. }=-
 
 #. Set Operations -={
 #function :util:sets:explode() {
@@ -302,14 +481,3 @@ function :util:join() {
 #    explode sd
 #}
 #. }=-
-
-#. ANSI2HTML -={
-function :util:ansi2html() {
-    ${SITE_LIBEXEC_CORE}/ansi2html
-}
-#. }=-
-
-function :util:is_int() {
-    [[ $1 =~ ^-?[0-9]+$ ]]
-    return $?
-}
