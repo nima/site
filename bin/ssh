@@ -1,0 +1,2 @@
+#!/bin/bash
+site remote connect -C -T ${0#${0%?}} $@

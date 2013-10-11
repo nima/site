@@ -19,6 +19,8 @@ install: extern
 	ln -sf $(PWD)/share $(HOME)/.site/share
 	@
 	ln -sf $(PWD)/bin/site $(HOME)/bin/site
+	ln -sf $(PWD)/bin/ssh $(HOME)/bin/ssm
+	ln -sf $(PWD)/bin/ssh $(HOME)/bin/ssp
 	@echo "Install complete."
 
 extern:
@@ -36,6 +38,8 @@ clean:
 uninstall: clean
 	rm -rf $(HOME)/.site
 	rm -rf $(HOME)/bin/site
+	rm -rf $(HOME)/bin/ssm
+	rm -rf $(HOME)/bin/ssp
 	@echo "Uninstall complete."
 
 .PHONY: install reinstall uninstall extern clean
