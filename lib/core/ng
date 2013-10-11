@@ -8,8 +8,8 @@ core:import ldap
 
 #. Internal Functions -={
 function ::ng:tree_data() {
+  ${CACHE_OUT}; {
     : ${#g_PROCESSED_NETGROUP[@]?}
-
     local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 -o $# -eq 5 ]; then
@@ -96,6 +96,7 @@ function ::ng:tree_data() {
     fi
 
     return $e
+  } | ${CACHE_IN}; ${CACHE_EXIT}
 }
 
 function ::ng:tree:cpf() {
@@ -284,10 +285,10 @@ function :ng:resolve() {
                     ${FUNCNAME} ${tldid} ${child}
                 done
 
-                IFS='|||' read -a children <<< "$(:ldap:search -1 netgroup cn=${ng} nisNetgroupTriple)"
+                IFS='|||' read -a children <<< "$(:ldap:search -1 netgroup cn=${ng} nisNetgroupTriple|tr -d '(),')"
                 for child in ${children[@]}; do
-                    if echo ${child}|grep -q "${tld}"; then
-                        echo ${child/.${tld}/}|tr -d '(),'
+                    if echo "${child}"|grep -qE "\.${tld}$"; then
+                        echo "${child/.${tld}/}"
                     fi
                 done
                 e=${CODE_SUCCESS}
@@ -362,6 +363,7 @@ function ng:tree() {
 }
 
 function :ng:hosts() {
+  ${CACHE_OUT}; {
     local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 2 ]; then
@@ -384,6 +386,7 @@ function :ng:hosts() {
     fi
 
     return $e
+  } | ${CACHE_IN}; ${CACHE_EXIT}
 }
 
 function ng:hosts:usage() { echo "-T|--tldid <tldid> <netgroup>"; }
@@ -582,7 +585,12 @@ function ng:summary() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 0 ]; then
-        :ldap:search -1 netgroup cn description
+        local -i i=0
+        while read line; do
+            ((i++))
+            IFS="${SITE_DELIM?}" read ng desc <<< "${line}"
+            cpf "%{@int:%04s}. %{@netgroup:%-32s} %{@comment:%s}\n" "${i}" "${ng}" "${desc}"
+        done < <( :ldap:search -1 netgroup cn description|sort )
         e=$?
     fi
 
