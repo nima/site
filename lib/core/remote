@@ -10,34 +10,7 @@ core:import util
 core:import ldap
 
 #. -={
-#. SSH -={
-declare -g g_SSH_OPT
-g_SSH_OPTS="-q -o ConnectionAttempts=${USER_SSH_ATTEMPTS:-2} -o ConnectTimeout=${USER_SSH_TIMEOUT:-3} -o PasswordAuthentication=no"
-
-function :remote:copy() {
-# FIXME - if fqdn is sent, work out tldid backwards?
-    local -i e=${CODE_FAILURE?}
-
-    #.Usage: :remote:copy ${fqdn}:/etc/security/access.conf ${SITE_CACHE}/${fqdn}-access.conf
-    if [ $# -eq 3 ]; then
-        local tldid=$1
-        local qdn=$2
-        shift 2
-
-        local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
-        local scp_opts="${g_SSH_OPTS}"
-        if [ ${#ssh_proxy} -eq 0 ]; then
-            scp ${scp_opts} ${SITE_USERNAME}@${qdn} $*
-        else
-            #. FIXME: Hardcoding m...
-            scp ${scp_opts} -o ProxyCommand="ssh ${SITE_USERNAME}@${ssh_proxy}\
-                nc %h.${USER_TLDS[${tldid}]} 22" ${SITE_USERNAME}@${qdn} $*
-        fi
-    fi
-
-    return $e
-}
-
+#. remote:connect() -={
 function :remote:connect() {
     local -i e=${CODE_FAILURE?}
 
@@ -85,6 +58,126 @@ function :remote:connect() {
     return $e
 }
 
+function remote:connect:usage() { echo "[-T|--tldid <tldid>] <hnh>"; }
+function remote:connect() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -ge 1 ]; then
+        local hnh=$1
+        local tldid
+        tldid=$(:dns:qualified ${hnh})
+        if [ $? -eq ${CODE_SUCCESS} ]; then
+            :remote:connect $*
+            e=$?
+        else
+            tldid=${g_TLDID}
+            shift 1
+
+            local tld=${USER_TLDS[${tldid}]}
+
+            if [ ${#tld} -gt 0 ]; then
+                local qdn
+                local -a qdns=( $(:dns:qdn ${tldid} ${hnh}) )
+                if [ ${#qdns[@]} -gt 0 ]; then
+                    #if [ -t 1 ]; then
+                    #    if [ ${#qdns[@]} -gt 1 ]; then
+                    #        theme HAS_WARNED "More than one match"
+                    #        for qdn in ${qdns[@]}; do
+                    #            cpf "    - %{@host:%s}\n" ${qdn}
+                    #        done
+                    #    fi
+                    #fi
+
+                    if [ $# -eq 0 ]; then
+                        theme INFO "Connecting to ${qdns[0]}.${tldid}..."
+                    fi
+
+                    :remote:connect ${tldid} ${hnh} $*
+                    e=$?
+                    if [ $e -eq 255 ]; then
+                        theme ERR "Failed to connect to \`${qdns[0]}'"
+                    elif [ $e -ne ${CODE_SUCCESS?} ]; then
+                        theme WARN "Connection to ${qdns[0]} terminated with error code \`$e'"
+                    fi
+                elif [ ${#qdns[@]} -gt 0 ]; then
+                    for qdn in ${qdns[@]}; do
+                        read record context query sdn ip <<< "$(:dns:lookup P a ${qdn})"
+                        printf "$(basename $0) ssh connect %-48s #. %s\n" "${qdn} $*" ${ip}
+                    done
+                    e=${CODE_SUCCESS}
+                else
+                    theme ERR "Failed to resolve any host matching \`${hnh}'"
+                    e=${CODE_FAILURE}
+                fi
+            else
+                theme ERR "Invalid TLD identifier \'${tldid}'"
+                e=${CODE_FAILURE}
+            fi
+        fi
+    fi
+
+    return $e
+}
+#. }=-
+#. remote:copy() -={
+declare -g g_SSH_OPT
+g_SSH_OPTS="-q -o ConnectionAttempts=${USER_SSH_ATTEMPTS:-2} -o ConnectTimeout=${USER_SSH_TIMEOUT:-3} -o PasswordAuthentication=no"
+
+# TODO - if fqdn is sent, work out tldid backwards?
+function :remote:copy:cached() { echo 3600; }
+function :remote:copy:cachefile() { echo $4; }
+function :remote:copy() {
+  ${CACHE_OUT}; {
+    local -i e=${CODE_FAILURE?}
+
+    #.Usage: :remote:copy m <fqdn> /etc/security/access.conf ${SITE_CACHE}/${fqdn}-access.conf
+    if [ $# -eq 4 ]; then
+        local tldid=$1
+        local qdn=$2
+        local src=$3
+        local dst=$4
+
+        local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
+        local scp_opts="${g_SSH_OPTS}"
+        if [ ${#ssh_proxy} -eq 0 ]; then
+            scp ${scp_opts} ${SITE_USERNAME}@${qdn}:${src} ${dst}
+        else
+            scp ${scp_opts} -o ProxyCommand="ssh ${SITE_USERNAME}@${ssh_proxy}\
+                nc %h.${USER_TLDS[${tldid}]} 22" ${SITE_USERNAME}@${qdn}:${src} ${dst}
+        fi
+    fi
+
+    return $e
+  } | ${CACHE_IN}; ${CACHE_EXIT}
+}
+
+function remote:copy:usage() { echo "-T<tldid> <hnh>:<src-path> <dst-path>"; }
+function remote:copy() {
+    local -i e=${CODE_DEFAULT?}
+
+    local tldid=${g_TLDID}
+    if [ $# -eq 2 -a ${#tldid} -gt 0 ]; then
+        local tld=${USER_TLDS[${tldid}]}
+        if [ ${#tld} -gt 0 ]; then
+            IFS=: read hnh src <<< "$1"
+            if [ ${#hnh} -gt 0 -a ${#src} -gt 0 ]; then
+                local dst="$2"
+                local -a qdns=( $(:dns:qdn ${tldid} ${hnh}) )
+                local qdn=${qdns[0]}
+                [ ! -t 1 ] || theme INFO "Copying shit from ${qdn}..."
+                :remote:copy "${tldid}" "${hnh}" "${src}" "${dst}"
+                e=$?
+            fi
+        else
+            theme ERR "Invalid TLD identifier \'${tldid}'"
+            e=${CODE_FAILURE}
+        fi
+    fi
+
+    return $e
+}
+#. }=-
+#. remote:sudo() -={
 function :remote:pipewrap() {
     # This function reads in the input from a terminal and output the same.
     # The only purpose is to insert PASSWORD for "sudo -S" command.
@@ -171,7 +264,7 @@ function remote:sudo() {
             #fi
             local qdn=${qdns[0]}
 
-            [ ! -t 1 ] || theme INFO "Connecting to ${qdn}..."
+            [ ! -t 1 ] || theme INFO "Connecting to ${qdn}.${tldid}..."
             :remote:sudo ${tldid} ${hnh} ${*}
             e=$?
         else
@@ -182,68 +275,8 @@ function remote:sudo() {
 
     return $e
 }
-
-function remote:connect:usage() { echo "[-T|--tldid <tldid>] <hnh>"; }
-function remote:connect() {
-    local -i e=${CODE_DEFAULT?}
-
-    if [ $# -ge 1 ]; then
-        local hnh=$1
-        local tldid
-        tldid=$(:dns:qualified ${hnh})
-        if [ $? -eq ${CODE_SUCCESS} ]; then
-            :remote:connect $*
-            e=$?
-        else
-            tldid=${g_TLDID}
-            shift 1
-
-            local tld=${USER_TLDS[${tldid}]}
-
-            if [ ${#tld} -gt 0 ]; then
-                local qdn
-                local -a qdns=( $(:dns:qdn ${tldid} ${hnh}) )
-                if [ ${#qdns[@]} -gt 0 ]; then
-                    #if [ -t 1 ]; then
-                    #    if [ ${#qdns[@]} -gt 1 ]; then
-                    #        theme HAS_WARNED "More than one match"
-                    #        for qdn in ${qdns[@]}; do
-                    #            cpf "    - %{@host:%s}\n" ${qdn}
-                    #        done
-                    #    fi
-                    #fi
-
-                    if [ $# -eq 0 ]; then
-                        theme INFO "Connecting to ${qdns[0]} $#..."
-                    fi
-
-                    :remote:connect ${tldid} ${hnh} $*
-                    e=$?
-                    if [ $e -eq 255 ]; then
-                        theme ERR "Failed to connect to \`${qdns[0]}'"
-                    elif [ $e -ne ${CODE_SUCCESS?} ]; then
-                        theme WARN "Connection to ${qdns[0]} terminated with error code \`$e'"
-                    fi
-                elif [ ${#qdns[@]} -gt 0 ]; then
-                    for qdn in ${qdns[@]}; do
-                        read record context query sdn ip <<< "$(:dns:lookup P a ${qdn})"
-                        printf "$(basename $0) ssh connect %-48s #. %s\n" "${qdn} $*" ${ip}
-                    done
-                    e=${CODE_SUCCESS}
-                else
-                    theme ERR "Failed to resolve any host matching \`${hnh}'"
-                    e=${CODE_FAILURE}
-                fi
-            else
-                theme ERR "Invalid TLD identifier \'${tldid}'"
-                e=${CODE_FAILURE}
-            fi
-        fi
-    fi
-
-    return $e
-}
-
+#. }=-
+#. remote:tmux() -={
 function remote:cluster:alert() {
     cat <<!
 DEPR This function has been deprecated in favour of tmux.
@@ -253,12 +286,12 @@ function remote:cluster:usage() { echo "<hnh> [<hnh> [...]]"; }
 function remote:cluster() {
     local -i e=${CODE_DEFAULT?}
 
-    local tldid=m
+    local tldid=${g_TLDID?}
 
     if [ $# -eq 1 ]; then
         local hgd=$1
         local -a hosts
-        hosts=( $(hgd:resolve ${hgd}) )
+        hosts=( $(hgd:resolve ${tldid} ${hgd}) )
         if [ $? -eq 0 -a ${#hosts[@]} -gt 0 ]; then
             cssh ${hosts[@]}
         else
@@ -278,65 +311,146 @@ function remote:cluster() {
     return $e
 }
 
-function ::remote:tmux() {
-    local -i e=${CODE_SUCCESS?}
-
-    if [ $# -eq 2 ]; then
+function ::remote:eval:tmux() {
+    if [ $# -eq 3 ]; then
         local session=$1
-        local hgd=$2
+        echo "#. session ${session}"
 
-        tmux new-session -d -s "${session}"
-        if [ $? -eq 0 ]; then
-            local tab
-            local -i pid
-            local -i lpid
-            local -i tid
-            local -i otid
-            local -a hosts=( $(:hgd:resolve ${hgd}) )
-            local -i nodes=${#hosts[@]}
+        local -i panes=$2
+        echo "#. ${panes} panes in total"
 
-            for ((pid=0; pid<nodes; pid++)); do
-                ((lpid=pid%zoning))
-                ((otid=tid))
-                ((tid=pid/zoning))
-                tab="tab-${tid}"
-                if [ ${pid} -gt 0 ]; then
-                    if [ ${otid} -ne ${tid} ]; then
-                        tmux new-window -t "${session}" -a -n "${tab}"
+        local pane_res=$3
+        IFS=x read x y <<< "${pane_res}"
+        echo "#. window pane resolution set to ${x}x${y}"
+
+        local -i ppw
+        ((ppw=x*y))
+        echo "#. ${ppw} panes per window"
+
+        local -i leftovers
+        ((leftovers=panes%ppw))
+
+        local -i windows
+        ((windows=panes/ppw))
+
+        if [ ${leftovers} -gt 0 ]; then
+            ((windows++))
+            echo "#. last-window has ${leftovers} panes"
+        fi
+        echo "#. ${windows} windows"
+
+        echo "#. session creation"
+        echo tmux new-session -d -s ${session}
+
+        echo "#. window creation"
+        wid=0
+        wname=${session}:w${wid}
+        echo tmux rename-window -t ${session} ${session}:w0
+        for ((wid=1; wid<${WINDOWS}; wid++)); do
+            wname=${session}:w${wid}
+            echo tmux new-window -t ${session} -d -a -n ${wname}
+        done
+
+        echo "#. pane creation"
+        wid=0
+        wname=${session}:w${wid}
+        for ((pid=0; pid<PANES; pid++)); do
+            if ((pid%PPW == 0)); then
+                if ((pid>0)); then
+                    echo "tmux select-layout -t ${session}:${wname} tiled >/dev/null"
+                    wname=${session}:w$((pid/PPW))
+                    echo "tmux select-window -t ${session}:${wname} #. Pane $pid, Window ${wname}"
+                else
+                    echo "#. Pane $pid, Window ${wname}"
+                fi
+            elif ((pid%X == 0)); then
+                echo "tmux split-window -h #. Pane $pid, Row $(((pid / X) % Y))"
+                echo "tmux select-layout -t ${session}:${wname} tiled >/dev/null"
+            else
+                echo "tmux split-window -v #. Pane $pid"
+            fi
+        done
+
+        echo "#. view preparation and session connection"
+        wid=0
+        wname=${session}:w${wid}
+        echo "tmux select-window -t ${session}:${wname}"
+        echo tmux select-pane -t ${session}:${wname}.0
+        echo tmux attach-session -t ${session}
+
+        echo "#. cleanup"
+        echo tmux kill-session -t tmux
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+}
+
+function ::remote:tmux() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 3 ]; then
+        local tldid=$1
+        local session=$2
+        local hgd=$3
+
+        local -a hosts=( $(:hgd:resolve ${tldid} ${hgd}) )
+        if [ ${#hosts[@]} -gt 0 ]; then
+            tmux new-session -d -s "${session}"
+            if [ $? -eq 0 ]; then
+                local tab
+                local -i pid
+                local -i lpid
+                local -i tid
+                local -i otid
+                local -i nodes=${#hosts[@]}
+
+                local -i zoning=12 #. Terminals per tab (tmux window)
+                for ((pid=0; pid<nodes; pid++)); do
+                    ((lpid=pid%zoning))
+                    ((tid=pid/zoning))
+                    tab="tab-${tid}"
+                    if [ ${pid} -gt 0 ]; then
+                        if [ ${otid} -ne ${tid} ]; then
+                            tmux new-window -t "${session}" -a -n "${tab}"
+                            tmux select-window -t "${session}:${tab}"
+                        fi
+                    else
+                        tmux rename-window -t "${session}:0" "${tab}"
                         tmux select-window -t "${session}:${tab}"
                     fi
-                else
-                    tmux rename-window -t "${session}:0" "${tab}"
-                    tmux select-window -t "${session}:${tab}"
-                fi
+                    ((otid=tid))
 
-                [ ${lpid} -eq 0 ] || tmux split-window -h
-                cpf "Connection %{g:${tab}}:%{@int:${pid}} to %{@host:${hosts[${pid}]}}..."
-                tmux send-keys -t "${lpid}" "ssh ${hosts[${pid}]}; exit $?" C-m
-                tmux select-layout -t "${session}:${tab}" tiled >/dev/null
-                theme HAS_PASSED "${tab}:${pid}"
-            done
+                    [ ${lpid} -eq 0 ] || tmux split-window -h
+                    cpf "Connection %{g:${tab}}:%{@int:${pid}} to %{@host:${hosts[${pid}]}}..."
+                    tmux send-keys -t "${lpid}" "ssh ${hosts[${pid}]}" C-m
+                    #XXX tmux send-keys -t "${lpid}" "ss${tldid} ${hosts[${pid}]}" C-m
+                    tmux select-layout -t "${session}:${tab}" tiled >/dev/null
+                    theme HAS_PASSED "${tab}:${pid}"
+                done
 
-            for tid in $(tmux list-windows -t ${session}|awk -F: '{print$1}'); do
+                for tid in $(tmux list-windows -t ${session}|awk -F: '{print$1}'); do
+                    tab="tab-${tid}"
+                    tmux select-window -t "${session}:${tid}"
+                    tmux set synchronize-panes on >/dev/null
+                    tmux select-pane   -t "${session}:${tab}.0"
+                done
+
+                tid=0
+                pid=0
                 tab="tab-${tid}"
-                tmux select-window -t "${session}:${tid}"
-                tmux set synchronize-panes on >/dev/null
+                tmux select-window -t "${session}:${tab}"
                 tmux select-pane   -t "${session}:${tab}.0"
-            done
 
-            tid=0
-            pid=0
-            tab="tab-${tid}"
-            tmux select-window -t "${session}:${tab}"
-            tmux select-pane   -t "${session}:${tab}.0"
-
-            tmux attach-session -t "${session}"
-            e=$?
+                tmux attach-session -t "${session}"
+                [ $? -ne 0 ] || e=${CODE_SUCCESS?}
+            else
+                theme HAS_WARNED "empty HGD resolution" >&2
+            fi
         else
-            core:raise EXCEPTION_BAD_FN_CALL
+            theme HAS_FAILED "tmux new-session -d -s '${session}'" >&2
         fi
     else
-        local -i e=${CODE_FAILURE?}
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
@@ -365,7 +479,7 @@ function remote:tmux() {
 
     core:requires tmux
 
-    local -i zoning=12 #. Terminals per tab (tmux window)
+    local tldid=${g_TLDID?}
     local session=$1
     local hgd=${2:-${session}}
 
@@ -374,7 +488,7 @@ function remote:tmux() {
         e=$?
         if [ $e -ne 0 ]; then
             if :hgd:list ${hgd} >/dev/null; then
-                ::remote:tmux "${hgd}" "${hgd}"
+                ::remote:tmux "${tldid}" "${hgd}" "${hgd}"
                 e=$?
             else
                 theme ERR_USAGE "There is no hgd or tmux session by that name."
@@ -382,7 +496,7 @@ function remote:tmux() {
         fi
     elif [ $# -eq 2 ]; then
         if ! tmux has-session -t "${session}" 2>/dev/null; then
-            ::remote:tmux "${session}" "${hgd}"
+            ::remote:tmux "${tldid}" "${session}" "${hgd}"
             e=$?
         else
             theme ERR_USAGE "That session already exists."
@@ -393,15 +507,15 @@ function remote:tmux() {
     return $e
 }
 #. }=-
-#. MON -={
+#. remote:mon() -={
 #. Deprecated Mon Serial Execution
 function ::remote:serialmon() {
     local -i e=${CODE_FAILURE?}
 
     if [ $# -ge 2 ]; then
-        local -a qdns=( $(:hgd:resolve $1) )
+        local tldid=${g_TLDID?}
+        local -a qdns=( $(:hgd:resolve ${tldid} $1) )
         local -r rcmd=${@:2}
-        local tldid=m
 
         if [ ${#rcmd} -gt 0 ]; then
             local qdn info postcmd
@@ -431,17 +545,16 @@ function remote:mon:usage() { echo "<hgd:*> @$(echo ${!USER_MON_CMDGRPREMOTE[@]}
 function remote:mon() {
     local -i e=${CODE_DEFAULT?}
 
-    core:requires PYTHON paramiko
+    core:requires PYTHON paramiko concurrent
     core:requires socat
 
     if [ $# -ge 2 ]; then
-        e=${CODE_FAILURE}
-
-        local -i timeout=${FLAGS_timeout:-8}; unset FLAGS_timeout
-        local -i threads=${FLAGS_threads:-32}; unset FLAGS_threads
+        local -i timeout=${FLAGS_timeout:-3}; unset FLAGS_timeout
+        local -i threads=${FLAGS_threads:-64}; unset FLAGS_threads
         local -i sudo=${FLAGS_sudo:-0}; ((sudo=!sudo)); unset FLAGS_sudo
 
         local -r hgd="$1"
+        local tldid=${g_TLDID?}
 
         local rcmd lcmd
         if [ ${2:0:1} == '@' ]; then
@@ -452,10 +565,12 @@ function remote:mon() {
             rcmd=${@}
         fi
 
-        if [ ${#rcmd[@]} -gt 0 ]; then
+        if [ ${#rcmd} -gt 0 ]; then
+            e=${CODE_FAILURE}
+
             cpf "Processing..."
             local -a qdns
-            qdns=( $(:hgd:resolve ${hgd}) )
+            qdns=( $(:hgd:resolve ${tldid} ${hgd}) )
             e=$?
             if [ $e -eq 0 ]; then
                 cpf "(%{@int:${#qdns[@]}} hosts (max-threads=%{@int:%s})" ${threads}
@@ -476,9 +591,8 @@ function remote:mon() {
                     else
                         script="${SITE_LIBEXEC_CORE}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME}@${csv_hosts} ${rcmd}"
                     fi
-                    #echo "#. ${script}"
+                    #echo "#. DEBUG: ${script}" >&2
 
-                    local tldid=m
                     eval "$(USER_TLD=${USER_TLDS[${tldid}]} USER_SSH_PROXY=${USER_SSH_PROXY[${tldid}]} ${script})"
 
                     local qdn
@@ -529,7 +643,7 @@ function remote:mon() {
                         rcmd=${@}
                     fi
 
-                    if [ ${#rcmd[@]} -gt 0 ]; then
+                    if [ ${#rcmd} -gt 0 ]; then
                         e=${CODE_SUCCESS}
                         cpf "(%{@int:${#qdns[@]}} hosts"
                         for qdn in ${qdns[@]}; do
@@ -569,19 +683,17 @@ function remote:mon() {
                 theme HAS_FAILED "NO_SUCH_HGD"
             fi
         fi
-
     fi
 
     return $e
 }
 #. }=-
-#. CF -={
+#. remote:cf -={
 function remote:cfrun:usage() { echo "[<hgd>]"; }
 function remote:cfrun() {
     local -i e=${CODE_DEFAULT?}
 
-    #. XXX HARDCODING
-    local tldid=m
+    local tldid=${g_TLDID?}
     local -a fqdns
     for hnh in ${USER_CFHOSTS[@]}; do
         fqdns+=( $(:dns:fqdn ${tldid} ${hnh}) )
@@ -592,7 +704,7 @@ function remote:cfrun() {
 
         local hgd=$1
         local -a hosts
-        hosts=( $(hgd:resolve ${hgd}) )
+        hosts=( $(hgd:resolve ${tldid} ${hgd}) )
         e=$?
 
         if [ $e -eq ${CODE_SUCCESS} ]; then
@@ -603,7 +715,7 @@ function remote:cfrun() {
             local -i i
             for (( i=0; i<${#hosts[@]}; i+=32)); do
                 printf "Queing hosts $i..$(($i+31)) of ${#hosts[@]} for cfrun...\n"
-                local -i sid=$(((($i/32)%2)))
+                local -i sid=$((( ($i/32)%2 )))
                 for host in ${fqdnhosts[@]:$i:32}; do
                     cpf " * Adding %{@host:%s}..." "${host}"
                     theme HAS_PASSED
