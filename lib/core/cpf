@@ -56,7 +56,7 @@ function ::cpf:theme() {
                 fi
 
                 case ${th} in
-                    err|crit)            fmt="%{r:${fmt}}";;
+                    err|crit|fail)       fmt="%{r:${fmt}}";;
                     warn)                fmt="%{y:${fmt}}";;
                     info)                fmt="%{wh:${fmt}}";;
                     pass)                fmt="%{g:${fmt}}";;
@@ -82,6 +82,7 @@ function ::cpf:theme() {
                     host_bad)            fmt="%{r:${fmt}}";;
                     ip)                  fmt="%{b:${fmt}}";;
                     cmd)                 fmt="%{c:${fmt}}";;
+                    hgd)                 fmt="%{+bo}%{m:${fmt}}%{-bo}";;
                     user)                fmt="%{m:${fmt}}";;
                     group)               fmt="%{m:${fmt}}";;
                     int)                 fmt="%{g:${fmt}}";;
