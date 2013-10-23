@@ -6,6 +6,7 @@ SITE_FULLNAME="Tyrion Lannister"
 SITE_EMAIL="tyrion.lannister@lannister.casterlyrock.com"
 SITE_GPG_ID="0xBADB00B5"
 SITE_SCM_CFENGINE="${HOME}/SCM/cfengine"
+SITE_DIFF=$(which colordiff || which diff)
 
 #. Executable Overrides -={
 #. Override your BASH if it's old, on Mac OS X, get the GNU utilities via
