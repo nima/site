@@ -301,31 +301,6 @@ function :ldap:add() {
 }
 #. }=-
 #. Utility -={
-function ldap:ngldif:usage() { echo "<host> [<host> [...]]"; }
-function ldap:ngldif() {
-    local -i e=${CODE_DEFAULT?}
-
-    if [ $# -ge 1 ]; then
-        e=${CODE_SUCCESS}
-        for host in $@; do
-            local -a hsns
-            hsns=( $(:dns:qdn m ${host}) )
-            if [ $? -eq 0 ]; then
-                local hsn
-                for hsn in ${hsns[@]}; do
-                    echo -e "nisNetgroupTriple: (${hsn//\.*/},,)"
-                    echo -e "nisNetgroupTriple: (${hsn}.${USER_TLD},,)"
-                    echo -e "nisNetgroupTriple: (${hsn}.${USER_TLD_MGMT},,)"
-                done
-            else
-                e=${CODE_FAILURE}
-            fi
-        done
-    fi
-
-    return $e
-}
-
 function ldap:checksum:usage() { echo "[<ldaphostid> <ldaphostid> [<ldaphostid> [...]]]"; }
 function ldap:checksum() {
     core:requires ANY colordiff diff
