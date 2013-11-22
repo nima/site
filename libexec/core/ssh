@@ -5,6 +5,7 @@ import binascii, socket, errno
 from select import select
 from sha import sha
 from concurrent import futures
+from threading import Thread, Lock
 
 from time import sleep
 from random import random
@@ -27,9 +28,9 @@ class MHKP(paramiko.AutoAddPolicy):
         paramiko.AutoAddPolicy.__init__(self, *argv, **kwargs)
 
     def missing_host_key(self, client, hostname, key):
-        client._host_keys.add(hostname, key.get_name(), key) 
-        if client._host_keys_filename is not None: 
-            client.save_host_keys(client._host_keys_filename) 
+        client._host_keys.add(hostname, key.get_name(), key)
+        if client._host_keys_filename is not None:
+            client.save_host_keys(client._host_keys_filename)
         return None
 
 def secret(secret):
@@ -63,14 +64,15 @@ class EssEssHache:
 
     def del_client(self, qdn):
         client = self._clients.pop(qdn)
-        if client._host_keys_filename is not None: 
-            client.save_host_keys(client._host_keys_filename) 
+        if client._host_keys_filename is not None:
+            client.save_host_keys(client._host_keys_filename)
         client.close()
-        
+
     def connect(self, username, qdn, command, stdin=[]):
         #sleep(2 * random())
 
         client = self._clients[qdn]
+        client.known_hosts = None
         data = None
         try:
             data = (qdn, [], [], 1)
@@ -80,17 +82,16 @@ class EssEssHache:
                 #sys.stdout.write("%s=%s\n" % ('ssh_proxy', ssh_proxy))
                 #sys.stdout.write("%s=%s\n" % ('tld', tld))
 
-                if ssh_proxy is None:
-                    sys.stdout.write("#. queued up %s\n" % qdn)
-                    client.connect(qdn, username=username)
+                if not ssh_proxy:
+                    client.connect(qdn, username=username, timeout=self._timeout)
                 else:
-                    sys.stdout.write("#. queued up %s via proxy %s\n" % (qdn, ssh_proxy))
+                    #sys.stderr.write("#. >>> Queued up %s via proxy %s\n" % (qdn, ssh_proxy))
                     proxy_command = paramiko.ProxyCommand(
                         "ssh %s@%s nc %s.%s 22" % (
                             username, ssh_proxy, qdn, tld
                         )
                     )
-                    client.connect(qdn, username=username, sock=proxy_command)
+                    client.connect(qdn, username=username, sock=proxy_command, timeout=self._timeout)
 
                 stdout = []
                 stderr = []
@@ -127,46 +128,53 @@ class EssEssHache:
                 data = (qdn, stdout, stderr, ecode)
 
             except paramiko.BadHostKeyException as exception:
-                estr = "BadHostKeyException"
+                estr = "Bad Host Key"
                 data = (qdn, [], [estr], 2)
 
             except paramiko.SSHException as exception:
-                estr = "UnknownHost"
-                data = (qdn, [], [estr], 2)
-                data = (qdn, [], [str(exception)], 2)
+                estr = "Unknown Host"
+                data = (qdn, [], ["%s: %s" % (estr, str(exception))], 2)
+
+            except socket.timeout as exception:
+                estr = "TCP Socket Timeout"
+                data = (qdn, [], [estr], 3)
 
             except socket.error as exception:
                 if exception.errno == errno.EHOSTUNREACH:
-                    estr = "HostUnreacheable"
-                    data = (qdn, [], [estr], 3)
+                    estr = "Host Unreacheable"
+                    data = (qdn, [], [estr], 4)
                 elif exception.errno == errno.ETIMEDOUT:
                     estr = "Timeout"
-                    data = (qdn, [], [estr], 3)
+                    data = (qdn, [], [estr], 4)
                 elif exception.errno == errno.ECONNRESET:
                     estr = "Connection Reset"
-                    data = (qdn, [], [estr], 3)
+                    data = (qdn, [], [estr], 4)
                 else:
-                    estr = "%s: %s" % (exception.__class__, exception)
+                    estr = "C %s: %s (%s)" % (exception.__class__, exception, exception.errno)
                     data = (qdn, [], [estr], 7)
 
             except Exception as exception:
-                estr = "%s: %s" % (exception.__class__, exception)
+                estr = "B %s: %s" % (exception.__class__, exception)
                 data = (qdn, [], [estr], 8)
 
             else:
                 self.del_client(qdn)
 
         except Exception as exception:
-            estr = "%s: %s" % (exception.__class__, exception)
+            estr = "A %s: %s" % (exception.__class__, exception)
             data = (qdn, [], [estr], 9)
 
         return data
 
 
     def writeMeABASHScript(self, var, username, password, cmd):
-        with futures.ThreadPoolExecutor(max_workers=self._threads) as executor:
-            sys.stdout.write("local -A %s\n" % var)   #. exit code
+        mutex = Lock()
 
+        sys.stdout.write("#!/bin/bash\n")
+        sys.stdout.write("#. threads: %d\n" % self._threads)
+        sys.stdout.write("#. timeout: %0.1f\n" % self._timeout)
+        sys.stdout.write("\n")
+        with futures.ThreadPoolExecutor(max_workers=self._threads) as executor:
             #. See if stdin from the shell has any data to offer...
             #stdindata = []
             #if select([sys.stdin,],[],[],0.0)[0]:
@@ -177,61 +185,59 @@ class EssEssHache:
                 cmd = """sudo -S %s""" % cmd
                 stdindata.append(password)
 
-            queue = (
-                (
-                    qdn, executor.submit(
-                        self.connect, username, qdn, cmd, stdindata
-                    )
-                ) for qdn in self._clients.keys()
-            )
+            queue = {
+                executor.submit(self.connect, username, qdn, cmd, stdindata):
+                    qdn for qdn in self._clients.keys()
+            }
 
+            sys.stdout.write("local -A %s\n"   % var) #. stdout
             sys.stdout.write("local -A %s_o\n" % var) #. stdout
             sys.stdout.write("local -A %s_e\n" % var) #. stderr
             sys.stdout.write("local -A %s_w\n" % var) #. warnings
 
             i = 0
             total = len(self._clients.keys())
-            for qdn, future in queue:
+
+            #for future in futures.as_completed(queue, timeout=self._timeout):
+            for future in futures.as_completed(queue):
                 i += 1
+
+                qdn = queue[future]
                 data = None
-                qdn_hash = sha(qdn).hexdigest()
                 try:
-                    sys.stdout.write(
-                        "#. Query with host %s (%d of %d)...\n" % (
-                            qdn, i, total
-                        )
-                    )
-                    data = future.result(timeout=self._timeout)
+                    #data = future.result(timeout=self._timeout)
+                    data = future.result()
                 except futures.TimeoutError:
                     sys.stdout.write("#. %s is taking too long. Oh well.\n" % qdn)
-                    #sys.stdout.write("%s[%s]=%d\n" % (var, qdn_hash, 9))
-                    #sys.stdout.write("%s_e[%s]='%s'\n" % (var, qdn_hash, 'TIMEOUT'))
                 else:
-                    qdn, stdout, stderr, e = data
+                    mutex.acquire()
+                    try:
+                        sys.stdout.write("#. %s -={\n" % qdn)
 
-                    sys.stdout.write("%s[%s]=%d\n" % (var, qdn_hash, e))
+                        _qdn, stdout, stderr, e = data
+                        qdn_hash = sha(qdn).hexdigest()
+                        sys.stdout.write(
+                            "#. Query with host %s (%d of %d) : %s\n" % (
+                                qdn, i, total, future._state
+                            )
+                        )
 
-                    #if len(stdout) == 1:
-                    #    if len(stdout[0].strip()) > 0:
-                    #        oneline = ''.join(stdout).strip()
-                    #        sys.stdout.write("%s_o[%s]='%s'\n" % (var, qdn_hash, oneline))
-                    if len(stdout) > 0:
-                        sys.stdout.write("read -r -d '' %s_o[%s] <<-!\n" % (var, qdn_hash))
-                        sys.stdout.write(''.join(stdout).strip())
-                        sys.stdout.write("\n!\n")
+                        sys.stdout.write("%s[%s]=%d\n" % (var, qdn_hash, e))
 
-                    #if len(stderr) == 1:
-                    #    if len(stderr[0].strip()) > 0:
-                    #        oneline = ''.join(stderr).strip()
-                    #        sys.stdout.write("%s_e[%s]='%s'\n" % (var, qdn_hash, oneline))
-                    if len(stderr) > 0:
-                        sys.stdout.write("read -r -d '' %s_e[%s] <<-!\n" % (var, qdn_hash))
-                        sys.stdout.write(''.join(stderr).strip())
-                        sys.stdout.write("\n!\n")
+                        if len(stdout) > 0:
+                            sys.stdout.write("read -r -d '' %s_o[%s] <<-!\n" % (var, qdn_hash))
+                            sys.stdout.write(''.join(stdout).strip())
+                            sys.stdout.write("\n!\n")
 
-                    #warning = MISSING_HKEY.get(qdn, False);
-                    #if warning:
-                    #    sys.stdout.write("%s_w[%s]='%s'\n" % (var, qdn_hash, warning))
+                        if len(stderr) > 0:
+                            sys.stdout.write("read -r -d '' %s_e[%s] <<-!\n" % (var, qdn_hash))
+                            sys.stdout.write(''.join(stderr).strip())
+                            sys.stdout.write("\n!\n")
+
+                        sys.stdout.write("#. }=- %s\n\n" % qdn)
+                    finally:
+                        mutex.release()
+
             sys.stdout.write("#. All done.\n")
 
 def main():
@@ -249,7 +255,7 @@ Usage: ssh <threads> <timeout> <var>=<username>[:<sudo-secret-id>]@<host>,<host>
 
     if len(sys.argv) >= 3:
         threads = int(sys.argv[1])
-        timeout = int(sys.argv[2])
+        timeout = float(sys.argv[2])
 
         var = None
         username = None
