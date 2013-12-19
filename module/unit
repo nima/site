@@ -45,6 +45,7 @@ function testCoverage() {
     local profile=${g_RUNTIME_PROFILE?}
     local module=${g_RUNTIME_MODULE?}
     local script=${g_RUNTIME_SCRIPT?}
+    local cwd=${g_RUNTIME_CWD}
     local -i e=0
     local -i t=0
     local -i p=0
@@ -58,12 +59,19 @@ function testCoverage() {
         [public]='^function %s:[a-z0-9_]+\(\)'
     )
 
-    if [ -d ${SITE}/lib/${profile} ]; then
-        cd ${SITE}/lib/${profile}
+    if [ -d ${cwd} ]; then
+        cd ${cwd}
         local context
         local blacklisted
         blacklisted="$(awk -F\| "NF==2&&\$1~/^#${profile}$/&&\$2~/^${module}$/{print\"BLACKLISTED\"}" ${SITE_UNITDATA?})"
         if [ "${blacklisted}" != "BLACKLISTED" ]; then
+            cat <<!SCRIPT > ${script}
+#!/bin/bash
+#. Script    : ${script}
+#. Profile   : ${profile}
+#. Module    : ${module}
+#. Generated : $(date)
+!SCRIPT
             cpf "%{@profile:${profile}}: %{!module:${module}} %{r:-=[}\n"
             for context in ${!fnregexes[@]}; do
                 local regex=$(printf "${fnregexes[${context}]}" ${module})
@@ -88,13 +96,6 @@ function testCoverage() {
                             local input
                             input="$(awk -F\| "\$1~/^${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\$0}" ${SITE_UNITDATA?})"
                             if [ -n "${input}" ]; then
-                                cat <<!SCRIPT > ${script}
-#!/bin/bash
-#. Script    : ${script}
-#. Profile   : ${profile}
-#. Module    : ${module}
-#. Generated : $(date)
-!SCRIPT
                                 local -i i=0
                                 local line
                                 while read line; do
@@ -260,18 +261,23 @@ function ::unit:prime() {
     local valid=0
     [ $# -ne 0 ] || valid=1
 
-    for profile in core ${PROFILE}; do
-        if [ -d ${SITE}/lib/${profile} ]; then
-            cd ${SITE}/lib/${profile}
+    local -A profiles=(
+        [core]=${SITE_MOD_CORE}
+        [${PROFILE}]=${SITE_MOD}
+    )
+    for profile in ${!profiles[@]}; do
+        if [ -d ${profiles[${profile}]} ]; then
+            cd ${profiles[${profile}]}
             local module
             for module in *; do
                 if [ ${#g_MODULES[@]} -eq 0 -o ${g_MODULES[${module}]--1} -eq 1 ]; then
                     cpf "%{@comment:${profile}.${module}.STATIC unit-testing} %{r:-=[}\n";
                     (
+                        export g_RUNTIME_CWD=${profiles[${profile}]}
                         export g_RUNTIME_PROFILE=${profile}
                         export g_RUNTIME_MODULE=${module}
                         export g_RUNTIME_SCRIPT=${SITE_CACHE?}/unittest-${module}.sh
-                        SHUNIT_PARENT=${SITE_LIB_CORE}/unit source ${SHUNIT2}
+                        SHUNIT_PARENT=${SITE_MOD_CORE}/unit source ${SHUNIT2}
                     )
                     e=$?
                     if [ ${e} -eq 0 ]; then

@@ -176,8 +176,8 @@ function ::cpf:module_is_modified() {
     local profile=$1
     local module=$2
     cd ${SITE_SCM}
-    if [ -e "${SITE}/lib/${profile}/${module}" ]; then
-        local path=$(readlink "${SITE}/lib/${profile}/${module}")
+    if [ -e "${SITE_MOD}/${module}" ]; then
+        local path=$(readlink "${SITE_MOD}/${module}")
         local amended=$(:core:git status --porcelain "${path}"|wc -l)
         [ ${PIPESTATUS[0]} -ne 0 ] || e=${amended}
     fi
@@ -191,8 +191,8 @@ function ::cpf:module_has_alerts() {
 
     local profile=$1
     local module=$2
-    if [ -e "${SITE}/lib/${profile}/${module}" ]; then
-        grep -qE "^function ${module}:[a-z0-9]+:alert()" "${SITE}/lib/${profile}/${module}"
+    if [ -e "${SITE_MOD}/${module}" ]; then
+        grep -qE "^function ${module}:[a-z0-9]+:alert()" "${SITE_MOD}/${module}"
         [ $? -ne 0 ] || e=${CODE_SUCCESS}
     fi
 
@@ -205,8 +205,8 @@ function ::cpf:function_has_alerts() {
     local profile=$1
     local module=$2
     local fn=$3
-    if [ -e "${SITE}/lib/${profile}/${module}" ]; then
-        grep -qE "^function ${module}:${fn}:alert()" "${SITE}/lib/${profile}/${module}"
+    if [ -e "${SITE_MOD}/${module}" ]; then
+        grep -qE "^function ${module}:${fn}:alert()" "${SITE_MOD}/${module}"
         [ $? -ne 0 ] || e=${CODE_SUCCESS}
     fi
 
@@ -220,7 +220,7 @@ function ::cpf:module() {
     local -i alerts=0
     local -i amended=0
     local fmt
-    if [ -e ${SITE_LIB_CORE}/${module} ]; then
+    if [ -e ${SITE_MOD_CORE}/${module} ]; then
         if ::cpf:module_has_alerts core ${module}; then
             alerts=1
             fmt="%{y}"
@@ -230,7 +230,7 @@ function ::cpf:module() {
             amended=$?
         fi
         enabled=${CORE_MODULES[${module}]}
-    elif [ -e ${SITE_LIB}/${module} ]; then
+    elif [ -e ${SITE_MOD}/${module} ]; then
         if ::cpf:module_has_alerts ${PROFILE} ${module}; then
             alerts=1
             fmt="%{y}"
@@ -256,7 +256,7 @@ function ::cpf:function() {
     local -i alerts=0
     local -i amended=0
     local fmt
-    if [ -e ${SITE_LIB_CORE}/${module} ]; then
+    if [ -e ${SITE_MOD_CORE}/${module} ]; then
         if ::cpf:function_has_alerts core ${module} ${fn}; then
             alerts=1
             fmt="%{y}"
@@ -266,7 +266,7 @@ function ::cpf:function() {
             amended=$?
         fi
         enabled=${CORE_MODULES[${module}]}
-    elif [ -e ${SITE_LIB}/${module} ]; then
+    elif [ -e ${SITE_MOD}/${module} ]; then
         if ::cpf:function_has_alerts ${PROFILE} ${module} ${fn}; then
             alerts=1
             fmt="%{y}"

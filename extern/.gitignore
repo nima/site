@@ -1,6 +1,6 @@
-*.tgz
-shflags*
-shunit*
-vimpager.git
-vimcat
-vimpager
+.install
+scm
+src
+lib
+libexec
+venv

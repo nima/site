@@ -1,45 +1,76 @@
-export MAKEFLAGS := --no-print-directory
+export MAKEFLAGS := --no-print-directory --warn-undefined-variables
 
+#. Site Bootstrap -={
+#. PROFILE Check -={
 ifeq (${PROFILE},)
 $(error PROFILE is not set)
 endif
-
-reinstall: uninstall install
-
-install: extern
-	@mkdir -p $(HOME)/.site $(HOME)/bin
+#. }=-
+#. Installation Status Check -={
+ifeq ($(wildcard .install),)
+STATUS := "UNINSTALLED"
+else
+STATUS := "INSTALLED"
+endif
+#. }=-
+#. Usage -={
+.PHONY: help
+help:
+	@echo "Usage:"
+	@echo "    $(MAKE) install"
+	@echo "    $(MAKE) uninstall"
+	@echo "Current status: ${STATUS}"
+#. }=-
+#. Installation -={
+.PHONY: install sanity
+sanity:; @test ! -f .install
+install: sanity .install; @echo "Installation complete!"
+.install:
+	@mkdir -p $(HOME)/.site
 	@
-	@rm -f $(HOME)/.site/lib
+	@$(MAKE) -C extern install
+	ln -sf $(PWD)/extern $(HOME)/.site/extern
 	ln -sf $(PWD)/lib $(HOME)/.site/lib
-	@rm -f $(HOME)/.site/etc
-	ln -sf $(PWD)/etc $(HOME)/.site/etc
-	@rm -f $(HOME)/.site/libexec
+	ln -sf $(PWD)/module $(HOME)/.site/module
 	ln -sf $(PWD)/libexec $(HOME)/.site/libexec
-	@
+	ln -sf $(PWD)/profile $(HOME)/.site/profile
 	ln -sf $(PWD)/share $(HOME)/.site/share
 	@
+	mkdir -p $(HOME)/bin
 	ln -sf $(PWD)/bin/site $(HOME)/bin/site
 	ln -sf $(PWD)/bin/ssh $(HOME)/bin/ssm
 	ln -sf $(PWD)/bin/ssh $(HOME)/bin/ssp
-	@echo "Install complete."
-
-extern:
-	@make -C $@
 	@
-	@mkdir -p $(HOME)/.site/extern
-	@ln -sf $(PWD)/extern/shflags   $(HOME)/.site/extern/shflags
-	@ln -sf $(PWD)/extern/shunit2   $(HOME)/.site/extern/shunit2
-	@ln -sf $(PWD)/extern/vimcat    $(HOME)/.site/extern/vimcat
-	@ln -sf $(PWD)/extern/vimpager  $(HOME)/.site/extern/vimpager
+	touch .install
+#. }=-
+#. Uninstallation -={
+.PHONY: unsanity unsanity
+unsanity:; @test -f .install
+uninstall: unsanity
+	@$(MAKE) -C extern uninstall
+	@
+	find lib/libpy -name '*.pyc' -exec rm -f {} \;
+	find lib/libpy -name '*.pyo' -exec rm -f {} \;
+	@
+	-rm $(HOME)/.site/extern
+	-rm $(HOME)/.site/lib
+	-rm $(HOME)/.site/module
+	-rm $(HOME)/.site/libexec
+	-rm $(HOME)/.site/profile
+	-rm $(HOME)/.site/share
+	@
+	-rm $(HOME)/bin/site
+	-rm $(HOME)/bin/ssm
+	-rm $(HOME)/bin/ssp
+	@
+	-rm .install
+	rmdir $(HOME)/.site
+	@
+	@echo "Uninstallation complete!"
+purge:
+	@$(MAKE) -C extern purge
+	find ~/.site -type l -exec rm -f {} \;
+	rm -f .install
+#. }=-
 
-clean:
-	@make -C extern $@
-
-uninstall: clean
-	rm -rf $(HOME)/.site
-	rm -rf $(HOME)/bin/site
-	rm -rf $(HOME)/bin/ssm
-	rm -rf $(HOME)/bin/ssp
-	@echo "Uninstall complete."
-
-.PHONY: install reinstall uninstall extern clean
+#. }=-

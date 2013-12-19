@@ -9,13 +9,18 @@ export SITE_MOD=${SITE}/profile/${PROFILE?}/module
 export SITE_MOD_CORE=${SITE}/module
 export SITE_LIB=${SITE}/profile/${PROFILE?}/lib
 export SITE_LIB_CORE=${SITE}/lib
-export SITE_LIB_EXTERN=${SITE}/extern
-export SITE_LIBEXEC=${SITE}/profile/${PROFILE?}/libexec
-export SITE_LIBEXEC_CORE=${SITE}/libexec
 export SITE_SCM=$(dirname $(dirname $(readlink ~/bin/site)))
 export SITE_UNITDATA=${SITE}/share/unittest.csv
+export SITE_EXTERN=${SITE}/extern
+export SITE_EXTERN_LIBSH=${SITE_EXTERN}/lib/libsh
+export SITE_EXTERN_LIBPY=${SITE_EXTERN}/lib/libpy
+export SITE_EXTERN_LIBRB=${SITE_EXTERN}/lib/librb
 
-export PATH=${PATH}:${SITE_LIBEXEC}:${SITE_LIBEXEC_CORE}
+export SITE_LIBEXEC=${SITE}/profile/${PROFILE?}/libexec
+export SITE_LIBEXEC_CORE=${SITE}/libexec
+export SITE_LIBEXEC_EXTERN=:${SITE_EXTERN}/libexec
+
+export PATH=${PATH}:${SITE_LIBEXEC}:${SITE_LIBEXEC_CORE}:${SITE_LIBEXEC_EXTERN}
 #. }=-
 #. 1.2  Core Configuration -={
 unset  CDPATH
@@ -41,15 +46,14 @@ if [ -d ${SITE_ETC} ]; then
 #    : ${USER_GDN?}
 #    : ${USER_NDN?}
 else
-    echo "#. TODO: handle this abrupt exit (no  ${SITE_ETC} direcotry)"
-    exit 99
+    cpf "%{@warn:NOTE}: Your profile %{@profile:${PROFILE}} has not been initialized.\n"
 fi
 #. }=-
 #. 1.5  ShUnit2 -={
-export SHUNIT2=${SITE_LIB_EXTERN}/shunit2
+export SHUNIT2=$(which shunit2)
 #. }=-
 #. 1.6  ShFlags -={
-export SHFLAGS=${SITE_LIB_EXTERN}/shflags
+export SHFLAGS=${SITE_EXTERN_LIBSH}/shflags
 source ${SHFLAGS?}
 #. }=-
 #. 1.7  Error Code Constants -={
@@ -95,9 +99,9 @@ function core:softimport() {
         if [ -z "${SITE_IMPORTED[${module}]}" ]; then
             e=2 #. No such module
             if [ ${USER_MODULES[${module}]-9} -eq 1 ]; then
-                if [ -f ${SITE_LIB}/${module} ]; then
+                if [ -f ${SITE_MOD}/${module} ]; then
                     SITE_IMPORTED[${module}]=0
-                    source ${SITE_LIB}/${module}
+                    source ${SITE_MOD}/${module}
                     e=$?
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
@@ -126,8 +130,8 @@ function core:docstring() {
 
         e=2 #. No such module
         if [ ${USER_MODULES[${module}]-9} -eq 1 ]; then
-            if [ -f ${SITE_LIB}/${module} ]; then
-                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_LIB}/${module}
+            if [ -f ${SITE_MOD}/${module} ]; then
+                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_MOD}/${module}
                 e=$?
             fi
         elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
@@ -755,7 +759,7 @@ function :core:usage() {
 
         if [ ${g_VERBOSE?} -eq 1 -a ${#FUNCNAME[@]} -lt 4 ]; then
             cpf "\n%{!module:${module}} %{g:changelog}\n"
-            local modfile=${SITE_SCM}/lib/${PROFILE}/${module}
+            local modfile=${SITE_MOD}/${module}
             [ -f ${modfile} ] || modfile=${SITE_MOD_CORE}/${module}
             cd ${SITE_SCM}
             :core:git --no-pager\
@@ -928,7 +932,7 @@ declare -A RAISE=(
     [${EXCEPTION_BAD_MODULE}]="Bad module"
     [${EXCEPTION_DEPRECATED}]="Deprecated function call"
     [${EXCEPTION_MISSING_PERL_MOD}]="Required perl module missing"
-    [${EXCEPTION_MISSING_PYTHON_MOD}]="Required perl module missing"
+    [${EXCEPTION_MISSING_PYTHON_MOD}]="Required python module missing"
     [${EXCEPTION_SHOULD_NOT_GET_HERE}]="Process flow should never get here"
 )
 function core:raise() {
