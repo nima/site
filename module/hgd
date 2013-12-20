@@ -140,6 +140,7 @@ function :hgd:resolve() {
     if [ $# -eq 2 ]; then
         local tldid=$1
 
+        #. &(...|...) or |(...|...) patterns
         if [[ ${2:0:2} =~ ^[\|\&]\($ ]]; then
             local eq="${2}"
 
@@ -151,7 +152,8 @@ function :hgd:resolve() {
             else
                 e=${CODE_FAILURE}
             fi
-        elif [[ ${2:0:1} =~ ^[a-z]$ ]]; then
+        #. simple alphanumeric patterns
+        elif [[ ${2:0:1} =~ ^[a-zA-Z0-9]$ ]]; then
             local session="$2"
             local -a buflist
             buflist=( $(awk -F '\t' '$1~/^'${session}'$/&&$2~/^'${tldid}'$/{print$0}' ${g_HGD_CACHE}) )
@@ -203,7 +205,7 @@ function hgd:resolve() {
     if [ $# -eq 1 ]; then
         local eq=$1
         local -a resolved
-        resolved=$(:hgd:resolve ${tldid} "${eq}")
+        resolved=$(:hgd:resolve "${tldid}" "${eq}")
         e=$?
         if [ $e -eq ${CODE_SUCCESS} ]; then
             for token in ${resolved[@]}; do

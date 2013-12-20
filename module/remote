@@ -241,7 +241,7 @@ function :remote:sudo() {
     return $e
 }
 
-function remote:sudo:usage() { echo "-T|--tldid <tldid> <host-hint> <cmd>"; }
+function remote:sudo:usage() { echo "-T|--tldid <host-hint> <cmd>"; }
 function remote:sudo() {
     local -i e=${CODE_DEFAULT}
 

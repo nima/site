@@ -127,7 +127,7 @@ function ldap:mkldif() {
     local -i e=${CODE_DEFAULT}
 
     if [ $# -ge 4 ]; then
-        ${SITE_LIB_EXTERN}/vimcat <<< "$(::ldap:mkldif $@)" >&2
+        vimcat <<< "$(::ldap:mkldif $@)" >&2
         e=$?
     fi
 
@@ -225,7 +225,7 @@ function :ldap:modify() {
                             e=$?
                             if [ $e -ne ${CODE_SUCCESS} ]; then
                                 cpf "%{@comment:#. } LDIF %{@err:Failed} with status code %{@int:$e}:\n" >&2
-                                ${SITE_LIB_EXTERN}/vimcat <<< "${ldif}" >&2
+                                vimcat <<< "${ldif}" >&2
                             fi
                         ;;
                         *) core:raise EXCEPTION_BAD_FN_CALL INVALID_USER_CHANGE;;
@@ -245,7 +245,7 @@ function :ldap:modify() {
                             e=$?
                             if [ $e -ne ${CODE_SUCCESS} ]; then
                                 cpf "%{@comment:#. } LDIF %{@err:Failed} with status code %{@int:$e}:\n" >&2
-                                ${SITE_LIB_EXTERN}/vimcat <<< "${ldif}" >&2
+                                vimcat <<< "${ldif}" >&2
                             fi
                         ;;
                         *) core:raise EXCEPTION_BAD_FN_CALL INVALID_GROUP_CHANGE;;
