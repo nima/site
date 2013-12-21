@@ -1,0 +1,15 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+declare -g -r -A USER_MODULES
+
+declare -g -r    USER_TLD_DEFAULT=m
+declare -g -r -a USER_TLDS_REQUIRED=( p m )
+declare -g -r -A USER_TLDS=(
+    [p]='public.com'
+    [m]='mgmt'
+)
+
+declare -g -r -A USER_IFACE=(
+    [p]=eth0
+    [m]=eth1
+)
