@@ -4,12 +4,13 @@
 #. 1.1  Paths -={
 : ${PROFILE?}
 export SITE=${HOME}/.site
+export SITE_SCM=$(dirname $(dirname $(readlink ~/bin/site)))
 export SITE_ETC=${SITE}/profile/${PROFILE?}/etc
 export SITE_MOD=${SITE}/profile/${PROFILE?}/module
 export SITE_MOD_CORE=${SITE}/module
 export SITE_LIB=${SITE}/profile/${PROFILE?}/lib
 export SITE_LIB_CORE=${SITE}/lib
-export SITE_SCM=$(dirname $(dirname $(readlink ~/bin/site)))
+export SITE_CORE_LIBPY=${SITE}/lib/libpy
 export SITE_UNITDATA=${SITE}/share/unittest.csv
 export SITE_EXTERN=${SITE}/extern
 export SITE_EXTERN_LIBSH=${SITE_EXTERN}/lib/libsh
@@ -20,7 +21,12 @@ export SITE_LIBEXEC=${SITE}/profile/${PROFILE?}/libexec
 export SITE_LIBEXEC_CORE=${SITE}/libexec
 export SITE_LIBEXEC_EXTERN=:${SITE_EXTERN}/libexec
 
-export PATH=${PATH}:${SITE_LIBEXEC}:${SITE_LIBEXEC_CORE}:${SITE_LIBEXEC_EXTERN}
+export PATH+=:${SITE_LIBEXEC}
+export PATH+=:${SITE_LIBEXEC_CORE}
+export PATH+=:${SITE_LIBEXEC_EXTERN}
+
+export PYTHONPATH+=:${SITE_CORE_LIBPY}
+export PYTHONPATH+=:${SITE_EXTERN_LIBPY}
 #. }=-
 #. 1.2  Core Configuration -={
 unset  CDPATH

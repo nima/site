@@ -1,3 +1,5 @@
 workbench
 profile
 .install
+*.pyc
+*.pyo
