@@ -1,74 +1,27 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
-#. Docstring for this module; keep this to a single line
+core:import util
+
 :<<[core:docstring]
-This module does X, Y and Z
+The module does X, Y and Z
 [core:docstring]
 
-#. Optional alerts
-function module:func:alert() {
-    cat <<!
-TODO A todo note goes here
-WARN And a warning here
-DEPR And maybe deprecation warnings here
-FIXME Some critical issues here
-!
-}
-function module:func:formats() {
-    cat <<!
-dot
-html
-email
-ansi
-text
-!
-}
-
-#. Optional shflags function for complicated functions
-function module:func:shflags() {
-    cat <<!
-boolean verbose false <verbose> v
-string dir . <repo-dir> d
-integer
-float
-!
-}
-
-#. Optional long help message
-function module:func:help() {
-    cat <<!
-    This function describes template in depth.  First of all, this is ...
-    ...
-!
-}
-
-#. Optional cachefile - specifies that the command generates a file, and that
-#. the output is not important.  It also specifies the generated file's path.
-#. This should be used to cache functions that generate files instead of
-#. output.
-function :remote:copy:cachefile() { echo $1; }
-
-#. Optional cachetime change, if cache is enabled at all for this function
-function module:func:cached() { echo 3600; }
-
-#. Mandatory short usage
-function module:func:usage() { echo "-d|--dir <dir> <from> <to>"; }
-
-#. Mandatory - the function itself
-function module:func() {
-  ${CACHE_OUT}; {
-    : ${FLAGS_dir?}
+function mymod:hello() {
     local -i e=${CODE_DEFAULT?}
 
-    if [ $# -eq 1 -o $# -eq 2 ]; then
-        local dir=${FLAGS_dir?}; unset FLAGS_dir;
+    if [ $# -gt 0 ]; then
+        local -a creatures
+        local whostr
+        shopt -s nocasematch
+        if [ $# -eq 1 ] && [[ $1 == "WORLD" ]]; then
+            whostr="WORLD!"
+        else
+            creatures=( "$@" )
+            whostr="$(:util:join , creatures), and of course ${name}!"
+        fi
 
-        pushd ${FLAGS_dir}
-        #. ...
-        e=$?
-        popd
+        e=${CODE_SUCCESS}
     fi
 
     return $e
-  } | ${CACHE_IN}; ${CACHE_EXIT}
 }
