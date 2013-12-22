@@ -30,9 +30,9 @@ install: sanity .install
 	@echo "Installation complete!"
 	@echo
 	@echo "You can now bootstrap your installation by setting up your profile:"
-	@echo "    cp share/examples/siterc.example ~/.siterc"
+	@echo "    cp share/examples/siterc.eg ~/.siterc"
 	@echo "    mkdir -p profile/${PROFILE}/etc"
-	@echo "    cp share/examples/site.conf.example profile/${PROFILE}/etc"
+	@echo "    cp share/examples/site.conf.eg profile/${PROFILE}/etc/site.conf"
 	@echo
 	@echo "Copy the template module..."
 	@echo "    mkdir -p profile/${PROFILE}/module"
