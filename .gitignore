@@ -1,2 +1,7 @@
-etc/include/shflags
+extern
+profile
 workbench
+.install
+*.pyc
+*.pyo
+Gemfile.lock
