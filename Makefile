@@ -1,5 +1,10 @@
 export MAKEFLAGS := --no-print-directory --warn-undefined-variables
 
+BIN_PY27 := python2.7
+BIN_VENV := virtualenv
+REQUIRED := ${BIN_PY27} ${BIN_VENV}
+export BIN_PY27 BIN_VENV
+
 #. Site Bootstrap -={
 #. PROFILE Check -={
 ifeq (${PROFILE},)
@@ -15,7 +20,7 @@ endif
 #. }=-
 #. Usage -={
 .PHONY: help
-help:
+help: require
 	@echo "Current status  : ${STATUS}"
 	@echo "Current profile : ${PROFILE}"
 	@echo
@@ -23,10 +28,14 @@ help:
 	@echo "    $(MAKE) install"
 	@echo "    $(MAKE) uninstall"
 #. }=-
+#. REQUIRED Check -={
+.PHONY: require
+require:; @$(foreach req,$(REQUIRED:%.required=%),printf ${req}...;which ${req} || (echo FAIL && exit 1);)
+#. }=-
 #. Installation -={
 .PHONY: install sanity
 sanity:; @test ! -f .install
-install: sanity .install
+install: require sanity .install
 	@echo "Installation complete!"
 	@echo
 	@echo "You can now bootstrap your installation by setting up your profile:"
@@ -50,12 +59,11 @@ install: sanity .install
 	@mkdir -p $(HOME)/.site
 	@
 	@$(MAKE) -C extern install
-	ln -sf $(PWD)/extern $(HOME)/.site/extern
-	ln -sf $(PWD)/lib $(HOME)/.site/lib
-	ln -sf $(PWD)/module $(HOME)/.site/module
-	ln -sf $(PWD)/libexec $(HOME)/.site/libexec
-	ln -sf $(PWD)/share $(HOME)/.site/share
-	ln -sf $(PWD)/profile $(HOME)/.site/profile
+	ln -sf $(PWD) $(HOME)/.site/lib
+	ln -sf $(PWD)/profile/${PROFILE}/etc $(HOME)/.site/etc
+	ln -sf $(PWD)/profile/${PROFILE}/module $(HOME)/.site/module
+	ln -sf $(PWD)/profile/${PROFILE}/libexec $(HOME)/.site/libexec
+	ln -sf $(HOME)/.cache/site/ $(HOME)/.site/var
 	@
 	@mkdir -p /var/tmp/site/
 	ln -sf /var/tmp/site/ $(HOME)/.site/log
@@ -76,12 +84,13 @@ uninstall: unsanity
 	find lib/libpy -name '*.pyc' -exec rm -f {} \;
 	find lib/libpy -name '*.pyo' -exec rm -f {} \;
 	@
-	-rm $(HOME)/.site/extern
 	-rm $(HOME)/.site/lib
+	-rm $(HOME)/.site/etc
 	-rm $(HOME)/.site/module
 	-rm $(HOME)/.site/libexec
 	-rm $(HOME)/.site/var
 	-rm $(HOME)/.site/log
+	@
 	-rm $(HOME)/bin/site
 	-rm $(HOME)/bin/ssm
 	-rm $(HOME)/bin/ssp
@@ -97,5 +106,4 @@ purge:
 	rm -rf /var/tmp/site/
 	rm -f .install
 #. }=-
-
 #. }=-

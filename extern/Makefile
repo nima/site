@@ -13,7 +13,7 @@ ifneq (${DLA},)
 flycatcher:
 	@echo "Do not run make here unless you know what you're doing."
 
-EXTERN := shflags shunit2 vimpager pyobjpath
+EXTERN := shflags shunit2 vimpager pyobjpath jsontool
 VENV_PKGS := softlayer paramiko ipaddress
 
 #. Installation -={
@@ -56,12 +56,7 @@ purge:
 #. }=-
 
 #. Python VirtualEnv -={
-VENV := $(shell which virtualenv)
-ifneq (${VENV},)
-PY27 := $(shell which python2.7)
-ifneq (${PY27},)
-
-venv:; ${VENV} -q --clear -p $(PY27) $@
+venv:; ${BIN_VENV} -q --clear -p ${BIN_PY27} $@
 
 .PHONY: venv.purge venv.play
 .PHONY: venv.install
@@ -81,8 +76,6 @@ venv.purge:; rm -rf venv
 venv.play:
 	@echo "Ctrl-D to exit environment"
 	@bash --rcfile venv/bin/activate -i
-endif
-endif
 #. }=-
 
 #. shflags -={
@@ -97,6 +90,7 @@ ${LIBSH}/shflags: ${SRC_SHFLAGS}
 ${SRC_SHFLAGS}: ${TGZ_SHFLAGS}
 	@echo "Untarring $< into $(@D)..."
 	tar -C $(@D) -xzf $<
+	@touch $@
 ${TGZ_SHFLAGS}:
 	@echo "Downloading $@..."
 	@${DLA} http://shflags.googlecode.com/files/$(@F) > $@
@@ -113,6 +107,7 @@ ${LIBEXEC}/shunit2: ${SRC_SHUNIT2}
 ${SRC_SHUNIT2}: ${TGZ_SHUNIT2}
 	@echo "Untarring $< into $(@D)..."
 	tar -C $(@D) -xzf $<
+	@touch $@
 ${TGZ_SHUNIT2}:
 	@echo "Downloading $@..."
 	@${DLA} http://shunit2.googlecode.com/files/$(@F) > $@
@@ -142,6 +137,14 @@ pyobjpath.install: scm/pyobjpath.git
 scm/pyobjpath.git:
 	@echo "Cloning $@..."
 	@git clone -q https://github.com/adriank/ObjectPath.git $@
+#. }=-
+#. jsontool -={
+jsontool.uninstall:
+	-rm ${LIBEXEC}/json
+jsontool.install:
+	@echo "Downloading jsontool..."
+	@${DLA} https://github.com/trentm/json/raw/master/lib/jsontool.js > ${LIBEXEC}/jsontool
+	@chmod +x ${LIBEXEC}/jsontool
 #. }=-
 
 #. -={
