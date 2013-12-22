@@ -457,6 +457,28 @@ function :util:ansi2html() {
 }
 #. }=-
 
+#. Markdown Scaffolding -={
+function :util:markdown() {
+    if read -t 0 -N 0; then
+        if [ $# -gt 0 ]; then
+            local op=$1
+            shift
+
+            {
+                case ${op} in
+                    h1) printf "# %s\n\n" "$@";;
+                    h2) printf "# %s\n\n" "$@";;
+                    h3) printf "# %s\n\n" "$@";;
+                    h4) printf "# %s\n\n" "$@";;
+                    h5) printf "# %s\n\n" "$@";;
+                    h6) printf "# %s\n\n" "$@";;
+                esac
+                cat
+                echo "###### vim:syntax=markdown"
+            } | vimcat
+        fi
+    fi
+}
 #. Set Operations -={
 #function :util:sets:explode() {
 #    for item in $(eval echo \${$1[@]}); do
