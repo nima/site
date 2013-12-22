@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+
+    <title>Site by nima</title>
+  </head>
+
+  <body>
+
+    <header>
+      <div class="container">
+        <h1>Site</h1>
+        <h2>Site is a modular framework for system administration, 99% native bash</h2>
+
+        <section id="downloads">
+          <a href="https://github.com/nima/site/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/nima/site/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/nima/site" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
+
+    <div class="container">
+      <section id="main_content">
+        <h1>
+<a name="overview" class="anchor" href="#overview"><span class="octicon octicon-link"></span></a>OVERVIEW</h1>
+
+<p><strong>MISSION STATEMENT</strong>: <em>To simplify group scripting, reporting and automation tasks for large teams of system engineers</em></p>
+
+<p>Site is written for system administrators, system engineers, devOps, or automation engineers.  It is a superset of bash, and structured to scale with your scripting requirements.</p>
+
+<p>Site is broken up into two main chunks:</p>
+
+<ol>
+<li>The bits that we write: the <em>site engine</em> (<code>lib/libsite</code>), and <em>core modules</em> <code>module/*</code>
+</li>
+<li>The bits that you write: <em>user modules</em> (<code>profile/${PROFILE}/module/*</code>)</li>
+</ol><p>You can configure site in two places:</p>
+
+<ol>
+<li>
+<code>profile/${PROFILE}/etc/site.conf</code> - configuration specific to <em>your organization</em>
+</li>
+<li>
+<code>~/.siterc</code> - configuration specific to <em>you</em>
+</li>
+</ol><h1>
+<a name="requirements" class="anchor" href="#requirements"><span class="octicon octicon-link"></span></a>REQUIREMENTS</h1>
+
+<ol>
+<li>Core Requirements
+
+<ul>
+<li>You need bash v4.0+</li>
+<li>You need gnu grep v2.0+ (probably)</li>
+</ul>
+</li>
+<li>Additional Requirements
+
+<ul>
+<li>The site modules will themselves check for any python, ruby, or perl module you need for that particular module.</li>
+</ul>
+</li>
+</ol><h1>
+<a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>INSTALLATION</h1>
+
+<ol>
+<li>
+<p>Clone It</p>
+
+<div class="highlight highlight-bash"><pre><span class="nb">cd</span> ~/
+git clone https://github.com/nima/site.git
+<span class="nb">cd </span>site
+</pre></div>
+</li>
+<li>
+<p>Set up yout new <code>PROFILE</code></p>
+
+<div class="highlight highlight-bash"><pre><span class="nb">export </span><span class="nv">PROFILE</span><span class="o">=</span>MYCOMPANY 
+mkdir -p profile/<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span>/etc/
+mkdir -p profile/<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span>/module/
+cp share/examples/site.conf.eg profile/<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span>/etc/
+cp share/examples/siterc.eg ~/.siterc
+</pre></div>
+</li>
+<li>
+<p>Install</p>
+
+<div class="highlight highlight-bash"><pre>make install
+</pre></div>
+</li>
+</ol><h2>
+<a name="filesystem-layout" class="anchor" href="#filesystem-layout"><span class="octicon octicon-link"></span></a>Filesystem Layout</h2>
+
+<p>Site is designed to be run by your local user; it is designed to be installed on your desktop machine, and it will communicate with your hosts remotely.  You should never need to install site on a server.</p>
+
+<h3>
+<a name="site-will-not-crap-all-over-your-filesystem-or-home-directory" class="anchor" href="#site-will-not-crap-all-over-your-filesystem-or-home-directory"><span class="octicon octicon-link"></span></a>Site will not crap all over your filesystem or home directory</h3>
+
+<p>Here are the only files that will exist outside of <code>${SITE_SCM}</code> (where you cloned site to):</p>
+
+<ul>
+<li><code>~/.site/</code></li>
+<li><code>~/.siterc</code></li>
+<li><code>~/.secrets</code></li>
+</ul><p>The installer installs everything required monolithically under <code>~/.site/</code>, and even that is just a set of symbolic links pointing back to various folders within <code>${SITE_SCM}</code>.</p>
+
+<p>The <code>~/.siterc</code> is where you can store configuration overrides for you particular user, and <code>~/.secrets</code> is a GPG-encrypted file where you cam store all your passwords.  Site will provide you with the necessary high-level tools to create, edit, and read to and from this file, so you don't have to invoke GPG commands directly.</p>
+
+<h3>
+<a name="site-can-be-uninstalled-as-easily-as-it-can-be-installed" class="anchor" href="#site-can-be-uninstalled-as-easily-as-it-can-be-installed"><span class="octicon octicon-link"></span></a>Site can be uninstalled as easily as it can be installed</h3>
+
+<p>To uninstall, simply run <code>make uninstall</code>, and if you want to delete all downloaded third-party software as well, then run <code>make purge</code>.</p>
+
+<h3>
+<a name="site-doesnt-expect-your-bash-profile-to-be-changed" class="anchor" href="#site-doesnt-expect-your-bash-profile-to-be-changed"><span class="octicon octicon-link"></span></a>Site doesn't expect your bash profile to be changed</h3>
+
+<p>Instead, you ever need to tell it to use a different executable, simply do so via <code>~/.siterc</code>; for example:</p>
+
+<div class="highlight highlight-bash"><pre><span class="k">function </span>grep<span class="o">()</span> <span class="o">{</span> /usr/local/bin/grep <span class="s2">"$@"</span><span class="p">;</span> <span class="k">return</span> <span class="nv">$?</span><span class="p">;</span> <span class="o">}</span>
+</pre></div>
+
+<p>That means that you do not need to change your <code>PATH</code> to accomodate it, and the only environment variable that site cares (deeply) about, is <code>PROFILE</code>.</p>
+
+<h1>
+<a name="philosophy" class="anchor" href="#philosophy"><span class="octicon octicon-link"></span></a>PHILOSOPHY</h1>
+
+<p>Instead of hardcoding tediously long and complex commands over and over again in various scripts and various places, implement them once, and implement them well.  That is all you need to do (as far as scripting habits go), and you can start using site (almost) seamlessly.</p>
+
+<p>All you have to do is to break up your scripts into small, single-purpose <em>functions</em>, and then group them contextually into <em>modules</em>.  Of course you don't have to break your scripts up at all, but if you want to reuse any part of that script, the this is the best way forward.</p>
+
+<h2>
+<a name="simplicity" class="anchor" href="#simplicity"><span class="octicon octicon-link"></span></a>Simplicity</h2>
+
+<p>Site is simple to use; and most UI concerns are automatically accounted for, simply as a result of you writing your code within the framework.</p>
+
+<p>For example, if you implement a function called <code>say:hello()</code> in <code>~/.site/profile/module/say</code>, you will get basic usage for free:</p>
+
+<pre><code>% site
+Using /bin/bash 4.2.37(1)-release (export SITE_SHELL to override)
+
+usage4nima@SITE01
+    site say:1/0; A module that greets the world
+    ...
+%
+</code></pre>
+
+<p>Now that we know of the <code>say</code> module:</p>
+
+<pre><code>% site say
+Using /bin/bash 4.2.37(1)-release (export SITE_SHELL to override)
+
+usage4nima@SITE01 say
+    site say hello {no-args}
+%
+</code></pre>
+
+<p>And now, that we know how to use it:</p>
+
+<pre><code>% site say hello
+Hello World!
+%
+</code></pre>
+
+<h2>
+<a name="verifiability" class="anchor" href="#verifiability"><span class="octicon octicon-link"></span></a>Verifiability</h2>
+
+<p>Scripts change over time, and so unit-testing is as relevant to systems scripts as it is to any piece of software.  Site comes with a flexible unit-testing module. This module reads everything it needs to know about every function test from a unit-testing configuration file, and warns you for functions that are missing unit-test data.</p>
+
+<pre><code>% site unit test
+</code></pre>
+
+<h2>
+<a name="security-measures" class="anchor" href="#security-measures"><span class="octicon octicon-link"></span></a>Security Measures</h2>
+
+<p>Site doesn't expect to be run as root; in fact it should <em>never</em> be run as root.  It will never <em>require</em> root access on your desktop machine - which is the only place it needs to be installed.</p>
+
+<p>It could however need root access when communicating tasks to remote hosts, and in that event it will resort to your <code>~/.secrets</code> file.</p>
+
+<p>All your passwords should be stored in <code>~/.secrets</code>, which is gnugp-encrypted with your user's public key; site will ask <code>gpg-agent</code> (or you) whenever it needs access to it.</p>
+
+<p>You can store any password you like in there, even remote host sudo passwords.</p>
+      </section>
+    </div>
+
+    
+  </body>
+</html>
