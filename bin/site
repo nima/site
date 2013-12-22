@@ -20,7 +20,7 @@ if [ $e -eq 0 ]; then
     : ${PROFILE?}
 
     if [ ${maj} -ge 4 -a ${min} -ge 0 ]; then
-        source ~/.site/etc/site.conf
+        source ~/.site/lib/libsite
         rm -f ${SITE_DEADMAN?}
         core:wrapper $@
         e=$?

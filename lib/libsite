@@ -1,5 +1,20 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
+export SITE_IN_COLOR=1
+
+declare -A CORE_MODULES=(
+    [help]=1
+    [hgd]=1
+    [remote]=1
+    [git]=1
+    [ng]=1
+    [dns]=1
+    [net]=1
+    [ldap]=1
+    [unit]=1
+    [util]=1
+)
+
 #. Site Engine -={
 #. 1.1  Paths -={
 : ${PROFILE?}
@@ -654,7 +669,7 @@ function :core:execute() {
 }
 
 function :core:git() {
-    local root=$(dirname $(readlink ~/.site/etc))
+    local root=$(dirname $(readlink ~/.site/module))
     cd ${root}
     git "$@"
     return $?
