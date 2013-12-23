@@ -14,7 +14,7 @@ flycatcher:
 	@echo "Do not run make here unless you know what you're doing."
 
 EXTERN := shflags shunit2 vimpager pyobjpath
-VENV_PKGS := softlayer paramiko
+VENV_PKGS := softlayer paramiko ipaddress
 
 #. Installation -={
 .PHONY: prepare install $(EXTERN:%=%.install)
@@ -69,6 +69,7 @@ venv:; ${VENV} -q --clear -p $(PY27) $@
 .PHONY: venv.uninstall
 #$(VENV_PKGS:%=%.venv.uninstall)
 
+#. venv/bin/activate && pip install hg+http://hg.secdev.org/scapy
 venv.install: venv $(VENV_PKGS:%=%.venv.install)
 %.venv.install:; . venv/bin/activate && pip install -q $(@:.venv.install=)
 

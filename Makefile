@@ -16,15 +16,36 @@ endif
 #. Usage -={
 .PHONY: help
 help:
+	@echo "Current status  : ${STATUS}"
+	@echo "Current profile : ${PROFILE}"
+	@echo
 	@echo "Usage:"
 	@echo "    $(MAKE) install"
 	@echo "    $(MAKE) uninstall"
-	@echo "Current status: ${STATUS}"
 #. }=-
 #. Installation -={
 .PHONY: install sanity
 sanity:; @test ! -f .install
-install: sanity .install; @echo "Installation complete!"
+install: sanity .install
+	@echo "Installation complete!"
+	@echo
+	@echo "You can now bootstrap your installation by setting up your profile:"
+	@echo "    cp share/examples/siterc.example ~/.siterc"
+	@echo "    mkdir -p profile/${PROFILE}/etc"
+	@echo "    cp share/examples/site.conf.example profile/${PROFILE}/etc"
+	@echo
+	@echo "Copy the template module..."
+	@echo "    mkdir -p profile/${PROFILE}/module"
+	@echo "    cp share/module/template profile/${PROFILE}/mymod"
+	@echo
+	@echo "Try out your new module..."
+	@echo "    site mymod"
+	@echo
+	@echo "Finally, commit your new profile to your own git repo:"
+	@echo "    cd profile/${PROFILE}/"
+	@echo "    git init"
+	@echo
+
 .install:
 	@mkdir -p $(HOME)/.site
 	@
@@ -33,8 +54,8 @@ install: sanity .install; @echo "Installation complete!"
 	ln -sf $(PWD)/lib $(HOME)/.site/lib
 	ln -sf $(PWD)/module $(HOME)/.site/module
 	ln -sf $(PWD)/libexec $(HOME)/.site/libexec
-	ln -sf $(PWD)/profile $(HOME)/.site/profile
 	ln -sf $(PWD)/share $(HOME)/.site/share
+	ln -sf $(PWD)/profile $(HOME)/.site/profile
 	@
 	mkdir -p $(HOME)/bin
 	ln -sf $(PWD)/bin/site $(HOME)/bin/site
@@ -63,13 +84,14 @@ uninstall: unsanity
 	-rm $(HOME)/bin/ssm
 	-rm $(HOME)/bin/ssp
 	@
-	-rm .install
+	@-rm .install
 	rmdir $(HOME)/.site
 	@
 	@echo "Uninstallation complete!"
 purge:
 	@$(MAKE) -C extern purge
-	find ~/.site -type l -exec rm -f {} \;
+	test ! -d ~/.site || find ~/.site -type l -exec rm -f {} \;
+	test ! -d ~/.site || find ~/.site -depth -type d -empty -exec rmdir {} \;
 	rm -f .install
 #. }=-
 
