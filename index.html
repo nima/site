@@ -82,7 +82,7 @@ git clone https://github.com/nima/site.git
 <li>
 <p>Set up yout new <code>PROFILE</code></p>
 
-<div class="highlight highlight-bash"><pre><span class="nb">export </span><span class="nv">PROFILE</span><span class="o">=</span>MYCOMPANY 
+<div class="highlight highlight-bash"><pre><span class="nb">export </span><span class="nv">PROFILE</span><span class="o">=</span>MYCOMPANY
 mkdir -p profile/<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span>/etc/
 mkdir -p profile/<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span>/module/
 cp share/examples/site.conf.eg profile/<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span>/etc/
@@ -106,6 +106,7 @@ cp share/examples/siterc.eg ~/.siterc
 <p>Here are the only files that will exist outside of <code>${SITE_SCM}</code> (where you cloned site to):</p>
 
 <ul>
+<li><code>~/bin/site</code></li>
 <li><code>~/.site/</code></li>
 <li><code>~/.siterc</code></li>
 <li><code>~/.secrets</code></li>
