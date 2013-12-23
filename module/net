@@ -173,7 +173,7 @@ function :net:portping() {
         local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
         local tld=${USER_TLDS[${tldid}]}
         if [ ${#ssh_proxy} -gt 0 ]; then
-            ssh ${SITE_USERNAME}@${ssh_proxy}\
+            ssh ${USER_USERNAME}@${ssh_proxy}\
                 nc -zw1 ${fqdn} ${port} >/dev/null 2>&1
             e=$?
         else

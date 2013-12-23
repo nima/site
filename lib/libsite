@@ -1,39 +1,34 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
-
-export SITE_IN_COLOR=1
-
-declare -A CORE_MODULES=(
-    [help]=1
-    [hgd]=1
-    [remote]=1
-    [git]=1
-    [ng]=1
-    [dns]=1
-    [net]=1
-    [ldap]=1
-    [unit]=1
-    [util]=1
-)
-
 #. Site Engine -={
-#. 1.1  Paths -={
+#. 1.1  Date/Time and Basics -={
+export NOW=$(date --utc +%s)
+#. FIXME: Mac OS X needs this instead:
+#. FIXME: export NOW=$(date -u +%s)
+
+export PS4=":\${BASH_SOURCE//\${SITE}/}:\${LINENO} -> "
+#. }=-
+#. 1.2  Paths -={
 : ${PROFILE?}
+export BASENAME=$(basename $0)
 export SITE=${HOME}/.site
+export SITE_CACHE=${SITE}/var/cache/
+export SITE_CORE=${SITE}/lib
 export SITE_SCM=$(dirname $(dirname $(readlink ~/bin/site)))
-export SITE_ETC=${SITE}/profile/${PROFILE?}/etc
-export SITE_MOD=${SITE}/profile/${PROFILE?}/module
-export SITE_MOD_CORE=${SITE}/module
-export SITE_LIB=${SITE}/profile/${PROFILE?}/lib
-export SITE_LIB_CORE=${SITE}/lib
-export SITE_CORE_LIBPY=${SITE}/lib/libpy
-export SITE_UNITDATA=${SITE}/share/unittest.csv
-export SITE_EXTERN=${SITE}/extern
+export SITE_ETC=${SITE}/etc
+export SITE_LOG=${SITE}/log/site.log
+export SITE_MOD=${SITE}/module
+export SITE_MOD_CORE=${SITE_CORE}/module
+export SITE_LIB_CORE=${SITE_CORE}/lib
+export SITE_CORE_LIBPY=${SITE_CORE}/lib/libpy
+export SITE_CORE_LIBJS=${SITE_CORE}/lib/libjs
+export SITE_UNITDATA=${SITE_CORE}/share/unittest.csv
+export SITE_EXTERN=${SITE_CORE}/extern
 export SITE_EXTERN_LIBSH=${SITE_EXTERN}/lib/libsh
 export SITE_EXTERN_LIBPY=${SITE_EXTERN}/lib/libpy
 export SITE_EXTERN_LIBRB=${SITE_EXTERN}/lib/librb
 
-export SITE_LIBEXEC=${SITE}/profile/${PROFILE?}/libexec
-export SITE_LIBEXEC_CORE=${SITE}/libexec
+export SITE_LIBEXEC=${SITE}/libexec
+export SITE_LIBEXEC_CORE=${SITE_CORE}/libexec
 export SITE_LIBEXEC_EXTERN=:${SITE_EXTERN}/libexec
 
 export PATH+=:${SITE_LIBEXEC}
@@ -42,23 +37,28 @@ export PATH+=:${SITE_LIBEXEC_EXTERN}
 
 export PYTHONPATH+=:${SITE_CORE_LIBPY}
 export PYTHONPATH+=:${SITE_EXTERN_LIBPY}
+export PYTHONPATH+=:${SITE_EXTERN_LIBPY}/pyobjpath
 #. }=-
-#. 1.2  Core Configuration -={
-unset  CDPATH
-export BASENAME=$(basename $0)
-source ${SITE_MOD_CORE?}/cpf
-[ ${#CORE_MODULES[@]} -gt 0 ] || : ${CORE_MODULES?}
-#. }=-
-#. 1.3  Date/Time -={
-export NOW=$(date --utc +%s)
-#. FIXME: Mac OS X needs this instead:
-#. FIXME: export NOW=$(date -u +%s)
-#. }=-
-#. 1.4  User/Profile Configuration -={
+#. 1.3  User/Profile Configuration -={
 declare -A USER_MODULES
+declare -A CORE_MODULES=(
+    [help]=1
+    [tutorial]=1
+    [hgd]=1
+    [remote]=1
+    [git]=1
+    [ng]=1
+    [dns]=1
+    [net]=1
+    [ldap]=1
+    [unit]=1
+    [mongo]=1
+    [util]=1
+)
 if [ -d ${SITE_ETC} ]; then
     unset USER_MODULES
     source ${SITE_ETC}/site.conf
+    source ~/.siterc
 #    [ ${#USER_MODULES[@]} -gt 0 ] || : ${USER_MODULES?}
 #    #. TODO: Move this to ldap module
     : ${USER_TLDS[@]?}
@@ -69,6 +69,13 @@ if [ -d ${SITE_ETC} ]; then
 else
     cpf "%{@warn:NOTE}: Your profile %{@profile:${PROFILE}} has not been initialized.\n"
 fi
+#. }=-
+#. 1.4  Core Configuration -={
+unset  CDPATH
+export SITE_DEADMAN=${SITE_CACHE}/deadman
+export SITE_IN_COLOR=1
+source ${SITE_MOD_CORE?}/cpf
+[ ${#CORE_MODULES[@]} -gt 0 ] || : ${CORE_MODULES?}
 #. }=-
 #. 1.5  ShUnit2 -={
 export SHUNIT2=$(which shunit2)
@@ -110,7 +117,43 @@ export SITE_DELIM=$(printf "\x07")
 
 CODE_DEFAULT=${CODE_USAGE_FN_LONG?}
 #. }=-
-#. 1.8  Modules -={
+#. 1.8  Logging -={
+declare -A SITE_LOG_NAMES=(
+    [EMERG]=0 [ALERT]=1 [CRIT]=2 [ERR]=3
+    [WARNING]=4 [NOTICE]=5 [INFO]=6 [DEBUG]=7
+)
+declare -A SITE_LOG_CODES=(
+    [0]=EMERG [1]=ALERT [2]=CRIT [3]=ERR
+    [4]=WARNING [5]=NOTICE [6]=INFO [7]=DEBUG
+)
+function core:log() {
+    local code=${1}
+    local -i level=0
+    case ${code} in
+        EMERG|ALERT|CRIT|ERR|WARNING|NOTICE|INFO|DEBUG)
+            level=${SITE_LOG_NAMES[${code}]}
+        ;;
+    esac
+
+    local -i fi=1
+    case ${FUNCNAME[1]} in
+        plogger|profiles)  fi=2;;
+    esac
+    local caller=${FUNCNAME[${fi}]}
+
+    if [ ${SITE_LOG_NAMES[${USER_LOG_LEVEL}]} -ge ${level} ]; then
+        shift 1
+        declare ts=$(date +"${SITE_DATE_FORMAT}")
+
+        declare msg=$(printf "%s; %5d; %8s[%24s];" "${ts}" "${$--1}" "${code}" "${caller}")
+        if [ -f ${SITE_LOG} ]; then
+            echo "${msg} $@" >> ${SITE_LOG}
+        fi
+        #printf "%s; %5d; %8s[%24s]; $@\n" "${ts}" "$$" "${code}" "$(sed -e 's/ /<-/g' <<< ${FUNCNAME[@]})" >> ${WMII_LOG}
+    fi
+}
+#. }=-
+#. 1.9  Modules -={
 declare -A SITE_IMPORTED
 function core:softimport() {
     local -i e=9
@@ -208,21 +251,33 @@ function core:requires() {
                 #. TODO: Check if ${caller} is a valid/plausible executable name
                 local caller_is_mod=$(( ${USER_MODULES[${caller/:*/}]-0} + ${CORE_MODULES[${caller/:*/}]-0} ))
                 if [ ${caller_is_mod} -ne 0 ]; then
-                    core:raise EXCEPTION_MISSING_EXEC $1
+                    #core:raise EXCEPTION_MISSING_EXEC $1
+                    e=${CODE_FAILURE}
                 fi
             fi
         ;;
         *:PERL)
             for required in ${@:2}; do
                 if ! perl -M${required} -e ';' 2>/dev/null; then
-                    core:raise EXCEPTION_MISSING_PERL_MOD ${required}
+                    #core:raise EXCEPTION_MISSING_PERL_MOD ${required}
+                    e=${CODE_FAILURE}
                 fi
             done
         ;;
         *:PYTHON)
             for required in ${@:2}; do
                 if ! python -c "import ${required}" 2>/dev/null; then
-                    core:raise EXCEPTION_MISSING_PYTHON_MOD ${required}
+                    #core:raise EXCEPTION_MISSING_PYTHON_MOD ${required}
+                    e=${CODE_FAILURE}
+                fi
+            done
+        ;;
+        *:ENV)
+            for required in ${@:2}; do
+                if [ -z "${!required}" ]; then
+                    e=${CODE_FAILURE}
+                    #core:raise EXCEPTION_MISSING_USER ${required}
+                    break
                 fi
             done
         ;;
@@ -231,7 +286,7 @@ function core:requires() {
             for required in ${@:2}; do
                 if ! :core:requires "${required}"; then
                     e=${CODE_FAILURE}
-                    core:raise EXCEPTION_MISSING_EXEC ${required}
+                    #core:raise EXCEPTION_MISSING_EXEC ${required}
                     break
                 fi
             done
@@ -244,22 +299,22 @@ function core:requires() {
                     break
                 fi
             done
-            if [ $e -ne ${CODE_SUCCESS} ]; then
-                core:raise EXCEPTION_MISSING_EXEC "${@:2}"
-            fi
+            #if [ $e -ne ${CODE_SUCCESS} ]; then
+            #    core:raise EXCEPTION_MISSING_EXEC "${@:2}"
+            #fi
         ;;
-        *) core:raise EXCEPTION_BAD_FN_CALL $*;;
+        *) core:raise EXCEPTION_BAD_FN_CALL "${@}";;
     esac
 
-    test $e -eq 0 && return $e || exit $e
+    return $e
+    #test $e -eq 0 && return $e || exit $e
 }
 #. }=-
-#. 1.9  Caching -={
+#. 1.10 Caching -={
 #. 0 means cache forever (default)
 #. >0 indeicates TTL in seconds
 declare -g g_CACHE_TTL=0
 
-SITE_CACHE=${HOME}/.cache/${BASENAME?}
 mkdir -p ${SITE_CACHE?}
 chmod 3770 ${SITE_CACHE?} 2>/dev/null
 
@@ -267,8 +322,8 @@ chmod 3770 ${SITE_CACHE?} 2>/dev/null
 declare g_CACHE_USED=${SITE_CACHE}/.cache_used
 rm -f ${g_CACHE_USED}
 
-CACHE_OUT='eval :core:cached "$*" && return ${CODE_SUCCESS}'
-CACHE_IN='eval :core:cache "$*"'
+CACHE_OUT='eval :core:cached "${*}" && return ${CODE_SUCCESS}'
+CACHE_IN='eval :core:cache "${*}"'
 CACHE_EXIT='eval return ${PIPESTATUS[0]}'
 :<<! USAGE:
 Any function (private or internal only, do not try and cache-enable public
@@ -331,17 +386,15 @@ function :core:cache:file() {
     if [ "$(type -t ${modfn}:cachefile)" == "function" ]; then
         #. File-Cached...
         shift 1
-        cachefile=$(${modfn}:cachefile $*)
+        cachefile=$(${modfn}:cachefile "${@}")
     else
         #. Output-Cached...
-        test -d ${SITE_CACHE}/cache || mkdir ${SITE_CACHE}/cache
-
         local effective_format=${g_FORMAT}
         if [[ $1 =~ ^: ]] && [ ${g_FORMAT} == "ansi" ]; then
             effective_format=text
         fi
 
-        cachefile=${SITE_CACHE}/cache/${1//:/=}
+        cachefile=${SITE_CACHE}/${1//:/=}
         cachefile+=+${g_TLDID}
         cachefile+=+${g_VERBOSE}
         cachefile+=+$(echo -ne "${2}"|md5sum|awk '{print$1}')
@@ -357,7 +410,7 @@ function :core:cache:file() {
 function :core:cache:age() {
     local -i e=${CODE_FAILURE}
 
-    local cachefile=$(:core:cache:file $*)
+    local cachefile=$(:core:cache:file "${@}")
 
     :core:age "${cachefile}"
     e=$?
@@ -373,8 +426,7 @@ function ::core:cache:cachetype() {
         local cachetype=file
 
         if [ "${cachefile:0:1}" == '/' ]; then
-            outputcached="${SITE_CACHE}/cache"
-            if [ "${cachefile//${outputcached}/}" != "${cachefile}" ]; then
+            if [ "${cachefile//${SITE_CACHE}/}" != "${cachefile}" ]; then
                 cachetype=output
             fi
             e=${CODE_SUCCESS}
@@ -404,7 +456,11 @@ function :core:cache() {
                     echo "$line" >> ${cachefile}
                 done
 
-                cat ${cachefile}
+                if [ -s ${cachefile} ]; then
+                    cat ${cachefile}
+                else
+                    rm -f ${cachefile}
+                fi
             ;;
             file)
                 : PASS
@@ -464,18 +520,15 @@ function :core:cached() {
     return $e
 }
 #. }=-
-#. 1.10 Deadman -={
-export SITE_DEADMAN=${SITE_CACHE}/deadman
-#. }=-
 #. 1.11 Execution -={
-: ${SITE_USERNAME:=$(whoami)}
+: ${USER_USERNAME:=$(whoami)}
 
 function ::core:execute:internal() {
     local module=$1
     local fn=$2
     shift 2
     #set -x
-    :${module}:${fn} ${*}
+    :${module}:${fn} "${@}"
     #set +x
     return $?
 }
@@ -485,7 +538,7 @@ function ::core:execute:private() {
     local fn=$2
     shift 2
     #set -x
-    ::${module}:${fn} ${*}
+    ::${module}:${fn} "${@}"
     #set +x
     return $?
 }
@@ -496,7 +549,7 @@ declare -i g_VERBOSE=0
 declare -i g_LDAPHOST=-1
 declare -i g_CACHED=0
 declare g_FORMAT=ansi
-declare g_TLDID='m' #XXX
+declare g_TLDID=${USER_TLD_DEFAULT:-.}
 declare g_DUMP
 
 function ::core:shflags() {
@@ -510,8 +563,8 @@ function ::core:shflags() {
     local fn=-
 
     local arg
-    for arg in $@; do
-        if [ ${arg:0:1} != '-' ]; then
+    for arg in "${@}"; do
+        if [ "${arg:0:1}" != '-' ]; then
             if [ "${module}" == "-" ]; then
                 module="${arg?}"
             elif [ "${fn}" == "-" ]; then
@@ -525,7 +578,7 @@ function ::core:shflags() {
             ((argc++))
         fi
     done
-    set -- ${argv[@]}
+    set -- "${argv[@]}"
 
     #. GLOBAL_OPTS 2/4: Our generic and global optiones
     DEFINE_boolean help     false            "<help>"                   H
@@ -555,14 +608,14 @@ declare -g fn=${fn:-}
     fi
 
     #. Process it all
-    FLAGS "$@" >/dev/null 2>&1
+    FLAGS "${@}" >/dev/null 2>&1
     if [ $? -eq 0 ]; then
         #. GLOBAL_OPTS 3/4:
         FLAGS_HELP="site ${module} ${fn} [<flags>]"
         #. Booleans get inverted:
-        g_HELP=!${FLAGS_help?}; unset FLAGS_help
-        g_VERBOSE=!${FLAGS_verbose?}; unset FLAGS_verbose
-        g_CACHED=!${FLAGS_cached?}; unset FLAGS_cached
+        let g_HELP=~${FLAGS_help?}+2; unset FLAGS_help
+        let g_VERBOSE=~${FLAGS_verbose?}+2; unset FLAGS_verbose
+        let g_CACHED=~${FLAGS_cached?}+2; unset FLAGS_cached
         #. Everything else is straight-forward:
         g_FORMAT=${FLAGS_format?}; unset FLAGS_format
         g_LDAPHOST=${FLAGS_ldaphost?}; unset FLAGS_ldaphost
@@ -583,7 +636,7 @@ set -- ${FLAGS_ARGV?}
         fi
     else
         cat <<!
-g_DUMP="$(FLAGS "$@" 2>&1|sed -e '1,2 d' -e 's/^/    /')"
+g_DUMP="$(FLAGS "${@}" 2>&1|sed -e '1,2 d' -e 's/^/    /')"
 !
     fi
 
@@ -609,13 +662,13 @@ function :core:execute() {
 
             if [ "$(type -t ${module}:${fn})" == "function" ]; then
                 case ${g_FORMAT} in
-                    dot|text|png)    SITE_IN_COLOR=0 ${module}:${fn} ${*};;
-                    html|email)      SITE_IN_COLOR=1 ${module}:${fn} ${*};;
+                    dot|text|png)    SITE_IN_COLOR=0 ${module}:${fn} "${@}";;
+                    html|email)      SITE_IN_COLOR=1 ${module}:${fn} "${@}";;
                     ansi)
                         if [ -t 1 ]; then
-                            SITE_IN_COLOR=1 ${module}:${fn} ${*}
+                            SITE_IN_COLOR=1 ${module}:${fn} "${@}"
                         else
-                            SITE_IN_COLOR=0 ${module}:${fn} ${*}
+                            SITE_IN_COLOR=0 ${module}:${fn} "${@}"
                         fi
                     ;;
                     *) core:raise EXCEPTION_SHOULD_NOT_GET_HERE "Format checks should have already taken place!";;
@@ -629,12 +682,12 @@ function :core:execute() {
                             set ${line}
                             local alert=$1
                             shift
-                            theme ${alert} "$*"
+                            theme ${alert} "${*}"
                         done < <(${module}:${fn}:alert)
                         cpf
                     fi
 
-                    if [ -f ${g_CACHE_USED} -a ${g_VERBOSE} -eq 1 ]; then
+                    if [ -f ${g_CACHE_USED?} -a ${g_VERBOSE?} -eq 1 ]; then
                         cpf
                         local age
                         local cachefile
@@ -746,7 +799,7 @@ function :core:usage() {
 
     if [ $# -eq 0 ]; then
         #. Usage for site
-        cpf "%{wh:usage}%{bl:4}%{@user:${SITE_USERNAME}}%{bl:@}%{g:${PROFILE}}\n"
+        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${PROFILE}}\n"
         for profile in USER_MODULES CORE_MODULES; do
             eval $(::core:eval:dereference profile) #. Will create ${profile} array
             for module in ${!profile[@]}; do (
@@ -765,7 +818,7 @@ function :core:usage() {
         done
     elif [ $# -eq 1 ]; then
         core:import ${module}
-        cpf "%{wh:usage}%{bl:4}%{@user:${SITE_USERNAME}}%{bl:@}%{g:${PROFILE}} %{!module:${module}}\n"
+        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${PROFILE}} %{!module:${module}}\n"
         local -a fns=( $(:core:functions public ${module}) )
         for fn in ${fns[@]}; do
             local usage_fn="${module}:${fn}:usage"
@@ -791,7 +844,7 @@ function :core:usage() {
         fi
         echo
     elif [ $# -ge 2 ]; then
-        cpf "%{wh:usage}%{bl:4}%{@user:${SITE_USERNAME}}%{bl:@}%{g:${PROFILE}} %{!function:${module}:${fn}}\n"
+        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${PROFILE}} %{!function:${module}:${fn}}\n"
         cpf "    %{bl:${BASENAME}} %{!function:${module}:${fn}} "
 
         local usage_s=${module}:${fn}:usage
@@ -850,17 +903,18 @@ function core:wrapper() {
 
     local setdata
     local -i e_shflags
-    setdata="$(::core:shflags $*)"
+    setdata="$(::core:shflags "${@}")"
     e_shflags=$?
     eval "${setdata}"
 
     local regex=':+[a-z0-9]+(:[a-z0-9]+) |*'
     core:softimport "${module?}"
+
     case $?/${module?}/${fn?} in
-        0/-/-)                                                                                   e=${CODE_USAGE_MODS} ;;
-        0/*/-)    :core:execute          ${module}            2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
-        0/*/::*) ::core:execute:private  ${module} ${fn:2} $* 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
-        0/*/:*)  ::core:execute:internal ${module} ${fn:1} $* 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
+        0/-/-)                                                                                       e=${CODE_USAGE_MODS} ;;
+        0/*/-)    :core:execute          ${module}                2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
+        0/*/::*) ::core:execute:private  ${module} ${fn:2} "${@}" 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
+        0/*/:*)  ::core:execute:internal ${module} ${fn:1} "${@}" 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
         0/*/*)
             local -a completed=( $(:core:complete ${module} ${fn}) )
 
@@ -875,13 +929,13 @@ function core:wrapper() {
                 fn=${completed}
                 if [ ${e_shflags} -eq ${CODE_SUCCESS} ]; then
                     if [ ${g_FORMAT?} == "email" ]; then
-                        :core:execute ${module} ${completed} $* 2>&1 |
+                        :core:execute ${module} ${completed} "${@}" 2>&1 |
                             grep --color -E "${regex}" |
                             ${SITE_LIBEXEC_CORE}/ansi2html |
-                            mail -a "Content-type: text/html" -s "Site Report [${module} ${completed} $*]" ${SITE_EMAIL}
+                            mail -a "Content-type: text/html" -s "Site Report [${module} ${completed} ${@}]" ${USER_EMAIL}
                             e=${PIPESTATUS[3]}
                     elif [ ${g_FORMAT?} == "html" ]; then
-                        :core:execute ${module} ${completed} $* 2>&1 |
+                        :core:execute ${module} ${completed} "${@}" 2>&1 |
                             grep --color -E "${regex}" |
                             ${SITE_LIBEXEC_CORE}/ansi2html
                             e=${PIPESTATUS[2]}
@@ -889,7 +943,7 @@ function core:wrapper() {
                         theme ERR_USAGE "That is not a supported format."
                         e=${CORE_FAILURE}
                     elif [ ${supported_formats[${g_FORMAT}]} -gt 0 ]; then
-                        :core:execute ${module} ${completed} $*
+                        :core:execute ${module} ${completed} "${@}"
                         e=$?
                     else
                         theme ERR_USAGE "This function does not support that format."
@@ -920,7 +974,7 @@ function core:wrapper() {
         ;;
         */*/*)
             e=${CODE_FAILURE}
-            core:raise EXCEPTION_BAD_FN_CALL "Check call/caller to/of \`core:softimport $*'"
+            core:raise EXCEPTION_BAD_FN_CALL "Check call/caller to/of \`core:softimport ${@}'"
         ;;
     esac
 
@@ -938,18 +992,22 @@ function core:wrapper() {
 #. 1.12 Exceptions -={
 EXCEPTION=63
 EXCEPTION_BAD_FN_CALL=64
-EXCEPTION_MISSING_EXEC=65
-EXCEPTION_BAD_MODULE=66
-EXCEPTION_DEPRECATED=67
-EXCEPTION_MISSING_PERL_MOD=68
-EXCEPTION_MISSING_PYTHON_MOD=69
-EXCEPTION_INVALID_FQDN=80
+EXCEPTION_BAD_FN_RETURN_CODE=65
+EXCEPTION_MISSING_EXEC=70
+EXCEPTION_BAD_MODULE=71
+EXCEPTION_DEPRECATED=72
+EXCEPTION_MISSING_PERL_MOD=80
+EXCEPTION_MISSING_PYTHON_MOD=81
+EXCEPTION_MISSING_USER=82
+EXCEPTION_INVALID_FQDN=90
 EXCEPTION_SHOULD_NOT_GET_HERE=125
 EXCEPTION_NOT_IMPLEMENTED=126
 EXCEPTION_UNHANDLED=127
 declare -A RAISE=(
     [${EXCEPTION_BAD_FN_CALL}]="Bad function call internally"
+    [${EXCEPTION_BAD_FN_RETURN_CODE}]="Bad function return code internally"
     [${EXCEPTION_MISSING_EXEC}]="Required executable not found"
+    [${EXCEPTION_MISSING_USER}]="Required user environment not set, or set to nil"
     [${EXCEPTION_BAD_MODULE}]="Bad module"
     [${EXCEPTION_DEPRECATED}]="Deprecated function call"
     [${EXCEPTION_MISSING_PERL_MOD}]="Required perl module missing"
@@ -957,37 +1015,40 @@ declare -A RAISE=(
     [${EXCEPTION_SHOULD_NOT_GET_HERE}]="Process flow should never get here"
 )
 function core:raise() {
+    : !!! CRITICAL FAILURE !!!
     touch ${SITE_DEADMAN?}
 
-    : !!! CRITICAL FAILURE !!!
-    sleep 3
     local -i e=$1
 
-    cpf "%{r}Exception[%{st:%s}]: %s ($*) %{N}\n" ${e} "${RAISE[$e]-[UNKNOWN EXCEPTION:$e]}" 1>&2
-
-    if [ ${#module} -gt 0 ]; then
-        if [ ${#fn} -gt 0 ]; then
-            cpf "Function %{c:${module}:${fn}()}" 1>&2
-            echo "Critical failure in function ${module}:${fn}()" >> ${SITE_DEADMAN?}
-        else
-            cpf "Module %{c:${module}}" 1>&2
-            echo "Critical failure in module ${module}" >> ${SITE_DEADMAN?}
-        fi
+    if [[ $- =~ x ]]; then
+        :!!! Exiting raise function early as we are being traced !!!
     else
-        cpf "File %{@path:$0}" 1>&2
-        echo "Critical failure in file ${0}" >> ${SITE_DEADMAN?}
-    fi
+        cpf "%{r}EXCEPTION%{+bo}[%s->%s]%{-bo}: %s%{N}:\n" "${e}" "$1" "${RAISE[$e]-[UNKNOWN EXCEPTION:$e]}" >&2
 
-    cpf " %{r:failed with exception} %{g:$e}; %{c:traceback}:\n" 1>&2
-    local i=0
-    local -i frames=${#BASH_LINENO[@]}
-    #. ((frames-2)): skips main, the last one in arrays
-    for ((i=frames-2; i>=0; i--)); do
-        cpf "  File %{g:${BASH_SOURCE[i+1]}}, line %{g:${BASH_LINENO[i]}}, in %{r:${FUNCNAME[i+1]}()}\n" 1>&2
-        # Grab the source code of the line
-        local code=$(sed -n "${BASH_LINENO[i]}{s/^ *//;p}" "${BASH_SOURCE[i+1]}")
-        cpf "    %{wh:>>>} %{c}${code}%{N}\n" 1>&2
-    done
+        if [ ${#module} -gt 0 ]; then
+            if [ ${#fn} -gt 0 ]; then
+                cpf "Function %{c:${module}:${fn}()}" 1>&2
+                echo "Critical failure in function ${module}:${fn}()" >> ${SITE_DEADMAN?}
+            else
+                cpf "Module %{c:${module}}" 1>&2
+                echo "Critical failure in module ${module}" >> ${SITE_DEADMAN?}
+            fi
+        else
+            cpf "File %{@path:$0}" 1>&2
+            echo "Critical failure in file ${0}" >> ${SITE_DEADMAN?}
+        fi
+
+        cpf " %{r:failed with exception} %{g:$e}; %{c:traceback}:\n" 1>&2
+        local i=0
+        local -i frames=${#BASH_LINENO[@]}
+        #. ((frames-2)): skips main, the last one in arrays
+        for ((i=frames-2; i>=0; i--)); do
+            cpf "  File %{g:${BASH_SOURCE[i+1]}}, line %{g:${BASH_LINENO[i]}}, in %{r:${FUNCNAME[i+1]}()}\n" 1>&2
+            # Grab the source code of the line
+            local code=$(sed -n "${BASH_LINENO[i]}{s/^ *//;p}" "${BASH_SOURCE[i+1]}")
+            cpf "    %{wh:>>>} %{c}${code}%{N}\n" 1>&2
+        done
+    fi
 
     exit $e
 }

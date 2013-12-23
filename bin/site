@@ -20,9 +20,10 @@ if [ $e -eq 0 ]; then
     : ${PROFILE?}
 
     if [ ${maj} -ge 4 -a ${min} -ge 0 ]; then
-        source ~/.site/lib/libsite
+        source ~/.site/lib/lib/libsite
         rm -f ${SITE_DEADMAN?}
-        core:wrapper $@
+
+        core:wrapper "$@"
         e=$?
     else
         e=1

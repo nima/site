@@ -38,11 +38,11 @@ function :remote:connect() {
 
                 local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
                 if [ ${#ssh_proxy} -eq 0 ]; then
-                    ssh ${ssh_opts} ${SITE_USERNAME}@${qdn} $*
+                    ssh ${ssh_opts} ${USER_USERNAME}@${qdn} $*
                     e=$?
                 else
-                    ssh ${ssh_opts} -o ProxyCommand="ssh ${SITE_USERNAME}@${ssh_proxy}\
-                        nc %h.${USER_TLDS[${tldid}]} 22" ${SITE_USERNAME}@${qdn} $*
+                    ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME}@${ssh_proxy}\
+                        nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME}@${qdn} $*
                     e=$?
                 fi
             else
@@ -140,10 +140,10 @@ function :remote:copy() {
         local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
         local scp_opts="${g_SSH_OPTS}"
         if [ ${#ssh_proxy} -eq 0 ]; then
-            scp ${scp_opts} ${SITE_USERNAME}@${qdn}:${src} ${dst}
+            scp ${scp_opts} ${USER_USERNAME}@${qdn}:${src} ${dst}
         else
-            scp ${scp_opts} -o ProxyCommand="ssh ${SITE_USERNAME}@${ssh_proxy}\
-                nc %h.${USER_TLDS[${tldid}]} 22" ${SITE_USERNAME}@${qdn}:${src} ${dst}
+            scp ${scp_opts} -o ProxyCommand="ssh ${USER_USERNAME}@${ssh_proxy}\
+                nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME}@${qdn}:${src} ${dst}
         fi
     fi
 
@@ -551,7 +551,7 @@ function remote:mon() {
     if [ $# -ge 2 ]; then
         local -i timeout=${FLAGS_timeout:-3}; unset FLAGS_timeout
         local -i threads=${FLAGS_threads:-64}; unset FLAGS_threads
-        local -i sudo=${FLAGS_sudo:-0}; ((sudo=!sudo)); unset FLAGS_sudo
+        local -i sudo=${FLAGS_sudo:-0}; ((sudo=~sudo+2)); unset FLAGS_sudo
 
         local -r hgd="$1"
         local tldid=${g_TLDID?}

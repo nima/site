@@ -3,11 +3,11 @@
 #. Set your PROFILE here:
 #PROFILE="SITE01"
 
-SITE_USERNAME="tyrion"
-SITE_FULLNAME="Tyrion Lannister"
-SITE_EMAIL="tyrion.lannister@lannister.casterlyrock.com"
-SITE_GPG_ID="0xBADB00B5"
-SITE_DIFF=$(which colordiff || which diff)
+USER_USERNAME="tyrion"
+USER_FULLNAME="Tyrion Lannister"
+USER_EMAIL="tyrion.lannister@lannister.casterlyrock.com"
+USER_GPG_ID="0xBADB00B5"
+USER_DIFF=$(which colordiff || which diff)
 
 #. Executable Overrides -={
 #. Override your BASH if it's old, on Mac OS X, get the GNU utilities via

@@ -57,6 +57,9 @@ install: sanity .install
 	ln -sf $(PWD)/share $(HOME)/.site/share
 	ln -sf $(PWD)/profile $(HOME)/.site/profile
 	@
+	@mkdir -p /var/tmp/site/
+	ln -sf /var/tmp/site/ $(HOME)/.site/log
+	@
 	mkdir -p $(HOME)/bin
 	ln -sf $(PWD)/bin/site $(HOME)/bin/site
 	ln -sf $(PWD)/bin/ssh $(HOME)/bin/ssm
@@ -77,9 +80,8 @@ uninstall: unsanity
 	-rm $(HOME)/.site/lib
 	-rm $(HOME)/.site/module
 	-rm $(HOME)/.site/libexec
-	-rm $(HOME)/.site/profile
-	-rm $(HOME)/.site/share
-	@
+	-rm $(HOME)/.site/var
+	-rm $(HOME)/.site/log
 	-rm $(HOME)/bin/site
 	-rm $(HOME)/bin/ssm
 	-rm $(HOME)/bin/ssp
@@ -92,6 +94,7 @@ purge:
 	@$(MAKE) -C extern purge
 	test ! -d ~/.site || find ~/.site -type l -exec rm -f {} \;
 	test ! -d ~/.site || find ~/.site -depth -type d -empty -exec rmdir {} \;
+	rm -rf /var/tmp/site/
 	rm -f .install
 #. }=-
 

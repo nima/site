@@ -1,5 +1,22 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
+declare -A CORE_MODULES=(
+    [help]=1
+    [tutorial]=1
+    [hgd]=1
+    [remote]=1
+    [git]=1
+    [ng]=1
+    [dns]=1
+    [net]=1
+    [ldap]=1
+    [unit]=1
+    [mongo]=1
+    [util]=1
+)
+
+declare -g -r USER_LOG_LEVEL=DEBUG
+
 declare -g -r -A USER_MODULES=(
     [mymod]=1
 )

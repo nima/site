@@ -4,15 +4,15 @@
 Core utilities module
 [core:docstring]
 
-: ${SITE_GPG_ID:=UNSET}
-g_GPG_KEY_PATH=${HOME}/.gnupg/${SITE_USERNAME}.${PROFILE}.${SITE_GPG_ID}
+: ${USER_GPG_ID:=UNSET}
+g_GPG_KEY_PATH=${HOME}/.gnupg/${USER_USERNAME}.${PROFILE}.${USER_GPG_ID}
 
 #. GPG -={
 function :util:gpgkeygen() {
     : ${PROFILE?}
-    : ${SITE_USERNAME?}
-    : ${SITE_FULLNAME?}
-    : ${SITE_EMAIL?}
+    : ${USER_USERNAME?}
+    : ${USER_FULLNAME?}
+    : ${USER_EMAIL?}
     core:requires gpg2
 
     local -i e=${CODE_FAILURE}
@@ -25,9 +25,9 @@ Key-Type: RSA
 Key-Length: 3072
 Subkey-Type: ELG-E
 Subkey-Length: 3072
-Name-Real: ${SITE_FULLNAME?}
-Name-Comment: ${SITE_USERNAME?} profile key generated via site
-Name-Email: ${SITE_EMAIL?}
+Name-Real: ${USER_FULLNAME?}
+Name-Comment: ${USER_USERNAME?} profile key generated via site
+Name-Email: ${USER_EMAIL?}
 Expire-Date: 0
 %ask-passphrase
 %pubring ${g_GPG_KEY_PATH}.pub
@@ -43,19 +43,19 @@ Expire-Date: 0
     gpg2 -q --batch --gen-key ${g_GPG_KEY_PATH}.conf 2>&1|sed -e '/^$/d' -e 's/^/   * /'
     if [ $? -eq 0 ]; then
         if [ -e ${g_GPG_KEY_PATH}.sec -a -e ${g_GPG_KEY_PATH}.pub ]; then
-            export SITE_GPG_ID=0x$(
+            export USER_GPG_ID=0x$(
                 gpg2 --no-default-keyring \
                     --secret-keyring ${g_GPG_KEY_PATH}.sec\
                     --keyring ${g_GPG_KEY_PATH}.pub\
                     --list-secret-keys | awk -F '[ /]+' '$1~/^sec/{print$3}'
             )
-            export g_GPG_KEY_PATH=${HOME}/.gnupg/${SITE_USERNAME}.${PROFILE}.${SITE_GPG_ID}
+            export g_GPG_KEY_PATH=${HOME}/.gnupg/${USER_USERNAME}.${PROFILE}.${USER_GPG_ID}
             mv ${tmp_GPG_KEY_PATH}.sec ${g_GPG_KEY_PATH}.sec
             mv ${tmp_GPG_KEY_PATH}.pub ${g_GPG_KEY_PATH}.pub
             if gpg -q --batch --import ${g_GPG_KEY_PATH}.sec; then
                 if gpg -q --batch --import ${g_GPG_KEY_PATH}.pub; then
                     e=${CODE_SUCCESS}
-                    cpf "   * Now set %{@code:SITE_GPG_ID=\"${SITE_GPG_ID}\"} in %{@path:~/.siterc}\n"
+                    cpf "   * Now set %{@code:USER_GPG_ID=\"${USER_GPG_ID}\"} in %{@path:~/.siterc}\n"
                 fi
             fi
         fi
@@ -69,8 +69,8 @@ Expire-Date: 0
 function util:gpg:usage() { echo "info|create | delete <gpg-key>"; }
 function util:gpg() {
     : ${PROFILE?}
-    : ${SITE_USERNAME?}
-    : ${SITE_EMAIL?}
+    : ${USER_USERNAME?}
+    : ${USER_EMAIL?}
     core:requires gpg2
 
     local -i e=${CODE_DEFAULT}
@@ -78,7 +78,7 @@ function util:gpg() {
     case $#:$1 in
         1:info)
             cpf "Examining %{@path:${g_GPG_KEY_PATH}}..."
-            if [ "${SITE_GPG_ID}" != "UNSET" ]; then
+            if [ "${USER_GPG_ID}" != "UNSET" ]; then
                 if [ -e ${g_GPG_KEY_PATH}.sec -a -e ${g_GPG_KEY_PATH}.pub ]; then
                     gpg2 --no-default-keyring \
                         --secret-keyring ${g_GPG_KEY_PATH}.sec\
@@ -102,8 +102,8 @@ function util:gpg() {
         ;;
 
         1:create)
-            if [ ${SITE_GPG_ID} == "UNSET" ]; then
-                cpf "#. Generating an RSA/ELG-E GPG key for you (%{@user:%s}@%{@profile:%s}) %{r:%s}\n" "${SITE_USERNAME}" "${PROFILE}" "-=["
+            if [ ${USER_GPG_ID} == "UNSET" ]; then
+                cpf "#. Generating an RSA/ELG-E GPG key for you (%{@user:%s}@%{@profile:%s}) %{r:%s}\n" "${USER_USERNAME}" "${PROFILE}" "-=["
                 if :util:gpgkeygen; then
                     cpf "#. %{r:%s} GPG Key Generation..." "]=-"
                     theme HAS_PASSED "${g_GPG_KEY_PATH}.*"
@@ -138,8 +138,8 @@ function util:gpg() {
             echo gpg -q --batch --yes --delete-key ${gpgkid}
 
             cpf "%{@comment:%s}\n" "#. Then the files...\n"
-            echo rm -f ${HOME}/.gnupg/${SITE_USERNAME}.${PROFILE}.${gpgkid}.pub
-            echo rm -f ${HOME}/.gnupg/${SITE_USERNAME}.${PROFILE}.${gpgkid}.sec
+            echo rm -f ${HOME}/.gnupg/${USER_USERNAME}.${PROFILE}.${gpgkid}.pub
+            echo rm -f ${HOME}/.gnupg/${USER_USERNAME}.${PROFILE}.${gpgkid}.sec
 
             e=${CODE_SUCCESS}
         ;;
@@ -193,12 +193,12 @@ function util:secrets() {
     core:requires gpg
 
     cpf "Checking your GPG id..."
-    if [ "${SITE_GPG_ID}" != "UNSET" ]; then
-        theme HAS_PASSED ${SITE_GPG_ID}
+    if [ "${USER_GPG_ID}" != "UNSET" ]; then
+        theme HAS_PASSED ${USER_GPG_ID}
 
         if [ ! -f ${g_VAULT} ]; then
             cpf "Generating blank secrets file..."
-            echo "XXX" | gpg -q --batch --use-agent -r ${SITE_GPG_ID} -e -a -o ${g_VAULT}
+            echo "XXX" | gpg -q --batch --use-agent -r ${USER_GPG_ID} -e -a -o ${g_VAULT}
             theme HAS_PASSED ${g_VAULT}
         fi
 
@@ -212,7 +212,7 @@ function util:secrets() {
                         cpf "Decrypting secrets..."
                         mkdir -p $(dirname ${g_VAULT_TMP})
                         chmod 700 $(dirname ${g_VAULT_TMP})
-                        gpg -q --batch --use-agent -d --default-key ${SITE_GPG_ID} -o ${g_VAULT_TMP} ${g_VAULT}
+                        gpg -q --batch --use-agent -d --default-key ${USER_GPG_ID} -o ${g_VAULT_TMP} ${g_VAULT}
                         e=$?
                         if [ $e -eq 0 ]; then
                             theme HAS_PASSED
@@ -222,7 +222,7 @@ function util:secrets() {
                                 cpf "Encrypting secrets..."
                                 #draw ${g_VAULT_TMP}
                                 mv ${g_VAULT} ${g_VAULT_BACKUP}
-                                gpg -q --batch --use-agent -r ${SITE_GPG_ID} -e -a -o ${g_VAULT} ${g_VAULT_TMP}
+                                gpg -q --batch --use-agent -r ${USER_GPG_ID} -e -a -o ${g_VAULT} ${g_VAULT_TMP}
                                 e=$?
                                 if [ $e -eq 0 ]; then
                                     theme HAS_PASSED
@@ -269,7 +269,7 @@ function util:secrets() {
             esac
         fi
     else
-        theme HAS_FAILED "SITE_GPG_ID_UNDEFINED"
+        theme HAS_FAILED "USER_GPG_ID_UNDEFINED"
         e=${CODE_FAILURE}
     fi
 
