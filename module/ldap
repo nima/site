@@ -10,6 +10,15 @@ g_MAXDATA=20380119031407Z
 core:import dns
 core:import util
 
+core:requires ENV USER_GDN
+core:requires ENV USER_LDAPHOSTS
+core:requires ENV USER_LDAPHOSTS_RW
+core:requires ENV USER_LDAP_SYNC_ATTRS
+core:requires ENV USER_NDN
+core:requires ENV USER_REGEX
+core:requires ENV USER_UDN
+core:requires ENV USER_USERNAME
+
 function :ldap:host() {
     #. <arguments> = -1:
     #.    Returns a random LDAP host from the pool
@@ -122,7 +131,7 @@ function :ldap:authenticate() {
 #. 19  - LDAP_CONSTRAINT_VIOLATION
 #. 20  - LDAP_TYPE_OR_VALUE_EXISTS
 
-function ldap:mkldif:usage() { echo "add|modify|replace|delete user|group <username>/<groupname> <attr1> <val1> [<val2> [...]] [- <attr2> ...]"; }
+function ldap:mkldif:usage() { echo "add|modify|replace|delete user|group|netgroup <name> <attr1> <val1> [<val2> [...]] [- <attr2> ...]"; }
 function ldap:mkldif() {
     local -i e=${CODE_DEFAULT}
 
@@ -150,55 +159,49 @@ function ::ldap:mkldif() {
             [replace]=modify
             [delete]=modify
         )
-        local change=${changes[${action}]}
 
+        local change=${changes[${action}]}
+        local dn
         case $context in
             user)
                 local username=$3
-                echo "# vim:syntax=ldif"
-                echo "dn: uid=${username},${USER_UDN}"
-                echo "changetype: ${change}"
-
-                local attr=
-                for ((i=4; i<$#+1; i++)); do
-                    if [ "${!i}" != "-" -a ${#attr} -gt 0 ]; then
-                        printf "\n${attr}: ${!i}";
-                    else
-                        if [ ${#attr} -gt 0 ]; then
-                            printf "\n-\n"
-                            ((i++))
-                        fi
-                        attr=${!i}
-                        printf "${action}: ${attr}"
-                    fi
-                done;
-                printf "\n "
+                dn="uid=${username},${USER_UDN}"
                 e=${CODE_SUCCESS}
             ;;
             group)
                 local groupname=$3
-                echo "# vim:syntax=ldif"
-                echo "dn: cn=${groupname},${USER_GDN}"
-                echo "changetype: ${change}"
-
-                local attr=
-                for ((i=4; i<$#+1; i++)); do
-                    if [ "${!i}" != "-" -a ${#attr} -gt 0 ]; then
-                        printf "\n${attr}: ${!i}";
-                    else
-                        if [ ${#attr} -gt 0 ]; then
-                            printf "\n-\n"
-                            ((i++))
-                        fi
-                        attr=${!i}
-                        printf "${action}: ${attr}"
-                    fi
-                done;
-                printf "\n "
+                dn="cn=${groupname},${USER_GDN}"
                 e=${CODE_SUCCESS}
             ;;
-            *) core:raise EXCEPTION_BAD_FN_CALL;;
+            netgroup)
+                local netgroupname=$3
+                dn="cn=${netgroupname},${USER_NDN}"
+                e=${CODE_SUCCESS}
+            ;;
         esac
+
+        if [ $e -eq ${CODE_SUCCESS} ]; then
+            echo "# vim:syntax=ldif"
+            echo "dn: ${dn}"
+            echo "changetype: ${change}"
+            local attr=
+            for ((i=4; i<$#+1; i++)); do
+                if [ "${!i}" != "-" -a ${#attr} -gt 0 ]; then
+                    printf "\n${attr}: ${!i}";
+                else
+                    if [ ${#attr} -gt 0 ]; then
+                        printf "\n-\n"
+                        ((i++))
+                    fi
+                    attr=${!i}
+                    printf "${action}: ${attr}"
+                fi
+            done
+            printf "\n"
+        else
+            core:raise EXCEPTION_BAD_FN_CALL
+        fi
+
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
