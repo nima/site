@@ -1,0 +1,48 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+core:import util
+core:requires mongo
+
+:<<[core:docstring]
+The module interfaces mongodb
+[core:docstring]
+
+function :mongo:query() {
+    local -i e=${CODE_ERROR?}
+
+    if [ $# -gt 1 ]; then
+        local db=$1
+        shift 1
+
+        local -a filters
+        local -a display
+        for kvp in $@; do
+            if [[ ${kvp} =~ [^=]+=.+ ]]; then
+                filters+=( "${kvp//=*}: ${kvp##*=}" )
+            else
+                display+=( "${kvp}" )
+            fi
+        done
+
+        if [ ${#display[@]} -gt 0 ]; then
+            #"load(\"${SITE_CORE_LIBJS}/mongo/helper.js\")"
+            local -a jseval=(
+                "var filters = { $(:util:join ', ' filters) }"
+            )
+
+            mongo --quiet --eval "$(:util:join ';' jseval)"\
+                ${db} ${SITE_CORE_LIBJS}/mongo/host.js |
+                jsontool -a ${display[@]}
+
+            e=${CODE_SUCCESS}
+
+        else
+            core:raise EXCEPTION_BAD_FN_CALL "At least one display field to be supplied"
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL "$# arguments given, >1 expected"
+    fi
+
+    return $e
+}
+
