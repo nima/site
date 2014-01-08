@@ -4,6 +4,7 @@ Core HGD (Host-Group Directive) module
 [core:docstring]
 
 core:import util
+core:import mongo
 
 declare -g g_HGD_CACHE=${SITE_CACHE}/hgd.conf
 
@@ -52,6 +53,13 @@ function ::hgd:explode() {
                 else
                     e=${CODE_FAILURE}
                 fi
+            ;;
+            '%')
+                local -a hosts
+                IFS=% read -a filters <<< "${hgdn}"
+                hosts=( $(:mongo:query ${PROFILE//@*} qdn ${filters[@]}) )
+                echo ${hosts[@]}
+                [ $? -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
             ;;
             '#')
                 if [ "${hgdn//[^\/]/}" == "/" ]; then
