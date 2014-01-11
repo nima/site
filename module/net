@@ -165,19 +165,27 @@ function :net:firsthost() {
 #. PortPing -={
 function :net:portping() {
     core:requires nc
+    core:requires socat
 
     local -i e=${CODE_FAILURE}
-    if [ $# -eq 2 ]; then
+    if [ $# -eq 2 -o $# -eq 3 ]; then
         local fqdn=$1
         local port=$2
-        local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
-        local tld=${USER_TLDS[${tldid}]}
-        if [ ${#ssh_proxy} -gt 0 ]; then
-            ssh ${USER_USERNAME}@${ssh_proxy}\
-                nc -zw1 ${fqdn} ${port} >/dev/null 2>&1
-            e=$?
+        local tldid=$3
+        cmd="nc -zqw1 ${fqdn} ${port}"
+        cmd="socat -u /dev/null TCP:${fqdn}:${port},connect-timeout=1"
+        if [ ${#tldid} -gt 0 ]; then
+            local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
+            local tld=${USER_TLDS[${tldid}]}
+            if [ ${#ssh_proxy} -gt 0 ]; then
+                ssh ${USER_USERNAME}@${ssh_proxy} ${cmd} >/dev/null 2>&1
+                e=$?
+            else
+                eval ${cmd} >/dev/null 2>&1
+                e=$?
+            fi
         else
-            nc -zqw1 ${fqdn} ${port}
+            eval ${cmd} >/dev/null 2>&1
             e=$?
         fi
     else
@@ -199,20 +207,24 @@ function net:portping() {
 
         local fqdn
         local tldid
-        tldid=$(:dns:qualified ${hnh})
-        if [ $? -ne ${CODE_SUCCESS} ]; then
-            tldid=${g_TLDID}
-            fqdn=$(:dns:fqdn ${tldid} ${hnh})
+        if [ "${hnh:$((${#hnh}-1))}" != '.' ]; then
+            tldid=$(:dns:qualified ${hnh})
             if [ $? -ne ${CODE_SUCCESS} ]; then
-                theme HAS_FAILED "INVALID_FQDN"
-                e=${CODE_FAILURE}
+                tldid=${g_TLDID}
+                fqdn=$(:dns:fqdn ${tldid} ${hnh})
+                if [ $? -ne ${CODE_SUCCESS} ]; then
+                    theme HAS_FAILED "INVALID_FQDN"
+                    e=${CODE_FAILURE}
+                fi
+            else
+                fqdn=${hnh}
             fi
         else
             fqdn=${hnh}
         fi
 
         if [ $e -ne ${CODE_FAILURE} ]; then
-            if :net:portping ${fqdn} ${port}; then
+            if :net:portping ${fqdn} ${port} ${tldid}; then
                 theme HAS_PASSED "CONNECTED"
                 e=${CODE_SUCCESS}
             else
