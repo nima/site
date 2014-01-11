@@ -228,7 +228,6 @@ function dns:sd() {
     return $e
 }
 
-
 function dns:lookup:usage() { echo "<hosthint>"; }
 function dns:lookup() {
     local -i e=${CODE_DEFAULT?}
@@ -261,48 +260,52 @@ function dns:cname:usage() { echo "-T|--tldid <tldid> <netgroup> <cname-subdomai
 function dns:cname() {
     local -i e=${CODE_DEFAULT?}
 
-    core:import ng
+    core:softimport ng
+    if [ $? -eq 0 ]; then
+        local tldid=${g_TLDID}
+        if [ $# -eq 2 -a ${#tldid} -gt 0 ]; then
+            local ng=$1
+            local cnamesd=${2}
+            local hosts_in_ng
+            hosts_in_ng="$(:ng:hosts ${tldid} ${ng} )"
+            if [ $? -eq 0 ]; then
+                local -a hosts=( $(sed -e 's/\([^\.]\+\)\..*/\1/' <<< "$hosts_in_ng") )
+                local cnamea=
+                local host record tldid query sdn answer
+                if [ ${#hosts[@]} -gt 0 ]; then
+                    for host in ${hosts[@]}; do
+                        read record tldid query sdn answer <<< "$(:dns:lookup p a ${host})"
+                        if [ $? -eq 0 ]; then
+                            ip="${answer}"
 
-    local tldid=${g_TLDID}
-    if [ $# -eq 2 -a ${#tldid} -gt 0 ]; then
-        local ng=$1
-        local cnamesd=${2}
-        local hosts_in_ng
-        hosts_in_ng="$(:ng:hosts ${tldid} ${ng} )"
-        if [ $? -eq 0 ]; then
-            local -a hosts=( $(sed -e 's/\([^\.]\+\)\..*/\1/' <<< "$hosts_in_ng") )
-            local cnamea=
-            local host record tldid query sdn answer
-            if [ ${#hosts[@]} -gt 0 ]; then
-                for host in ${hosts[@]}; do
-                    read record tldid query sdn answer <<< "$(:dns:lookup p a ${host})"
-                    if [ $? -eq 0 ]; then
-                        ip="${answer}"
+                            cname="${host}.${cnamesd}.${USER_TLD}"
+                            cnamea=$(dig +short ${cname}|head -n1)
+                            cnameip=$(dig +short ${cnamea}|tail -n1)
+                            cnamea=${cnamea//.${USER_TLD}./}
 
-                        cname="${host}.${cnamesd}.${USER_TLD}"
-                        cnamea=$(dig +short ${cname}|head -n1)
-                        cnameip=$(dig +short ${cnamea}|tail -n1)
-                        cnamea=${cnamea//.${USER_TLD}./}
-
-                        cpf "%{@host:%-24s} %{@host:%-24s} %{@ip:%-16s}" ${host}.${cnamesd} ${cnamea} ${cnameip}
-                        if [[ ${cnamea} =~ ^${host}\..* ]]; then
-                            theme HAS_PASSED
+                            cpf "%{@host:%-24s} %{@host:%-24s} %{@ip:%-16s}" ${host}.${cnamesd} ${cnamea} ${cnameip}
+                            if [[ ${cnamea} =~ ^${host}\..* ]]; then
+                                theme HAS_PASSED
+                            else
+                                e=${CODE_FAILURE}
+                                theme HAS_FAILED
+                            fi
                         else
                             e=${CODE_FAILURE}
                             theme HAS_FAILED
                         fi
-                    else
-                        e=${CODE_FAILURE}
-                        theme HAS_FAILED
-                    fi
-                done
+                    done
+                else
+                    e=${CODE_FAILURE}
+                fi
             else
                 e=${CODE_FAILURE}
+                theme HAS_FAILED
             fi
-        else
-            e=${CODE_FAILURE}
-            theme HAS_FAILED
         fi
+    else
+        e=${CODE_FAILURE}
+        core:log ERROR "Failed to load the netgroup module \`ng'."
     fi
 
     return $e
