@@ -389,8 +389,9 @@ function cpf() {
             fi
         else
             echo "CPF Failure: mismatched arguments for given format string ( ${substitutions} in fmtstr, ${#args[@]} arguments supplied )" > /dev/stderr
-            echo "Formatstr: \`${fmt}'" > /dev/stderr
-            echo "Arguments: \`${args[@]}'" > /dev/stderr
+            echo "Formatstr: \`${fmtstr}'" > /dev/stderr
+            echo "Arguments:" > /dev/stderr
+            printf " * \`%s'\n" "${args[@]}" > /dev/stderr
             #exit 99
         fi
     else
