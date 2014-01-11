@@ -140,6 +140,7 @@ function theme() {
             DEPR)                fmt="%{y}WARN";  dvc=/dev/stderr;;
             ERR)                 fmt="%{r}ERROR"; dvc=/dev/stderr;;
             ERR_USAGE)           fmt="%{r}USAGE ERROR"; dvc=/dev/stderr;;
+            EXCEPTION)           fmt="%{r}EXCEPTION"; dvc=/dev/stderr;;
 
             TODO)                fmt="%{y}TODO"; dvc=/dev/stderr;;
             FIXME)               fmt="%{r}FIXME"; dvc=/dev/stderr;;
