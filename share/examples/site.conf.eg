@@ -21,14 +21,27 @@ declare -g -r -A USER_MODULES=(
     [mymod]=1
 )
 
-declare -g -r    USER_TLD_DEFAULT=m
+#. Let's say our hosts have 2 interfaces in general:
+#. Public, which we will call `p', and management which we will call `m':
 declare -g -r -a USER_TLDS_REQUIRED=( p m )
+#. We also define which interface is on subnet:
+declare -g -r -A USER_IFACE=(
+    [p]=eth0
+    [m]=eth1
+)
+#. When unspecified on the commandline, we will default to the mgmt subnet:
+declare -g -r    USER_TLD_DEFAULT=m
+#. Now we declare the TLD for these subnets:
 declare -g -r -A USER_TLDS=(
     [p]='public.com'
     [m]='mgmt'
 )
-
-declare -g -r -A USER_IFACE=(
-    [p]=eth0
-    [m]=eth1
+#. Finally, for each TLD, we define the list of possible subdomain for any
+#. given host:
+declare -g -r -a USER_SUBDOMAIN_m=(
+    networks
+    systems
+)
+declare -g -r -a USER_SUBDOMAIN_p=(
+    products
 )

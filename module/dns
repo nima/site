@@ -355,11 +355,12 @@ function :dns:subdomains() {
 
     if [ $# -eq 1 ]; then
         local tldid=$1
-        local fN=${SITE_ETC}/subdom-${tldid}.conf
-        if [ -r ${fN} ]; then
-            cat ${fN} && e=${CODE_SUCCESS}
+        local -a sdns=( $(eval "echo \${USER_SUBDOMAIN_${tldid}[@]}") )
+        if [ ${#sdns[@]} -gt 0 ]; then
+            echo ${sdns[@]}
+            e=${CODE_SUCCESS}
         else
-            core:raise EXCEPTION_BAD_FN_CALL "No input file found for TLDID"
+            core:log WARNING "No subnets defined for tldid \`${tldid}'"
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -387,14 +388,12 @@ function dns:subdomains() {
 
     local tldid=${g_TLDID?}
     if [ $# -eq 0 -a ${#tldid} -gt 0 ]; then
-        local fN=${SITE_ETC}/subdom-${tldid}.conf
-        local tld=${USER_TLDS[${tldid}]}
-        if [ -f ${fN} ]; then
-            :dns:subdomains ${tldid} | column -t
-        else
-            theme HAS_FAILED "Missing \`${tldid}' subdomain configuration file"
+        local data
+        data="$(:dns:subdomains ${tldid})"
+        e=$?
+        if [ $e -eq ${CODE_SUCCESS} ]; then
+            echo "${data}" | column -t
         fi
-        return $?
     fi
 
     return $e
