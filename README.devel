@@ -10,6 +10,7 @@ TERMS & JARGONS
 <qdn>       <shn>.<sdn>
 <fqdn>      <shn>.<sdn>.<tld>
 <hnh>       hostname hint; either a <shn>, or a <qdn>
+<sdh>       subdomain hint
 <lhi>       ldap-host index
 
 ### Variable Scope
