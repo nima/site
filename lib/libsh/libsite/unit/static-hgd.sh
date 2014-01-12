@@ -1,18 +1,85 @@
-#. Unit-testing static functions -={
-function testCoreHgdDeletePublic() {
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+function testCoreHgdSavePublic() { return 0; }
+function testCoreHgdListPublic() { return 0; }
+function testCoreHgdRenamePublic() { return 0; }
+function testCoreHgdDeletePublic() { return 0; }
+function testCoreHgdMultiPublic() {
     core:softimport hgd
-    local session=testCoreHgdDeletePublic
-    if assertEquals t1 0 $?; then
-        :hgd:save . ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
-        if assertEquals t2 0 $?; then
-            grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
-            if assertEquals t3 0 $?; then
-                hgd:delete ${session} >${stdoutF?} 2>${stderrF?}
-                grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
-                assertNotEquals t4 0 $?
-            fi
-        fi
-    fi
+    assertEquals 'core:softimport hgd' 0 $?
+
+    local session=${FUNCNAME}
+    core:wrapper hgd save -T. ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:save.0' $?
+    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    assertTrue 'hgd:save.1' $?
+
+    core:wrapper hgd list ${session} >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:list.0' $?
+    assertEquals 'hgd:list.1' $(cat ${stdoutF?}|wc -l) 1
+
+    core:wrapper hgd rename ${session} ${session}Renamed >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:renamed.0' $?
+    grep -qE "\<${session}Renamed\>" ${SITE_CACHE}/hgd.conf
+    assertTrue 'hgd:renamed.1' $?
+    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    assertFalse 'hgd:renamed.2' $?
+    core:wrapper hgd rename ${session}Renamed ${session} >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:renamed.3' $?
+
+    core:wrapper hgd list ${session}Renamed >${stdoutF?} 2>${stderrF?}
+    assertFalse 'hgd:list.2' $?
+    core:wrapper hgd list ${session} >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:list.3' $?
+    assertEquals 'hgd:list.4' $(cat ${stdoutF?}|wc -l) 1
+
+    core:wrapper hgd delete ${session} >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:delete.0' $?
+    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    assertFalse 'hgd:delete.1' $?
+    core:wrapper hgd delete ${session} >${stdoutF?} 2>${stderrF?}
+    assertFalse 'hgd:delete.2' $?
+}
+
+function testCoreHgdSaveInternal() { return 0; }
+function testCoreHgdListInternal() { return 0; }
+function testCoreHgdRenameInternal() { return 0; }
+function testCoreHgdDeleteInternal() { return 0; }
+function testCoreHgdMultiInternal() {
+    core:softimport hgd
+    assertEquals 'core:softimport hgd' 0 $?
+
+    local session=${FUNCNAME}
+    :hgd:save . ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:save.0' $?
+    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    assertTrue 'hgd:save.1' $?
+
+    :hgd:list ${session} >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:list.0' $?
+    assertEquals 'hgd:list.1' $(cat ${stdoutF?}|wc -l) 1
+
+    :hgd:rename ${session} ${session}Renamed >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:renamed.0' $?
+    grep -qE "\<${session}Renamed\>" ${SITE_CACHE}/hgd.conf
+    assertTrue 'hgd:renamed.1' $?
+    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    assertFalse 'hgd:renamed.2' $?
+    :hgd:rename ${session}Renamed ${session} >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:renamed.3' $?
+
+    :hgd:list ${session}Renamed >${stdoutF?} 2>${stderrF?}
+    assertFalse 'hgd:list.2' $?
+    :hgd:list ${session} >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:list.3' $?
+    assertEquals 'hgd:list.4' $(cat ${stdoutF?}|wc -l) 1
+
+    :hgd:delete ${session} >${stdoutF?} 2>${stderrF?}
+    assertTrue 'hgd:delete.0' $?
+    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    assertFalse 'hgd:delete.1' $?
+    :hgd:delete ${session} >${stdoutF?} 2>${stderrF?}
+    assertFalse 'hgd:delete.2' $?
 }
 
 function testPySetsAND() {
@@ -64,4 +131,3 @@ fff
         assertEquals "aaa bbb eee fff ccc ddd" "$(cat ${stdoutF})"
     fi
 }
-#. }=-
