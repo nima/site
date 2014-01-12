@@ -112,11 +112,15 @@ Hello World!
 ```
 
 ## Verifiability
+### Unit Testing Framework
 Scripts change over time, and so unit-testing is as relevant to systems scripts as it is to any piece of software.  Site comes with a flexible unit-testing module. This module reads everything it needs to know about every function test from a unit-testing configuration file, and warns you for functions that are missing unit-test data.
 
 ```
 % site unit test
 ```
+
+### Bash Traceback
+That's right, we have a traceback so you can debug your scripts (site user modules).  Of course bash doesn't provide such functionality natively, so we had to be creative.
 
 ## Security Measures
 Site doesn't expect to be run as root; in fact it should _never_ be run as root.  It will never _require_ root access on your desktop machine - which is the only place it needs to be installed.
