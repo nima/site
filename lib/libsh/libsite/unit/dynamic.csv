@@ -3,10 +3,20 @@
 #core|git
 #core|cpf
 #core|unit
-#core|hgd|resolve|internal||(#10.1.2.3/29)|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
-#core|hgd|resolve|private||(#10.1.2.3/29)|53c0006ef9e5cda4111db1851c960e6e||0
-#core|hgd|resolve|public||#10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
-#core|hgd|explode|private||#10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
+
+#. HGD (Host Group Directives)
+core|hgd|resolve|private||. &(#10.1.2.3/29)|53c0006ef9e5cda4111db1851c960e6e||0
+core|hgd|explode|private||. #10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
+core|hgd|resolve|internal||. &(#10.1.2.3/29)|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
+core|hgd|resolve|public||#10.1.2.3/29|8671846114c5b462c507ccd428776565||0
+core|hgd|save|public||-T. ut-hgd-save #10.1.2.3/29|||0
+core|hgd|save|internal||. ut-hgd-save #10.1.2.3/29|||0
+core|hgd|load|public||-T. ut-hgd-save|||0
+core|hgd|load|internal||. ut-hgd-save|||0
+core|hgd|refresh|public||ut-hgd-save|||0
+core|hgd|refresh|internal||. ut-hgd-save|||0
+core|hgd|list|public||ut-hgd-save|^ut-hgd-save||0
+
 core|net|b2nm|internal||33|||1
 core|net|b2hm|internal||33|||1
 core|net|b2nm|internal||32|0xffffffff||0
@@ -24,27 +34,21 @@ core|net|s2h|internal||255.0.255.0|0xff00ff00||0
 core|net|i2s|internal||lo|127.0.0.1||0
 core|net|hosts|internal||10.1.2.3/29|10.1.2.1 10.1.2.2 10.1.2.3 10.1.2.4 10.1.2.5 10.1.2.6||0
 core|net|firsthost|internal||10.1.3.3/23|10.1.2.1||0
-core|net|portping|internal||um-dir-s1.unix.mgmt.det 22|||0
-core|net|portping|public||um-dir-s1.unix.mgmt.det 22|||0
-core|net|portping|public||um-dir-s1 22|||0
-core|net|portping|public||um-dir-s1 23|||1
+core|net|portping|internal||google-public-dns-a.google.com. 53|||0
+core|net|portping|public||google-public-dns-a.google.com. 53|||0
+core|net|portping|public||google-public-dns-a.google.com. 53|||0
+core|net|portping|public||google-public-dns-a.google.com. 12345|||1
 core|ldap|ngldif|public||foo|||1
 core|ldap|mkldif|public||add user freddy/fatass balls one-medium one-large - shlong high-girth very-short|||0
 core|ldap|mkldif|private||add user freddy/fatass balls one-medium one-large - shlong high-girth very-short|55d303f117d5e1b7b4772b4a36aa3c3e||0
 #core|ldap|modify|internal
 #core|ldap|modify|private
-core|dns|fqdn|public||-T p um-rhn-s1|um-rhn-s1.corpdev.det.nsw.edu.au||0
-core|dns|fqdn|internal||p um-rhn-s1|um-rhn-s1.corpdev.det.nsw.edu.au||0
-core|dns|fqdn|internal||m um-rhn-s1|um-rhn-s1.unix.mgmt.det||0
-core|dns|qdn|public||-T p um-rhn-s1|||0
-core|dns|qdn|internal||p um-rhn-s1|um-rhn-s1.corpdev||0
-core|dns|qdn|internal||m um-rhn-s1|um-rhn-s1.unix||0
 core|dns|lookup|public||notahost|||1
 core|dns|cname|public||-T p @notahost notadomain|||1
-core|dns|ptr|public||&(#127.0.0.1)|||0
-core|dns|subdomains|public||-T p|||0
+#core|dns|ptr|public||&(#127.0.0.1)|||0
+#core|dns|subdomains|public||-T p|||0
 core|dns|subdomains|internal||p|||0
-core|dns|tldids|public|||fe8f1ce743e355dd68c348838137be3b||0
+#core|dns|tldids|public|||fe8f1ce743e355dd68c348838137be3b||0
 #core|util|timeout|public
 core|util|date:i2s|internal||1369369079|20130524041759||0
 core|util|date:s2i|internal||20131230235959|1388447999||0
