@@ -131,7 +131,7 @@ function :net:hosts() {
             ip=$(printf "0x%x" $(( ( ipx & nm ) + ${i})))
             :net:h2s ${ip}
             e=$?
-        done | xargs
+        done
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
