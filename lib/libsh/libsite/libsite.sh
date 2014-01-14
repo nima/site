@@ -5,47 +5,54 @@ export NOW=$(date --utc +%s)
 #. FIXME: Mac OS X needs this instead:
 #. FIXME: export NOW=$(date -u +%s)
 
-export PS4=":\${BASH_SOURCE//\${SITE}/}:\${LINENO} -> "
+export PS4=":\${BASH_SOURCE//\${SITE_USER}/}:\${LINENO} -> "
 #. }=-
 #. 1.2  Paths -={
-: ${PROFILE?}
-export BASENAME=$(basename $0)
-export SITE=${HOME}/.site
-export SITE_CACHE=${SITE}/var/cache/
-export SITE_CORE=${SITE}/lib
-export SITE_SCM=$(dirname $(dirname $(readlink ~/bin/site)))
-export SITE_ETC=${SITE}/etc
-export SITE_LOG=${SITE}/log/site.log
-export SITE_MOD=${SITE}/module
-export SITE_MOD_CORE=${SITE_CORE}/module
-export SITE_LIB_CORE=${SITE_CORE}/lib
+: ${SITE_PROFILE?}
+export SITE_SITE_BASENAME=$(basename $0)
+
+export SITE_CORE=$(dirname $(dirname $(readlink ~/bin/site)))
+export SITE_CORE_MOD=${SITE_CORE}/module
+export SITE_CORE_LIBEXEC=${SITE_CORE}/libexec
+export SITE_CORE_BIN=${SITE_CORE}/bin
+export SITE_CORE_LIB=${SITE_CORE}/lib
 export SITE_CORE_LIBPY=${SITE_CORE}/lib/libpy
 export SITE_CORE_LIBJS=${SITE_CORE}/lib/libjs
 export SITE_CORE_LIBSH=${SITE_CORE}/lib/libsh
-export SITE_UNIT_DYNAMIC=${SITE_CORE_LIBSH}/libsite/unit/dynamic.csv
+export SITE_CORE_EXTERN=${SITE_CORE}/extern
+export SITE_CORE_EXTERN_LIBSH=${SITE_CORE_EXTERN}/lib/libsh
+export SITE_CORE_EXTERN_LIBPY=${SITE_CORE_EXTERN}/lib/libpy
+export SITE_CORE_EXTERN_LIBRB=${SITE_CORE_EXTERN}/lib/librb
+export SITE_CORE_EXTERN_LIBEXEC=${SITE_CORE_EXTERN}/libexec
 export SITE_UNIT_STATIC=${SITE_CORE_LIBSH}/libsite/unit/static.sh
-export SITE_EXTERN=${SITE_CORE}/extern
-export SITE_EXTERN_LIBSH=${SITE_EXTERN}/lib/libsh
-export SITE_EXTERN_LIBPY=${SITE_EXTERN}/lib/libpy
-export SITE_EXTERN_LIBRB=${SITE_EXTERN}/lib/librb
+export SITE_UNIT_DYNAMIC=${SITE_CORE_LIBSH}/libsite/unit/dynamic.csv
 
-export SITE_LIBEXEC=${SITE}/libexec
-export SITE_LIBEXEC_CORE=${SITE_CORE}/libexec
-export SITE_LIBEXEC_EXTERN=:${SITE_EXTERN}/libexec
+export SITE_USER=${HOME}/.site
+export SITE_USER_CACHE=${SITE_USER}/var/cache/
+export SITE_USER_ETC=${SITE_USER}/etc
+export SITE_USER_LOG=${SITE_USER}/log/site.log
+export SITE_USER_MOD=${SITE_USER}/module
+export SITE_USER_LIBEXEC=${SITE_USER}/libexec
+export SITE_USER_EXTERN=${SITE_USER}/extern
+export SITE_USER_EXTERN_LIBEXEC=:${SITE_USER_EXTERN}/libexec
 
-export PATH+=:${SITE_LIBEXEC}
-export PATH+=:${SITE_LIBEXEC_CORE}
-export PATH+=:${SITE_LIBEXEC_EXTERN}
+export PATH+=:${SITE_CORE_LIBEXEC}
+export PATH+=:${SITE_USER_LIBEXEC}
+export PATH+=:${SITE_CORE_EXTERN_LIBEXEC}
+export PATH+=:${SITE_USER_EXTERN_LIBEXEC}
 
 export PYTHONPATH+=:${SITE_CORE_LIBPY}
-export PYTHONPATH+=:${SITE_EXTERN_LIBPY}
-export PYTHONPATH+=:${SITE_EXTERN_LIBPY}/pyobjpath
+export PYTHONPATH+=:${SITE_CORE_EXTERN_LIBPY}
+export PYTHONPATH+=:${SITE_CORE_EXTERN_LIBPY}/pyobjpath
 #. }=-
 #. 1.3  User/Profile Configuration -={
 declare -A USER_MODULES
+export USER_MODULES
+
 declare -A CORE_MODULES=(
     [help]=1
     [tutorial]=1
+    [softlayer]=1
     [hgd]=1
     [remote]=1
     [git]=1
@@ -58,33 +65,37 @@ declare -A CORE_MODULES=(
     [util]=1
     [gpg]=1
 )
-if [ -d ${SITE_ETC} ]; then
-    unset USER_MODULES
-    source ${SITE_ETC}/site.conf
-    source ~/.siterc
-#    [ ${#USER_MODULES[@]} -gt 0 ] || : ${USER_MODULES?}
-#    #. TODO: Move this to ldap module
-    : ${USER_TLDS[@]?}
-    : ${USER_TLD_DEFAULT?}
-#    : ${USER_UDN?}
-#    : ${USER_GDN?}
-#    : ${USER_NDN?}
-else
-    cpf "%{@warn:NOTE}: Your profile %{@profile:${PROFILE}} has not been initialized.\n"
-fi
+export CORE_MODULES
+
+source ${SITE_USER_ETC}/site.conf
+test ! -f ~/.siterc || source ~/.siterc
+: ${USER_TLDS[@]?}
+: ${USER_FULLNAME?}
+: ${USER_USERNAME?}
+: ${USER_EMAIL?}
+
+#. GLOBAL_OPTS 1/4:
+declare -i g_HELP=0
+declare -i g_VERBOSE=0
+declare -i g_LDAPHOST=-1
+declare -i g_CACHED=0
+declare g_FORMAT=ansi
+declare g_DUMP
+
+declare g_TLDID=${USER_TLDID_DEFAULT:-.}
 #. }=-
 #. 1.4  Core Configuration -={
 unset  CDPATH
-export SITE_DEADMAN=${SITE_CACHE}/deadman
+export SITE_DEADMAN=${SITE_USER_CACHE}/deadman
 export SITE_IN_COLOR=1
-source ${SITE_MOD_CORE?}/cpf
+source ${SITE_CORE_MOD?}/cpf
 [ ${#CORE_MODULES[@]} -gt 0 ] || : ${CORE_MODULES?}
 #. }=-
 #. 1.5  ShUnit2 -={
 export SHUNIT2=$(which shunit2)
 #. }=-
 #. 1.6  ShFlags -={
-export SHFLAGS=${SITE_EXTERN_LIBSH}/shflags
+export SHFLAGS=${SITE_CORE_EXTERN_LIBSH}/shflags
 source ${SHFLAGS?}
 #. }=-
 #. 1.7  Error Code Constants -={
@@ -149,8 +160,8 @@ function core:log() {
         declare ts=$(date +"${SITE_DATE_FORMAT}")
 
         declare msg=$(printf "%s; %5d; %8s[%24s];" "${ts}" "${$--1}" "${code}" "${caller}")
-        if [ -f ${SITE_LOG} ]; then
-            echo "${msg} $@" >> ${SITE_LOG}
+        if [ -f ${SITE_USER_LOG} ]; then
+            echo "${msg} $@" >> ${SITE_USER_LOG}
         fi
         #printf "%s; %5d; %8s[%24s]; $@\n" "${ts}" "$$" "${code}" "$(sed -e 's/ /<-/g' <<< ${FUNCNAME[@]})" >> ${WMII_LOG}
     fi
@@ -166,15 +177,15 @@ function core:softimport() {
         if [ -z "${SITE_IMPORTED[${module}]}" ]; then
             e=2 #. No such module
             if [ ${USER_MODULES[${module}]-9} -eq 1 ]; then
-                if [ -f ${SITE_MOD}/${module} ]; then
+                if [ -f ${SITE_USER_MOD}/${module} ]; then
                     SITE_IMPORTED[${module}]=0
-                    source ${SITE_MOD}/${module}
+                    source ${SITE_USER_MOD}/${module}
                     e=$?
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
-                if [ -f ${SITE_MOD_CORE}/${module} ]; then
+                if [ -f ${SITE_CORE_MOD}/${module} ]; then
                     SITE_IMPORTED[${module}]=0
-                    source ${SITE_MOD_CORE}/${module}
+                    source ${SITE_CORE_MOD}/${module}
                     e=$?
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 0 -o ${USER_MODULES[${module}]-9} -eq 0 ]; then
@@ -197,13 +208,13 @@ function core:docstring() {
 
         e=2 #. No such module
         if [ ${USER_MODULES[${module}]-9} -eq 1 ]; then
-            if [ -f ${SITE_MOD}/${module} ]; then
-                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_MOD}/${module}
+            if [ -f ${SITE_USER_MOD}/${module} ]; then
+                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_USER_MOD}/${module}
                 e=$?
             fi
         elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
-            if [ -f ${SITE_MOD_CORE}/${module} ]; then
-                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_MOD_CORE}/${module}
+            if [ -f ${SITE_CORE_MOD}/${module} ]; then
+                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_CORE_MOD}/${module}
                 e=$?
             fi
         elif [ ${CORE_MODULES[${module}]-9} -eq 0 -o ${USER_MODULES[${module}]-9} -eq 0 ]; then
@@ -318,11 +329,11 @@ function core:requires() {
 #. >0 indeicates TTL in seconds
 declare -g g_CACHE_TTL=0
 
-mkdir -p ${SITE_CACHE?}
-chmod 3770 ${SITE_CACHE?} 2>/dev/null
+mkdir -p ${SITE_USER_CACHE?}
+chmod 3770 ${SITE_USER_CACHE?} 2>/dev/null
 
 #. Keep track if cache was used globally
-declare g_CACHE_USED=${SITE_CACHE}/.cache_used
+declare g_CACHE_USED=${SITE_USER_CACHE}/.cache_used
 rm -f ${g_CACHE_USED}
 
 CACHE_OUT='eval :core:cached "${*}" && return ${CODE_SUCCESS}'
@@ -397,7 +408,7 @@ function :core:cache:file() {
             effective_format=text
         fi
 
-        cachefile=${SITE_CACHE}/${1//:/=}
+        cachefile=${SITE_USER_CACHE}/${1//:/=}
         cachefile+=+${g_TLDID}
         cachefile+=+${g_VERBOSE}
         cachefile+=+$(echo -ne "${2}"|md5sum|awk '{print$1}')
@@ -429,7 +440,7 @@ function ::core:cache:cachetype() {
         local cachetype=file
 
         if [ "${cachefile:0:1}" == '/' ]; then
-            if [ "${cachefile//${SITE_CACHE}/}" != "${cachefile}" ]; then
+            if [ "${cachefile//${SITE_USER_CACHE}/}" != "${cachefile}" ]; then
                 cachetype=output
             fi
             e=${CODE_SUCCESS}
@@ -545,15 +556,6 @@ function ::core:execute:private() {
     #set +x
     return $?
 }
-
-#. GLOBAL_OPTS 1/4:
-declare -i g_HELP=0
-declare -i g_VERBOSE=0
-declare -i g_LDAPHOST=-1
-declare -i g_CACHED=0
-declare g_FORMAT=ansi
-declare g_TLDID=${USER_TLD_DEFAULT:-.}
-declare g_DUMP
 
 function ::core:shflags() {
     local -i e=${CODE_FAILURE}
@@ -680,7 +682,7 @@ function :core:execute() {
 
                 if [ ${SITE_IN_COLOR} -eq 1 ]; then
                     if [ "$(type -t ${module}:${fn}:alert)" == "function" ]; then
-                        cpf "%{r:ALERTS}%{bl:@}%{g:${PROFILE}} %{!function:${module} ${fn}}:\n"
+                        cpf "%{r:ALERTS}%{bl:@}%{g:${SITE_PROFILE}} %{!function:${module} ${fn}}:\n"
                         while read line; do
                             set ${line}
                             local alert=$1
@@ -802,7 +804,7 @@ function :core:usage() {
 
     if [ $# -eq 0 ]; then
         #. Usage for site
-        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${PROFILE}}\n"
+        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${SITE_PROFILE}}\n"
         for profile in USER_MODULES CORE_MODULES; do
             eval $(::core:eval:dereference profile) #. Will create ${profile} array
             for module in ${!profile[@]}; do (
@@ -811,34 +813,34 @@ function :core:usage() {
                 local -a fn_private=( $(:core:functions private ${module}) )
                 if [ ${#fn_public[@]} -gt 0 ]; then
                     local docstring=$(core:docstring ${module})
-                    cpf "    %{bl:${BASENAME}} %{!module:${module}}:%{@int:%s}/%{@int:%s}%{@comment:%s}\n"\
+                    cpf "    %{bl:${SITE_BASENAME}} %{!module:${module}}:%{@int:%s}/%{@int:%s}%{@comment:%s}\n"\
                         "${#fn_public[@]}" "${#fn_private[@]}" "${docstring:+; ${docstring}}"
                 else
-                    cpf "!   %{bl:${BASENAME}} %{!module:${module}}:%{@int:%s}/%{@int:%s}%{@comment:%s}\n"\
+                    cpf "!   %{bl:${SITE_BASENAME}} %{!module:${module}}:%{@int:%s}/%{@int:%s}%{@comment:%s}\n"\
                         "${#fn_public[@]}" "${#fn_private[@]}" "${docstring:+; ${docstring}}"
                 fi
             ); done
         done
     elif [ $# -eq 1 ]; then
         core:import ${module}
-        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${PROFILE}} %{!module:${module}}\n"
+        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${SITE_PROFILE}} %{!module:${module}}\n"
         local -a fns=( $(:core:functions public ${module}) )
         for fn in ${fns[@]}; do
             local usage_fn="${module}:${fn}:usage"
             local usagestr="{no-args}"
             if [ "$(type -t ${usage_fn})" == "function" ]; then
                 usagestr="$(${usage_fn})"
-                cpf "    %{bl:${BASENAME}} %{!function:${module}:${fn}} %{c:%s}\n" "${usagestr}"
+                cpf "    %{bl:${SITE_BASENAME}} %{!function:${module}:${fn}} %{c:%s}\n" "${usagestr}"
             else
-                cpf "    %{bl:${BASENAME}} %{!function:${module}:${fn}} %{bl:%s}\n" "${usagestr}"
+                cpf "    %{bl:${SITE_BASENAME}} %{!function:${module}:${fn}} %{bl:%s}\n" "${usagestr}"
             fi
         done
 
         if [ ${g_VERBOSE?} -eq 1 -a ${#FUNCNAME[@]} -lt 4 ]; then
             cpf "\n%{!module:${module}} %{g:changelog}\n"
-            local modfile=${SITE_MOD}/${module}
-            [ -f ${modfile} ] || modfile=${SITE_MOD_CORE}/${module}
-            cd ${SITE_SCM}
+            local modfile=${SITE_USER_MOD}/${module}
+            [ -f ${modfile} ] || modfile=${SITE_CORE_MOD}/${module}
+            cd ${SITE_CORE}
             :core:git --no-pager\
                 log --follow --all --format=format:'    |___%C(bold blue)%h%C(reset) %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(bold white)— %an%C(reset)%C(bold yellow)%d%C(reset)'\
                 --abbrev-commit --date=relative -- "${modfile}"
@@ -847,8 +849,8 @@ function :core:usage() {
         fi
         echo
     elif [ $# -ge 2 ]; then
-        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${PROFILE}} %{!function:${module}:${fn}}\n"
-        cpf "    %{bl:${BASENAME}} %{!function:${module}:${fn}} "
+        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${SITE_PROFILE}} %{!function:${module}:${fn}}\n"
+        cpf "    %{bl:${SITE_BASENAME}} %{!function:${module}:${fn}} "
 
         local usage_s=${module}:${fn}:usage
         if [ "$(type -t $usage_s)" == "function" ]; then
@@ -934,13 +936,13 @@ function core:wrapper() {
                     if [ ${g_FORMAT?} == "email" ]; then
                         :core:execute ${module} ${completed} "${@}" 2>&1 |
                             grep --color -E "${regex}" |
-                            ${SITE_LIBEXEC_CORE}/ansi2html |
+                            ${SITE_CORE_LIBEXEC}/ansi2html |
                             mail -a "Content-type: text/html" -s "Site Report [${module} ${completed} ${@}]" ${USER_EMAIL}
                             e=${PIPESTATUS[3]}
                     elif [ ${g_FORMAT?} == "html" ]; then
                         :core:execute ${module} ${completed} "${@}" 2>&1 |
                             grep --color -E "${regex}" |
-                            ${SITE_LIBEXEC_CORE}/ansi2html
+                            ${SITE_CORE_LIBEXEC}/ansi2html
                             e=${PIPESTATUS[2]}
                     elif [ -z "${supported_formats[${g_FORMAT}]}" ]; then
                         theme ERR_USAGE "That is not a supported format."
@@ -958,7 +960,7 @@ function core:wrapper() {
             elif [ ${#completed[@]} -gt 1 ]; then
                 theme ERR_USAGE "Did you mean one of the following:"
                 for acfn in ${completed[@]}; do
-                    echo "    ${BASENAME} ${module} ${acfn}"
+                    echo "    ${SITE_BASENAME} ${module} ${acfn}"
                 done
                 e=${CODE_USAGE_FN_GUESS}
             else

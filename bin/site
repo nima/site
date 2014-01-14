@@ -17,10 +17,10 @@ fi
 if [ $e -eq 0 ]; then
     maj=${BASH_VERSINFO[0]}
     min=${BASH_VERSINFO[1]}
-    : ${PROFILE?}
+    : ${SITE_PROFILE?}
 
     if [ ${maj} -ge 4 -a ${min} -ge 0 ]; then
-        source ~/.site/lib/lib/libsite
+        source ~/.site/lib/libsh/libsite/libsite.sh
         rm -f ${SITE_DEADMAN?}
 
         core:wrapper "$@"

@@ -149,7 +149,7 @@ function ${utf}Dyn${i}() {
         [ ${auto_exitcode} -eq 0 ] && cpf "%{g:0}" || cpf "%{r:${auto_exitcode}}"
     cpf " %{r:]=-}"
 
-    if [ -z "${auto_site}" -o "${auto_site}" == "${PROFILE}" ]; then
+    if [ -z "${auto_site}" -o "${auto_site}" == "${SITE_PROFILE}" ]; then
         cpf
         core:softimport ${auto_module}
         if assertEquals "import ${auto_module}" ${CODE_SUCCESS} \$?; then
@@ -271,8 +271,8 @@ function ::unit:prime() {
     [ $# -ne 0 ] || valid=1
 
     local -A profiles=(
-        [core]=${SITE_MOD_CORE}
-        [${PROFILE}]=${SITE_MOD}
+        [core]=${SITE_CORE_MOD}
+        [${SITE_PROFILE}]=${SITE_USER_MOD}
     )
     for profile in ${!profiles[@]}; do
         if [ -d ${profiles[${profile}]} ]; then
@@ -285,7 +285,7 @@ function ::unit:prime() {
                         export g_RUNTIME_CWD=${profiles[${profile}]}
                         export g_RUNTIME_PROFILE=${profile}
                         export g_RUNTIME_MODULE=${module}
-                        export g_RUNTIME_SCRIPT=${SITE_CACHE?}/unittest-${module}.sh
+                        export g_RUNTIME_SCRIPT=${SITE_USER_CACHE?}/unittest-${module}.sh
 
                         cat <<!SCRIPT > ${g_RUNTIME_SCRIPT}
 #!/bin/bash
@@ -299,7 +299,7 @@ function ::unit:prime() {
                             cat "${script}" > ${g_RUNTIME_SCRIPT}
                         fi
                         source ${g_RUNTIME_SCRIPT}
-                        SHUNIT_PARENT="${SITE_MOD_CORE}/unit" source ${SHUNIT2}
+                        SHUNIT_PARENT="${SITE_CORE_MOD}/unit" source ${SHUNIT2}
                     )
                     e=$?
                     if [ ${e} -eq 0 ]; then
@@ -310,7 +310,7 @@ function ::unit:prime() {
                     cpf "%{r:]=-}\n"
 
                     cpf "%{@comment:${profile}.${module}.DYNAMIC} %{r:-=[}\n";
-                    script=${SITE_CACHE?}/unittest-${module}.sh
+                    script=${SITE_USER_CACHE?}/unittest-${module}.sh
                     if [ -r "${script}" ]; then
                         (
                             export g_RUNTIME_SCRIPT="${script}"

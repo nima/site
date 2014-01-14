@@ -6,7 +6,7 @@ Core HGD (Host-Group Directive) module
 core:import util
 core:import mongo
 
-declare -g g_HGD_CACHE=${SITE_CACHE}/hgd.conf
+declare -g g_HGD_CACHE=${SITE_USER_CACHE}/hgd.conf
 
 #. HGD -={
 #. HGD Resolvers -={
@@ -58,7 +58,7 @@ function ::hgd:explode() {
                 local -a filters
                 IFS=% read -a filters <<< "${hgdn}"
                 local -a hosts
-                :mongo:query ${PROFILE//@*} qdn ${filters[@]}
+                :mongo:query ${SITE_PROFILE//@*} qdn ${filters[@]}
                 [ $? -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
             ;;
             '#')
@@ -116,7 +116,7 @@ function ::hgd:resolve() {
         local tldid=$1
         local eq="$2"
         local buf
-        buf=$(${SITE_LIBEXEC_CORE}/sets "${eq}")
+        buf=$(sets "${eq}")
         if [ $? -eq 0 ]; then
             e=${CODE_SUCCESS}
             read -a hgds <<< "${buf}"
@@ -156,7 +156,7 @@ function :hgd:resolve() {
             local buffer
             buffer="$(::hgd:resolve ${tldid} ${eq})"
             if [ $? -eq ${CODE_SUCCESS} -a -n "${buffer}" ]; then
-                echo -e "${buffer}" | ${SITE_LIBEXEC_CORE}/sets "$eq"
+                echo -e "${buffer}" | sets "$eq"
                 e=$?
             else
                 e=${CODE_FAILURE}

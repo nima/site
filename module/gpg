@@ -8,7 +8,7 @@ core:import util
 
 core:requires gpg2
 
-core:requires ENV PROFILE%%@*
+core:requires ENV SITE_PROFILE%%@*
 core:requires ENV USER_USERNAME
 core:requires ENV USER_EMAIL
 
@@ -25,7 +25,7 @@ function ::gpg:keypath() {
     if [ $# -eq 1 ]; then
         local -a data
         local gpgkid="${1}"
-        local -r gpgkp="${HOME}/.gnupg/${USER_USERNAME}.${PROFILE%%@*}"
+        local -r gpgkp="${HOME}/.gnupg/${USER_USERNAME}.${SITE_PROFILE%%@*}"
         case ${gpgkid}:${#gpgkid} in
             '.':1)
                 data=( ${gpgkp} )
@@ -33,11 +33,11 @@ function ::gpg:keypath() {
             ;;
             '*':1)
                 local -a files=( ${gpgkp}.* )
-                if ! [[ ${files[0]} =~ ${PROFILE%%@*}\.\*$ ]]; then
+                if ! [[ ${files[0]} =~ ${SITE_PROFILE%%@*}\.\*$ ]]; then
                     for file in ${files[@]}; do
                         gpgkid=$(
                             basename ${file} |
-                                sed -n -e "s/${USER_USERNAME}.${PROFILE%%@*}.\(.*\).sec/\1/p"
+                                sed -n -e "s/${USER_USERNAME}.${SITE_PROFILE%%@*}.\(.*\).sec/\1/p"
                         )
                         if [ ${#gpgkid} -eq 10 ]; then
                             data=( $(::gpg:keypath ${gpgkid}) )
@@ -176,7 +176,7 @@ function gpg:create() {
         gpgkp=( $(::gpg:keypath '*') )
         e=$?
         if [ ${#gpgkp[@]} -eq 0 ]; then
-            cpf "Generating an RSA/ELG-E GPG key for (%{@user:%s}@%{@profile:%s}) %{r:%s}\n" "${USER_USERNAME}" "${PROFILE%%@*}" "-=["
+            cpf "Generating an RSA/ELG-E GPG key for (%{@user:%s}@%{@profile:%s}) %{r:%s}\n" "${USER_USERNAME}" "${SITE_PROFILE%%@*}" "-=["
             if :gpg:create; then
                 cpf " * %{r:%s} GPG Key Generation..." "]=-"
                 theme HAS_PASSED "${gpgkp}.*"

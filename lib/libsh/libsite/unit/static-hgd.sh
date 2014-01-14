@@ -11,7 +11,7 @@ function testCoreHgdMultiPublic() {
     local session=${FUNCNAME}
     core:wrapper hgd save -T. ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:save.0' $?
-    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    grep -qE "\<${session}\>" ${SITE_USER_CACHE}/hgd.conf
     assertTrue 'hgd:save.1' $?
 
     core:wrapper hgd list ${session} >${stdoutF?} 2>${stderrF?}
@@ -20,9 +20,9 @@ function testCoreHgdMultiPublic() {
 
     core:wrapper hgd rename ${session} ${session}Renamed >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:renamed.0' $?
-    grep -qE "\<${session}Renamed\>" ${SITE_CACHE}/hgd.conf
+    grep -qE "\<${session}Renamed\>" ${SITE_USER_CACHE}/hgd.conf
     assertTrue 'hgd:renamed.1' $?
-    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    grep -qE "\<${session}\>" ${SITE_USER_CACHE}/hgd.conf
     assertFalse 'hgd:renamed.2' $?
     core:wrapper hgd rename ${session}Renamed ${session} >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:renamed.3' $?
@@ -35,7 +35,7 @@ function testCoreHgdMultiPublic() {
 
     core:wrapper hgd delete ${session} >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:delete.0' $?
-    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    grep -qE "\<${session}\>" ${SITE_USER_CACHE}/hgd.conf
     assertFalse 'hgd:delete.1' $?
     core:wrapper hgd delete ${session} >${stdoutF?} 2>${stderrF?}
     assertFalse 'hgd:delete.2' $?
@@ -52,7 +52,7 @@ function testCoreHgdMultiInternal() {
     local session=${FUNCNAME}
     :hgd:save . ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:save.0' $?
-    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    grep -qE "\<${session}\>" ${SITE_USER_CACHE}/hgd.conf
     assertTrue 'hgd:save.1' $?
 
     :hgd:list ${session} >${stdoutF?} 2>${stderrF?}
@@ -61,9 +61,9 @@ function testCoreHgdMultiInternal() {
 
     :hgd:rename ${session} ${session}Renamed >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:renamed.0' $?
-    grep -qE "\<${session}Renamed\>" ${SITE_CACHE}/hgd.conf
+    grep -qE "\<${session}Renamed\>" ${SITE_USER_CACHE}/hgd.conf
     assertTrue 'hgd:renamed.1' $?
-    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    grep -qE "\<${session}\>" ${SITE_USER_CACHE}/hgd.conf
     assertFalse 'hgd:renamed.2' $?
     :hgd:rename ${session}Renamed ${session} >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:renamed.3' $?
@@ -76,14 +76,14 @@ function testCoreHgdMultiInternal() {
 
     :hgd:delete ${session} >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:delete.0' $?
-    grep -qE "\<${session}\>" ${SITE_CACHE}/hgd.conf
+    grep -qE "\<${session}\>" ${SITE_USER_CACHE}/hgd.conf
     assertFalse 'hgd:delete.1' $?
     :hgd:delete ${session} >${stdoutF?} 2>${stderrF?}
     assertFalse 'hgd:delete.2' $?
 }
 
 function testPySetsAND() {
-    cat <<! | ${SITE_LIBEXEC_CORE}/sets '&(nucky,rothstein,waxy)' >${stdoutF?} 2>${stderrF?}
+    cat <<! | sets '&(nucky,rothstein,waxy)' >${stdoutF?} 2>${stderrF?}
 nucky
 aaa
 bbb
@@ -108,7 +108,7 @@ fff
 }
 
 function testPySetsOR() {
-    cat <<! | ${SITE_LIBEXEC_CORE}/sets '|(nucky,rothstein,waxy)' >${stdoutF?} 2>${stderrF?}
+    cat <<! | sets '|(nucky,rothstein,waxy)' >${stdoutF?} 2>${stderrF?}
 nucky
 aaa
 bbb

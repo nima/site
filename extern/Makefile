@@ -36,22 +36,21 @@ prepare:
 .PHONY: unprepare venv.uninstall uninstall $(EXTERN:%=%.uninstall)
 unprepare:
 	@printf "Unpreparing extern build..."
-	find ${LIBPY}
-	find ${LIBPY} -name '*.pyc' -exec rm -f {} \;
-	find ${LIBPY} -name '*.pyo' -exec rm -f {} \;
-	-rmdir ${LIBSH} ${LIBPY} ${LIBRB} lib
-	-rmdir ${LIBEXEC}
+	@find ${LIBPY} -name '*.pyc' -exec rm -f {} \;
+	@find ${LIBPY} -name '*.pyo' -exec rm -f {} \;
+	@rmdir ${LIBSH} ${LIBPY} ${LIBRB} lib
+	@rmdir ${LIBEXEC}
+	@echo "DONE"
 
 uninstall: $(EXTERN:%=%.uninstall) unprepare
 	@rm -f .install
 	@echo "Uninstallation (extern) complete!"
 
-purge:
+purge: venv.purge
 	rm -rf lib
 	rm -rf src
 	rm -rf scm
 	rm -rf ${LIBEXEC}
-	rm -rf venv
 	rm -f .install
 #. }=-
 
@@ -71,7 +70,7 @@ venv.install: venv $(VENV_PKGS:%=%.venv.install)
 venv.uninstall: $(VENV_PKGS:%=%.venv.uninstall)
 %.venv.uninstall:; . venv/bin/activate && pip uninstall -q -y $(@:.venv.uninstall=)
 
-venv.purge:; rm -rf venv
+venv.purge:; @rm -rf venv
 
 venv.play:
 	@echo "Ctrl-D to exit environment"
@@ -82,8 +81,8 @@ venv.play:
 TGZ_SHFLAGS := src/shflags-1.0.3.tgz
 SRC_SHFLAGS := $(TGZ_SHFLAGS:.tgz=)
 shflags.uninstall:
-	-rm ${LIBSH}/shflags
-	-rm -r ${SRC_SHFLAGS}
+	@-rm ${LIBSH}/shflags
+	@-rm -r ${SRC_SHFLAGS}
 shflags.install: ${LIBSH}/shflags
 ${LIBSH}/shflags: ${SRC_SHFLAGS}
 	@ln -sf $(CURDIR)/$</src/shflags $@
@@ -99,8 +98,8 @@ ${TGZ_SHFLAGS}:
 TGZ_SHUNIT2 := src/shunit2-2.1.6.tgz
 SRC_SHUNIT2 := $(TGZ_SHUNIT2:.tgz=)
 shunit2.uninstall:
-	-rm ${LIBEXEC}/shunit2
-	-rm -r ${SRC_SHUNIT2}
+	@-rm ${LIBEXEC}/shunit2
+	@-rm -r ${SRC_SHUNIT2}
 shunit2.install: ${LIBEXEC}/shunit2
 ${LIBEXEC}/shunit2: ${SRC_SHUNIT2}
 	@ln -sf $(CURDIR)/$</src/shunit2 $@
@@ -114,8 +113,8 @@ ${TGZ_SHUNIT2}:
 #. }=-
 #. vimpager -={
 vimpager.uninstall:
-	-rm ${LIBEXEC}/vimpager
-	-rm ${LIBEXEC}/vimcat
+	@-rm ${LIBEXEC}/vimpager
+	@-rm ${LIBEXEC}/vimcat
 vimpager.install: scm/vimpager.git
 	@ln -sf $(CURDIR)/$</vimpager ${LIBEXEC}/vimpager
 	@ln -sf $(CURDIR)/$</vimcat ${LIBEXEC}/vimcat
@@ -125,10 +124,10 @@ scm/vimpager.git:
 #. }=-
 #. pyobjpath -={
 pyobjpath.uninstall:
-	-rm ${LIBPY}/pyobjpath/core
-	-rm ${LIBPY}/pyobjpath/utils
-	-rm ${LIBPY}/pyobjpath/__init__.py
-	-rmdir ${LIBPY}/pyobjpath/
+	@-rm ${LIBPY}/pyobjpath/core
+	@-rm ${LIBPY}/pyobjpath/utils
+	@-rm ${LIBPY}/pyobjpath/__init__.py
+	@-rmdir ${LIBPY}/pyobjpath/
 pyobjpath.install: scm/pyobjpath.git
 	@mkdir ${LIBPY}/pyobjpath
 	@touch ${LIBPY}/pyobjpath/__init__.py
@@ -140,7 +139,7 @@ scm/pyobjpath.git:
 #. }=-
 #. jsontool -={
 jsontool.uninstall:
-	-rm ${LIBEXEC}/json
+	@-rm ${LIBEXEC}/jsontool
 jsontool.install:
 	@echo "Downloading jsontool..."
 	@${DLA} https://github.com/trentm/json/raw/master/lib/jsontool.js > ${LIBEXEC}/jsontool

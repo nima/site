@@ -6,9 +6,9 @@ REQUIRED := ${BIN_PY27} ${BIN_VENV}
 export BIN_PY27 BIN_VENV
 
 #. Site Bootstrap -={
-#. PROFILE Check -={
-ifeq (${PROFILE},)
-$(error PROFILE is not set)
+#. SITE_PROFILE Check -={
+ifeq (${SITE_PROFILE},)
+$(error SITE_PROFILE is not set)
 endif
 #. }=-
 #. Installation Status Check -={
@@ -22,7 +22,7 @@ endif
 .PHONY: help
 help: require
 	@echo "Current status  : ${STATUS}"
-	@echo "Current profile : ${PROFILE}"
+	@echo "Current profile : ${SITE_PROFILE}"
 	@echo
 	@echo "Usage:"
 	@echo "    $(MAKE) install"
@@ -37,43 +37,41 @@ require:; @$(foreach req,$(REQUIRED:%.required=%),printf ${req}...;which ${req} 
 sanity:; @test ! -f .install
 install: require sanity .install
 	@echo "Installation complete!"
-	@echo
-	@echo "You can now bootstrap your installation by setting up your profile:"
-	@echo "    cp share/examples/siterc.eg ~/.siterc"
-	@echo "    mkdir -p profile/${PROFILE}/etc"
-	@echo "    cp share/examples/site.conf.eg profile/${PROFILE}/etc/site.conf"
-	@echo
-	@echo "Copy the template module..."
-	@echo "    mkdir -p profile/${PROFILE}/module"
-	@echo "    cp share/module/template profile/${PROFILE}/mymod"
-	@echo
-	@echo "Try out your new module..."
-	@echo "    site mymod"
-	@echo
-	@echo "Finally, commit your new profile to your own git repo:"
-	@echo "    cd profile/${PROFILE}/"
-	@echo "    git init"
-	@echo
 
 .install:
 	@mkdir -p $(HOME)/.site
 	@
 	@$(MAKE) -C extern install
-	ln -sf $(PWD) $(HOME)/.site/lib
-	ln -sf $(PWD)/profile/${PROFILE}/etc $(HOME)/.site/etc
-	ln -sf $(PWD)/profile/${PROFILE}/module $(HOME)/.site/module
-	ln -sf $(PWD)/profile/${PROFILE}/libexec $(HOME)/.site/libexec
-	ln -sf $(HOME)/.cache/site/ $(HOME)/.site/var
+	@printf "Installing symbolic links in $(HOME)/.site/..."
+	@ln -sf $(PWD)/lib $(HOME)/.site/lib
+	@ln -sf $(PWD)/profile/${SITE_PROFILE}/etc $(HOME)/.site/etc
+	@ln -sf $(PWD)/profile/${SITE_PROFILE}/module $(HOME)/.site/module
+	@ln -sf $(PWD)/profile/${SITE_PROFILE}/libexec $(HOME)/.site/libexec
+	@echo "DONE"
 	@
-	@mkdir -p /var/tmp/site/
-	ln -sf /var/tmp/site/ $(HOME)/.site/log
+	@printf "Installing symbolic links in $(HOME)/bin/..."
+	@mkdir -p $(HOME)/bin
+	@ln -sf $(PWD)/bin/site $(HOME)/bin/site
+	@ln -sf $(PWD)/bin/ssh $(HOME)/bin/ssm
+	@ln -sf $(PWD)/bin/ssh $(HOME)/bin/ssp
+	@echo "DONE"
 	@
-	mkdir -p $(HOME)/bin
-	ln -sf $(PWD)/bin/site $(HOME)/bin/site
-	ln -sf $(PWD)/bin/ssh $(HOME)/bin/ssm
-	ln -sf $(PWD)/bin/ssh $(HOME)/bin/ssp
+	@test -d profile/${SITE_PROFILE} || touch .initialize
+	@test ! -f .initialize || printf "Populating profile/${SITE_PROFILE}..."
+	@test ! -f .initialize || mkdir -p profile/${SITE_PROFILE}/etc
+	@test ! -f .initialize || cp share/examples/site.conf.eg profile/${SITE_PROFILE}/etc/site.conf
+	@test ! -f .initialize || cp share/examples/siterc.eg ${HOME}/.siterc
+	@test ! -f .initialize || echo "DONE"
+	@rm -f .initialize
 	@
-	touch .install
+	@printf "Preparing /var/tmp/site/..."
+	@mkdir -p /var/tmp/site/var
+	@ln -sf /var/tmp/site/ $(HOME)/.site/var
+	@mkdir -p /var/tmp/site/log
+	@ln -sf /var/tmp/site/ $(HOME)/.site/log
+	@echo "DONE"
+	@
+	@touch .install
 #. }=-
 #. Uninstallation -={
 .PHONY: unsanity unsanity

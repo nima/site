@@ -130,7 +130,7 @@ function :remote:copy() {
   ${CACHE_OUT}; {
     local -i e=${CODE_FAILURE?}
 
-    #.Usage: :remote:copy m <fqdn> /etc/security/access.conf ${SITE_CACHE}/${fqdn}-access.conf
+    #.Usage: :remote:copy m <fqdn> /etc/security/access.conf ${SITE_USER_CACHE}/${fqdn}-access.conf
     if [ $# -eq 4 ]; then
         local tldid=$1
         local qdn=$2
@@ -587,9 +587,9 @@ function remote:mon() {
                     local script=
 
                     if [ ${sudo} -eq 1 ]; then
-                        script="${SITE_LIBEXEC_CORE}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME}:SUDO@${csv_hosts} ${rcmd}"
+                        script="${SITE_CORE_LIBEXEC}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME}:SUDO@${csv_hosts} ${rcmd}"
                     else
-                        script="${SITE_LIBEXEC_CORE}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME}@${csv_hosts} ${rcmd}"
+                        script="${SITE_CORE_LIBEXEC}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME}@${csv_hosts} ${rcmd}"
                     fi
                     #echo "#. DEBUG: ${script}" >&2
 

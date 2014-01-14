@@ -299,7 +299,7 @@ function git:gource() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 ] && [ -d $1 ] || [ $# -eq 0 ]; then
-        gource --multi-sampling -s 3 --dont-stop ${1:-${SITE_SCM}}
+        gource --multi-sampling -s 3 --dont-stop ${1:-${SITE_CORE}}
         if [ $? -eq 0 ]; then
             e=${CODE_SUCCESS}
         fi

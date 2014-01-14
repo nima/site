@@ -1,13 +1,13 @@
 #. Copy this file to ~/.siterc, and set/uncomment variables as required.
 
-#. Set your PROFILE here:
-#PROFILE="SITE01"
+#. Set your SITE_PROFILE here:
+export SITE_PROFILE="SITE01"
 
-USER_USERNAME="tyrion"
-USER_FULLNAME="Tyrion Lannister"
-USER_EMAIL="tyrion.lannister@lannister.casterlyrock.com"
-USER_GPG_ID="0xBADB00B5"
-USER_DIFF=$(which colordiff || which diff)
+export USER_USERNAME="tyrion"
+export USER_FULLNAME="Tyrion Lannister"
+export USER_EMAIL="tyrion.lannister@lannister.casterlyrock.com"
+export USER_GPG_ID="0xBADB00B5"
+export USER_DIFF=$(which colordiff || which diff)
 
 #. Executable Overrides -={
 #. Override your BASH if it's old, on Mac OS X, get the GNU utilities via

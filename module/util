@@ -31,7 +31,7 @@ function :util:secrets() {
     local -i e=${CODE_FAILURE}
 
     if [ $# -eq 1 ]; then
-        ${SITE_LIBEXEC_CORE}/secret $1
+        ${SITE_CORE_LIBEXEC}/secret $1
         e=$?
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -308,7 +308,7 @@ function :util:is_int() {
 
 #. ANSI2HTML -={
 function :util:ansi2html() {
-    ${SITE_LIBEXEC_CORE}/ansi2html
+    ${SITE_CORE_LIBEXEC}/ansi2html
 }
 #. }=-
 

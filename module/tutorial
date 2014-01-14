@@ -24,7 +24,7 @@ function declaration is thus:
     }
 \`\`\`
 
-Peek inside ${SITE_SCM}/module/tutorial to see the implementation of this
+Peek inside ${SITE_CORE}/module/tutorial to see the implementation of this
 function before continuing.
 
 Let's get to that in the next tutorial, where we will demonstrate how to use

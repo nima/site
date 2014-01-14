@@ -1,20 +1,5 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
-declare -A CORE_MODULES=(
-    [help]=1
-    [tutorial]=1
-    [hgd]=1
-    [remote]=1
-    [git]=1
-    [ng]=1
-    [dns]=1
-    [net]=1
-    [ldap]=1
-    [unit]=1
-    [mongo]=1
-    [util]=1
-)
-
 declare -g -r USER_LOG_LEVEL=DEBUG
 
 declare -g -r -A USER_MODULES=(
@@ -30,9 +15,9 @@ declare -g -r -A USER_IFACE=(
     [p]=eth1
 )
 #. Next we define which ones are mandatory per host
-declare -g -r -a USER_TLDS_REQUIRED=( m p )
+declare -g -r -a USER_TLDIDS_REQUIRED=( m p )
 #. When unspecified on the commandline, we will default to the mgmt subnet:
-declare -g -r    USER_TLD_DEFAULT=m
+declare -g -r    USER_TLDID_DEFAULT=m
 #. Now we declare the TLD for these subnets:
 declare -g -r -A USER_TLDS=(
     [.]='localdomain'
