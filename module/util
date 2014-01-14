@@ -40,7 +40,7 @@ function :util:secrets() {
     return $e
 }
 
-function util:secrets:usage() { echo "edit|list"; }
+function util:secrets:usage() { echo "list|edit|read <sid>"; }
 function util:secrets() {
     local -i e=${CODE_DEFAULT}
     trap ::util:secrets:cleanup INT
@@ -61,7 +61,7 @@ function util:secrets() {
             case $1 in
                 edit)
                     cpf "Checking for GPG keys..."
-                    if [ -e ${g_GPG_KEY_PATH}.pub ]; then
+                    if [ -e ${gpgkp}.pub ]; then
                         theme HAS_PASSED
 
                         cpf "Decrypting secrets..."
@@ -90,7 +90,7 @@ function util:secrets() {
                         fi
                         ::util:secrets:cleanup
                     else
-                        theme HAS_FAILED "Missing ${g_GPG_KEY_PATH}.pub"
+                        theme HAS_FAILED "Missing ${gpgkp}.pub"
                         e=${CODE_FAILURE}
                     fi
                 ;;
