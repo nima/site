@@ -1,0 +1,254 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+:<<[core:docstring]
+Core GNUPG module
+[core:docstring]
+
+core:import util
+
+core:requires gpg2
+
+core:requires ENV PROFILE%%@*
+core:requires ENV USER_USERNAME
+core:requires ENV USER_EMAIL
+
+function ::gpg:keypath() {
+    #. Prints:
+    #. . -> <path>
+    #. * -> <path> <key-id>
+    #.
+    #. Returns:
+    #. CODE_SUCCESS if keys exists
+    #. CODE_FAILURE if keys don't exist
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local -a data
+        local gpgkid="${1}"
+        local -r gpgkp="${HOME}/.gnupg/${USER_USERNAME}.${PROFILE%%@*}"
+        case ${gpgkid}:${#gpgkid} in
+            '.':1)
+                data=( ${gpgkp} )
+                e=${CODE_SUCCESS}
+            ;;
+            '*':1)
+                local -a files=( ${gpgkp}.* )
+                if ! [[ ${files[0]} =~ ${PROFILE%%@*}\.\*$ ]]; then
+                    for file in ${files[@]}; do
+                        gpgkid=$(
+                            basename ${file} |
+                                sed -n -e "s/${USER_USERNAME}.${PROFILE%%@*}.\(.*\).sec/\1/p"
+                        )
+                        if [ ${#gpgkid} -eq 10 ]; then
+                            data=( $(::gpg:keypath ${gpgkid}) )
+                            e=$?
+                            break
+                        fi
+                    done
+                fi
+            ;;
+            *:10)
+                if [ -e ${gpgkp}.${gpgkid}.sec -a -e ${gpgkp}.${gpgkid}.pub ]; then
+                    e=${CODE_SUCCESS}
+                    data=( ${gpgkp} ${gpgkid} )
+
+                    gpg2 --no-default-keyring \
+                        --secret-keyring ${gpgkp}.sec\
+                        --keyring ${gpgkp}.pub\
+                        --list-secret-keys >/dev/null 2>&1
+                    e=$?
+                fi
+            ;;
+            *:*)
+                core:raise EXCEPTION_BAD_FN_CALL
+            ;;
+        esac
+
+        [ ${#data[@]} -eq 0 ] || echo "${data[@]}"
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function :gpg:list() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -le 1 ]; then
+        local -i data
+        ::gpg:keypath "${1:-*}"
+        e=$?
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function gpg:list:usage() { echo "[<gpg-key-id>]"; }
+function gpg:list() {
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -le 1 ]; then
+        e=${CODE_FAILURE}
+
+        local -a data
+        data=( $(::gpg:keypath "${1:-*}") )
+        e=$?
+        if [ ${#data[@]} -eq 2 ]; then
+            read gpgkp gpgkid <<< "${data[@]}"
+            cpf "%{@path:%s/%s}..." ${gpgkp} ${gpgkid}
+            if [ $e -eq ${CODE_SUCCESS} ]; then
+                theme HAS_PASSED VALID
+            else
+                theme HAS_FAILED INVALID
+            fi
+        fi
+    fi
+
+    return $e
+}
+
+function :gpg:create() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 0 ]; then
+        local -a data
+        data=( $(::gpg:keypath '*') )
+        if [ ${#data[@]} -eq 0 ]; then
+            mkdir -p ~/.gnupg
+            chmod 700 ~/.gnupg
+
+            local -i keysize=3072
+            gpgkp=$(::gpg:keypath '.')
+            cat <<! >${gpgkp}.conf
+Key-Type: RSA
+Key-Length: ${keysize}
+Subkey-Type: ELG-E
+Subkey-Length: ${keysize}
+Name-Real: ${USER_FULLNAME?}
+Name-Comment: ${USER_USERNAME?} profile key generated via site
+Name-Email: ${USER_EMAIL?}
+Expire-Date: 0
+%no-ask-passphrase
+%pubring ${gpgkp}.pub
+%secring ${gpgkp}.sec
+%commit
+!
+            gpg2 -q --batch --gen-key ${gpgkp}.conf 2>&1 |
+                sed -e '/^$/d' -e 's/^/   * /'
+            if [ $? -eq 0 -a -e ${gpgkp}.sec -a -e ${gpgkp}.pub ]; then
+                export gpgkid=0x$(
+                    gpg2 --no-default-keyring \
+                        --secret-keyring ${gpgkp}.sec\
+                        --keyring ${gpgkp}.pub\
+                        --list-secret-keys | awk -F '[ /]+' '$1~/^sec/{print$3}'
+                )
+                if gpg -q --batch --import ${gpgkp}.sec; then
+                    if gpg -q --batch --import ${gpgkp}.pub; then
+                        mv ${gpgkp}.sec ${gpgkp}.${gpgkid}.sec
+                        mv ${gpgkp}.pub ${gpgkp}.${gpgkid}.pub
+                        mv ${gpgkp}.conf ${gpgkp}.${gpgkid}.conf
+                        e=${CODE_SUCCESS}
+                    fi
+                fi
+            fi
+
+            if [ $e -ne ${CODE_SUCCESS} ]; then
+                rm -f ${gpgkp}.sec
+                rm -f ${gpgkp}.pub
+                rm -f ${gpgkp}.conf
+            fi
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function gpg:create() {
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -eq 0 ]; then
+        local gpgkp
+        gpgkp=( $(::gpg:keypath '*') )
+        e=$?
+        if [ ${#gpgkp[@]} -eq 0 ]; then
+            cpf "Generating an RSA/ELG-E GPG key for (%{@user:%s}@%{@profile:%s}) %{r:%s}\n" "${USER_USERNAME}" "${PROFILE%%@*}" "-=["
+            if :gpg:create; then
+                cpf " * %{r:%s} GPG Key Generation..." "]=-"
+                theme HAS_PASSED "${gpgkp}.*"
+                e=${CODE_SUCCESS}
+            else
+                cpf " * %{r:%s} GPG Key Generation..." "]=-"
+                theme HAS_FAILED
+                e=${CODE_FAILURE}
+            fi
+        elif [ ${#gpgkp[@]} -eq 2 ]; then
+            cpf "You already have a key for this profile: %{@hash:${gpgkp[1]}}\n"
+            e=${CODE_FAILURE}
+        else
+            core:raise EXCEPTION_BAD_FN_CALL
+        fi
+    fi
+
+    return $e
+}
+
+function :gpg:delete() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local gpgkid=$1
+        local -a data
+        data=( $(::gpg:keypath "${gpgkid}") )
+        if [ ${#data[@]} -eq 2 ]; then
+            #. Delete secret keys
+            local -a secretkeys=(
+                $(
+                    gpg --list-secret-keys --with-colons --fingerprint ${gpgkid} |
+                        sed -n 's/^fpr:::::::::\([[:alnum:]]\+\):/\1/p'
+                )
+            )
+            for sk in ${secretkeys[@]}; do
+                gpg --batch --yes --delete-secret-key ${sk}
+            done
+
+            #. Delete publik key
+            gpg -q --batch --yes --delete-key ${gpgkid}
+
+            #. Delete files
+            local gpgkp=${data[0]}.${gpgkid}
+            rm -f ${gpgkp}.sec
+            rm -f ${gpgkp}.pub
+            rm -f ${gpgkp}.conf
+
+            e=${CODE_SUCCESS}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function gpg:delete:usage() { echo "<gpg-key-id>"; }
+function gpg:delete() {
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -eq 1 ]; then
+        local gpgkid=$1
+        :gpg:delete ${gpgkid}
+        e=$?
+        cpf "Removing GPG key..."
+        if [ $e -eq ${CODE_SUCCESS} ]; then
+            theme HAS_PASSED "${gpgkid}"
+        else
+            theme HAS_FAILED "${gpgkid}"
+        fi
+    fi
+
+    return $e
+}
