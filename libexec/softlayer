@@ -6,7 +6,10 @@ import libsite
 from operator import getitem
 
 import SoftLayer
-from libsite.secret import secret
+from libsite.vault import vault
+
+CACHE = False
+
 class SLAPI:
     @classmethod
     def cachefile(cls, service, method, oid=None, mask=None):
@@ -54,7 +57,7 @@ class SLAPI:
     def expose(self, service, method, oid=None, mask=None):
         success = False
         cachefile = self.cachefile(service, method, oid=oid, mask=mask)
-        if not os.path.exists(cachefile):
+        if CACHE is False or not os.path.exists(cachefile):
             if self.retrieve(service, method, oid=oid, mask=mask):
                 success = True
         else:
@@ -105,7 +108,7 @@ if __name__ == '__main__':
     argc = len(argv)
 
     username = 'nima.talebi'
-    api_key = secret('SLAPI')
+    api_key = vault('SOFTLAYER_API_KEY')
     slapi = SLAPI(username, api_key)
 
     if argc > 0:
