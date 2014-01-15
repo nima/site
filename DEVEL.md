@@ -39,13 +39,36 @@ All global variables are of the pattern:
 <internal>  : functions that are not exposed publicly, but are there for use
               by other modules
 
-Basically anything you expect the user to see from the commandline must be
-defined as a public function; the public function therefore is primarily
-providing the "view" component of an MVC architecture.
+#### Public Functions
 
-However, the inner workings - or the "intelligent" part of all such functions
-should not be written in the public function, but either in the internal,
-or private function counterpart of that function.
+Public functions can call ::private and/or :internal functions, they look
+after the "view", and should never do any actual calculative work, or
+execute any interesting commands, other than calling their respective
+:internal counterparts, or other :internal functions.
+
+Basically anything you expect the user to see from the commandline must be
+carried out by a public function; the public function therefore is primarily
+providing the "view" component of an MVC architecture.  It also handles
+argument parsing.
+
+#### :Internal Functions
+:internal functions can be called from any function from any module are the
+major workhorse of the framework, and there are many of them.
+
+They should not take variable arguments, and any variables that can take a
+default value must be predetermined by the public caller at the start of the
+chain of calls.
+
+#### ::Private Functions
+::private function must not be called from outside of their module.  These
+functions generally contain either dirty code, or code that is way too
+specific to the calling function.  For the same reason, they generally
+only have a single :private caller, and thus named after the caller
+(prefixed with a colon).  Don't write these unless you want/need to hide
+away something in order to make reading the :internal function that calls
+it better; these functions should be thought of as the `third leg'.
+
+---
 
 The decision of segregating this code between private and internal is this: Is
 the function providing a service to a single internal function?  If so, make it
