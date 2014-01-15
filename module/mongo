@@ -1,14 +1,15 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
-core:import util
-core:requires mongo
-
 :<<[core:docstring]
 The module interfaces mongodb
 [core:docstring]
 
+core:import util
+core:requires mongo
+
+#site mongo :query BC 'qdn=/server/' qdn
 function :mongo:query() {
-    local -i e=${CODE_ERROR?}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -gt 1 ]; then
         local db=$1
@@ -28,10 +29,14 @@ function :mongo:query() {
             #"load(\"${SITE_CORE_LIBJS}/mongo/helper.js\")"
             local -a jseval=(
                 "var filters = { $(:util:join ', ' filters) }"
+                "var data = db.nodes.find(filters, { _id: 0 }).toArray()"
+                "printjson(data)"
             )
 
-            mongo --quiet --eval "$(:util:join ';' jseval)"\
-                ${db} ${SITE_CORE_LIBJS}/mongo/host.js |
+            #mongo --quiet --eval "$(:util:join ';' jseval)"\
+            #    ${db} ${SITE_CORE_LIBJS}/mongo/host.js |
+            #    jsontool -a ${display[@]}
+            mongo --quiet --eval "$(:util:join ';' jseval)" ${db} |
                 jsontool -a ${display[@]}
 
             e=${CODE_SUCCESS}
@@ -45,4 +50,3 @@ function :mongo:query() {
 
     return $e
 }
-
