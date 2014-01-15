@@ -7,7 +7,6 @@ Core Unit-Testing Module
 #. -={
 #. Pre/post test scaffolding -={
 oneTimeSetUp() {
-    cpf "%{@comment:#############################################################################}\n"
     cpf "%{@comment:Set-up...}"
 
     declare -gi tid=0
@@ -256,7 +255,6 @@ function ${utf}Dyn${i}() {
             cpf "%{@profile:${profile}}: %{!module:${module}} %{r:-=[} %{@warn:BLACKLISTED} %{r:]=-} %{@profile:${profile}}: %{!module:${module}}\n"
         fi
         cd ${OLDPWD}
-        cpf
     fi
 
     assertEquals "of the $t unit-tests, $p passed, $s skipped, and $e missing; i.e.," $((t-s)) $p
@@ -280,7 +278,7 @@ function ::unit:prime() {
             local module script
             for module in *; do
                 if [ ${#g_MODULES[@]} -eq 0 -o ${g_MODULES[${module}]--1} -eq 1 ]; then
-                    cpf "%{@comment:${profile}.${module}.STATIC unit-testing} %{r:-=[}\n";
+                    cpf "%{@comment:${profile}.${module}}.%{r:prime -=[}\n";
                     (
                         export g_RUNTIME_CWD=${profiles[${profile}]}
                         export g_RUNTIME_PROFILE=${profile}
@@ -302,14 +300,16 @@ function ::unit:prime() {
                         SHUNIT_PARENT="${SITE_CORE_MOD}/unit" source ${SHUNIT2}
                     )
                     e=$?
-                    if [ ${e} -eq 0 ]; then
-                        cpf "%{@comment:exit}:%{g:${e}} "
-                    else
-                        cpf "%{@comment:exit}:%{r:${e}} "
-                    fi
-                    cpf "%{r:]=-}\n"
 
-                    cpf "%{@comment:${profile}.${module}.DYNAMIC} %{r:-=[}\n";
+                    cpf "%{r:]=-} "
+                    if [ ${e} -eq 0 ]; then
+                        cpf "%{@comment:exit}:%{g:PASSED(${e})}\n"
+                    else
+                        cpf "%{@comment:exit}:%{r:FAILED(${e})}\n"
+                    fi
+                    cpf "%{@comment:#############################################################################}\n"
+
+                    cpf "%{@comment:${profile}.${module}}.%{r:execute -=[}\n";
                     script=${SITE_USER_CACHE?}/unittest-${module}.sh
                     if [ -r "${script}" ]; then
                         (
@@ -319,15 +319,17 @@ function ::unit:prime() {
                         )
                         e=$?
 
+                        cpf "%{r:]=-} "
                         if [ ${e} -eq 0 ]; then
-                            cpf "%{@comment:exit}:%{g:PASSED(${e})} "
+                            cpf "%{@comment:exit}:%{g:PASSED(${e})}\n"
                         else
-                            cpf "%{@comment:exit}:%{r:FAILED(${e})} "
+                            cpf "%{@comment:exit}:%{r:FAILED(${e})}\n"
                         fi
                     else
-                        cpf "%{@comment:exit}:%{y:SKIPPED} "
+                        cpf "%{r:]=-} "
+                        cpf "%{@comment:exit}:%{y:SKIPPED}\n"
                     fi
-                    cpf "%{r:]=-}\n"
+                    cpf "%{@comment:#############################################################################}\n"
                 fi
             done
         fi
@@ -361,7 +363,6 @@ function unit:test() {
             ::unit:prime
             local -i e=$?
 
-            cpf "%{@comment:#############################################################################}\n"
             cpf "Unit-testing overal result..."
             [ $e -eq 0 ] && theme HAS_PASSED || theme HAS_FAILED
         else
