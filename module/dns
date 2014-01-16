@@ -124,14 +124,21 @@ function :dns:fqdn() {
     if [ $# -eq 2 ]; then
         local -r tldid=$1
         local -r hint=$2
-        local -r shn=${hint%%.*}
-        local -i i=0
-        local line record _tldid query sdn answer
-        while read line; do
-            read record _tldid query sdn answer <<< ${line}
-            ((i++))
-            echo ${query}
-        done < <(:dns:lookup ${tldid} a ${hint})
+        local _tldid
+        _tldid=$(:dns:qualified ${hnh})
+        if [ $? -ne ${CODE_SUCCESS} ]; then
+            local -r shn=${hint%%.*}
+            local -i i=0
+            local line record _tldid query sdn answer
+            while read line; do
+                read record _tldid query sdn answer <<< ${line}
+                ((i++))
+                echo ${query}
+            done < <(:dns:lookup ${tldid} a ${hint})
+        else
+            echo ${hint}
+            e=${CODE_SUCCESS}
+        fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -140,6 +147,7 @@ function :dns:fqdn() {
         e=${CODE_SUCCESS}
     elif [ ${i} -gt 1 ]; then
         theme HAS_WARNED ":dns:fqdn() MoreThanOneMatch:($(:util:join , fqdns))" >&2
+        #. LOGGER
     fi
 
     return $e
