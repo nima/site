@@ -1,3 +1,7 @@
+[![status](https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png)](https://sourcegraph.com/github.com/nima/site)
+[![views](https://sourcegraph.com/api/repos/github.com/nima/site/counters/views.png)](https://sourcegraph.com/github.com/nima/site)
+[![authors](https://sourcegraph.com/api/repos/github.com/nima/site/badges/authors.png)](https://sourcegraph.com/github.com/nima/site)
+
 # OVERVIEW
 **MISSION STATEMENT**: _To simplify group scripting, reporting and automation tasks for large teams of system engineers_
 
