@@ -205,7 +205,7 @@ function :remote:sudo() {
 
     if [ $# -ge 2 ]; then
         local passwd
-        passwd="$(:util:secrets SUDO)"
+        passwd="$(:vault:read SUDO)"
         if [ $? -eq ${CODE_SUCCESS} ]; then
             local prompt="$(printf ".\r")"
             local lckfile=$(mktemp)
@@ -422,7 +422,7 @@ function ::remote:tmux() {
 
                     [ ${lpid} -eq 0 ] || tmux split-window -h
                     cpf "Connection %{g:${tab}}:%{@int:${pid}} to %{@host:${hosts[${pid}]}}..."
-                    tmux send-keys -t "${lpid}" "ssh ${hosts[${pid}]}" C-m
+                    tmux send-keys -t "${lpid}" "${SITE_CORE_BIN}/ssh ${hosts[${pid}]}" C-m
                     #XXX tmux send-keys -t "${lpid}" "ss${tldid} ${hosts[${pid}]}" C-m
                     tmux select-layout -t "${session}:${tab}" tiled >/dev/null
                     theme HAS_PASSED "${tab}:${pid}"

@@ -1,2 +1,18 @@
 #!/bin/bash
-site remote connect -C -T ${0#${0%?}} $@
+#site remote connect -C -T ${0#${0%?}} $@
+source ~/.siterc
+source ~/.site/lib/libsh/libsite/libsite.sh
+core:import net
+function myssh() {
+    local -i e
+
+    local qdn=$1
+    :net:portpersist . ${qdn} 22 3600
+    e=$?
+
+    [ $e -ne ${CODE_SUCCESS} ] || ssh $@
+
+    return $?
+}
+
+myssh $@
