@@ -168,13 +168,13 @@ function :net:portping() {
     core:requires socat
 
     local -i e=${CODE_FAILURE}
-    if [ $# -eq 2 -o $# -eq 3 ]; then
-        local fqdn=$1
-        local port=$2
-        local tldid=$3
-        cmd="nc -zqw1 ${fqdn} ${port}"
-        cmd="socat -u /dev/null TCP:${fqdn}:${port},connect-timeout=1"
-        if [ ${#tldid} -gt 0 ]; then
+    if [ $# -eq 3 ]; then
+        local tldid=$1
+        local qdn=$2
+        local port=$3
+        local cmd="nc -zqw1 ${qdn} ${port}"
+        cmd="socat /dev/null TCP:${qdn}:${port},connect-timeout=1"
+        if [ ${tldid} != '.' ]; then
             local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
             local tld=${USER_TLDS[${tldid}]}
             if [ ${#ssh_proxy} -gt 0 ]; then
@@ -188,6 +188,30 @@ function :net:portping() {
             eval ${cmd} >/dev/null 2>&1
             e=$?
         fi
+    else
+        theme EXCEPTION "$# / $*"
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function :net:portpersist() {
+    core:requires socat
+
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 4 ]; then
+        local tldid=$1
+        local qdn=$2
+        local port=$3
+        local -i attempts=$4
+        local -i i=0
+        while ((i < attempts)) && ((e == ${CODE_FAILURE})); do
+            :net:portping ${tldid} ${qdn} ${port}
+            e=$?
+            ((i++))
+        done
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -217,14 +241,16 @@ function net:portping() {
                     e=${CODE_FAILURE}
                 fi
             else
+                tldid='.'
                 fqdn=${hnh}
             fi
         else
+            tldid='.'
             fqdn=${hnh}
         fi
 
         if [ $e -ne ${CODE_FAILURE} ]; then
-            if :net:portping ${fqdn} ${port} ${tldid}; then
+            if :net:portping ${tldid} ${fqdn} ${port}; then
                 theme HAS_PASSED "CONNECTED"
                 e=${CODE_SUCCESS}
             else
