@@ -1,73 +1,107 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
-    <meta charset='utf-8'>
+    <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>site by nima</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
 
-    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
-    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
-    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
-
-    <title>Site by nima</title>
   </head>
-
   <body>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/nima/site">View On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/nima/site/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/nima/site/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
 
-    <header>
-      <div class="container">
-        <h1>Site</h1>
-        <h2>Site is a modular framework for system administration, 99% native bash</h2>
+    <div class="wrapper">
 
-        <section id="downloads">
-          <a href="https://github.com/nima/site/zipball/master" class="btn">Download as .zip</a>
-          <a href="https://github.com/nima/site/tarball/master" class="btn">Download as .tar.gz</a>
-          <a href="https://github.com/nima/site" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
-        </section>
-      </div>
-    </header>
+      <section>
+        <div id="title">
+          <h1>site</h1>
+          <p>Modular shell-scripting framework - 99% native bash, 1% phat!</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/nima">nima</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
+        </div>
 
-    <div class="container">
-      <section id="main_content">
-        <h1>
+        <p><a href="https://travis-ci.org/nima/site"><img src="https://travis-ci.org/nima/site.png?branch=master" alt="Build Status"></a>
+<a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/counters/views.png" alt="views"></a>
+<a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/badges/authors.png" alt="authors"></a>
+<a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png" alt="status"></a></p>
+
+<h1>
 <a name="overview" class="anchor" href="#overview"><span class="octicon octicon-link"></span></a>OVERVIEW</h1>
 
-<p><strong>MISSION STATEMENT</strong>: <em>To simplify group scripting, reporting and automation tasks for large teams of system engineers</em></p>
+<p><strong>MISSION STATEMENT</strong>: <em>To simplify and standardize collaborative scripting, reporting and automation tasks</em></p>
+
+<p><strong>TARGET AUDIENCE</strong>: <em>System Administrators, System Engineers, DevOps, System Reliability Engineers (SRE), Test Engineers</em></p>
 
 <p>Site is written for system administrators, system engineers, devOps, or automation engineers.  It is a superset of bash, and structured to scale with your scripting requirements.</p>
+
+<h2>
+<a name="the-code" class="anchor" href="#the-code"><span class="octicon octicon-link"></span></a>The Code</h2>
 
 <p>Site is broken up into two main chunks:</p>
 
 <ol>
-<li>The bits that we write: the <em>site engine</em> (<code>lib/libsite</code>), and <em>core modules</em> <code>module/*</code>
+<li>
+<p>The bits that we write:</p>
+
+<ul>
+<li>the <em>site engine</em>: <code>libsite.sh</code>
 </li>
-<li>The bits that you write: <em>user modules</em> (<code>profile/${PROFILE}/module/*</code>)</li>
-</ol><p>You can configure site in two places:</p>
+<li>the <em>core modules</em>: <code>module/*</code>
+</li>
+</ul>
+</li>
+<li>
+<p>The bits that you write:</p>
+
+<ul>
+<li>the <em>user modules</em>: <code>~/.site/module/*</code>
+</li>
+</ul>
+</li>
+</ol><h2>
+<a name="the-config" class="anchor" href="#the-config"><span class="octicon octicon-link"></span></a>The Config</h2>
+
+<p>Site is configured in two places:</p>
 
 <ol>
-<li>
-<code>profile/${PROFILE}/etc/site.conf</code> - configuration specific to <em>your organization</em>
+<li>One for <em>your organization</em>: <code>~/.site/etc/site.conf</code>
 </li>
-<li>
-<code>~/.siterc</code> - configuration specific to <em>you</em>
+<li>One just for <em>you</em>: <code>~/.siterc</code>
 </li>
 </ol><h1>
 <a name="requirements" class="anchor" href="#requirements"><span class="octicon octicon-link"></span></a>REQUIREMENTS</h1>
 
-<ol>
-<li>Core Requirements
+<h2>
+<a name="core-requirements" class="anchor" href="#core-requirements"><span class="octicon octicon-link"></span></a>Core Requirements</h2>
 
-<ul>
-<li>You need bash v4.0+</li>
-<li>You need gnu grep v2.0+ (probably)</li>
-</ul>
-</li>
-<li>Additional Requirements
+<p>You need bash v4.0+ to start with, but this is easier than you might think:  if your version of bash is older, simply compile a newer one locally in you home directory, and set the environment variable <code>SITE_SHELL</code> to point to it.  You don't even need to do this in your user profile, simply place it (and any other overrides) into your <code>~/.siterc</code> or ~/.site/etc/site.conf`.  More on those files later!</p>
 
-<ul>
-<li>The site modules will themselves check for any python, ruby, or perl module you need for that particular module.</li>
-</ul>
-</li>
-</ol><h1>
+<p>You also need a handful of utilities and interpreters such as gnu grep, gawk, gsed, nc, socat, etc. The full list is covered in the installation section bellow.</p>
+
+<h2>
+<a name="additional-requirements" class="anchor" href="#additional-requirements"><span class="octicon octicon-link"></span></a>Additional Requirements</h2>
+
+<p>The site modules will themselves check for any python, ruby, or perl module you need for that particular module.</p>
+
+<h1>
 <a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>INSTALLATION</h1>
 
 <ol>
@@ -77,6 +111,14 @@
 <div class="highlight highlight-bash"><pre><span class="nb">cd</span> ~/
 git clone https://github.com/nima/site.git
 <span class="nb">cd </span>site
+</pre></div>
+</li>
+<li>
+<p>Install prerequisite software</p>
+
+<p>Do what <a href="https://travis-ci.org/nima/site/builds">Travis</a> does:</p>
+
+<div class="highlight highlight-bash"><pre>sed -ne <span class="s1">'/^before_install:/,/^$/{/^ /p}'</span> .travis.yml
 </pre></div>
 </li>
 <li>
@@ -105,12 +147,13 @@ cp share/examples/siterc.eg ~/.siterc
 
 <p>Here are the only files that will exist outside of <code>${SITE_SCM}</code> (where you cloned site to):</p>
 
-<ul>
-<li><code>~/bin/site</code></li>
-<li><code>~/.site/</code></li>
-<li><code>~/.siterc</code></li>
-<li><code>~/.secrets</code></li>
-</ul><p>The installer installs everything required monolithically under <code>~/.site/</code>, and even that is just a set of symbolic links pointing back to various folders within <code>${SITE_SCM}</code>.</p>
+<pre><code>* `~/bin/site`
+* `~/.site/`
+* `~/.siterc`
+* `~/.secrets`
+</code></pre>
+
+<p>The installer installs everything required monolithically under <code>~/.site/</code>, and even that is just a set of symbolic links pointing back to various folders within <code>${SITE_SCM}</code>.</p>
 
 <p>The <code>~/.siterc</code> is where you can store configuration overrides for you particular user, and <code>~/.secrets</code> is a GPG-encrypted file where you cam store all your passwords.  Site will provide you with the necessary high-level tools to create, edit, and read to and from this file, so you don't have to invoke GPG commands directly.</p>
 
@@ -172,10 +215,18 @@ Hello World!
 <h2>
 <a name="verifiability" class="anchor" href="#verifiability"><span class="octicon octicon-link"></span></a>Verifiability</h2>
 
+<h3>
+<a name="unit-testing-framework" class="anchor" href="#unit-testing-framework"><span class="octicon octicon-link"></span></a>Unit Testing Framework</h3>
+
 <p>Scripts change over time, and so unit-testing is as relevant to systems scripts as it is to any piece of software.  Site comes with a flexible unit-testing module. This module reads everything it needs to know about every function test from a unit-testing configuration file, and warns you for functions that are missing unit-test data.</p>
 
 <pre><code>% site unit test
 </code></pre>
+
+<h3>
+<a name="bash-traceback" class="anchor" href="#bash-traceback"><span class="octicon octicon-link"></span></a>Bash Traceback</h3>
+
+<p>That's right, we have a traceback so you can debug your scripts (site user modules).  Of course bash doesn't provide such functionality natively, so we had to be creative.</p>
 
 <h2>
 <a name="security-measures" class="anchor" href="#security-measures"><span class="octicon octicon-link"></span></a>Security Measures</h2>
@@ -187,9 +238,14 @@ Hello World!
 <p>All your passwords should be stored in <code>~/.secrets</code>, which is gnugp-encrypted with your user's public key; site will ask <code>gpg-agent</code> (or you) whenever it needs access to it.</p>
 
 <p>You can store any password you like in there, even remote host sudo passwords.</p>
-      </section>
-    </div>
 
+<hr><h6>
+<a name="tags-abstraction-automation-reporting-verifiability-standards-monitoring-unit-testing-bash-ssh-tmux-netgroup-hosts-users-ldap-mongo-softlayer-gnupg-remote-execution-sudo-tmux-shell-scripting-traceback-ldif" class="anchor" href="#tags-abstraction-automation-reporting-verifiability-standards-monitoring-unit-testing-bash-ssh-tmux-netgroup-hosts-users-ldap-mongo-softlayer-gnupg-remote-execution-sudo-tmux-shell-scripting-traceback-ldif"><span class="octicon octicon-link"></span></a>TAGS: <code>abstraction</code>, <code>automation</code>, <code>reporting</code>, <code>verifiability</code>, <code>standards</code>, <code>monitoring</code>, <code>unit-testing</code>, <code>bash</code>, <code>ssh</code>, <code>tmux</code>, <code>netgroup</code>, <code>hosts</code>, <code>users</code>, <code>ldap</code>, <code>mongo</code>, <code>softlayer</code>, <code>gnupg</code>, <code>remote-execution</code>, <code>sudo</code>, <code>tmux</code>, <code>shell-scripting</code>, <code>traceback</code>, <code>ldif</code>
+</h6>
+      </section>
+
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
     
   </body>
 </html>
