@@ -4,14 +4,16 @@
 Core GNUPG module
 [core:docstring]
 
-core:import util
+#. GNUPG -={
 
 core:requires gpg2
 
-core:requires ENV SITE_PROFILE%%@*
+core:requires ENV SITE_PROFILE
 core:requires ENV USER_USERNAME
+core:requires ENV USER_FULLNAME
 core:requires ENV USER_EMAIL
 
+#. Private -={
 function ::gpg:keypath() {
     #. Prints:
     #. . -> <path>
@@ -53,14 +55,11 @@ function ::gpg:keypath() {
                     data=( ${gpgkp} ${gpgkid} )
 
                     gpg2 --no-default-keyring \
-                        --secret-keyring ${gpgkp}.sec\
-                        --keyring ${gpgkp}.pub\
+                        --secret-keyring ${gpgkp}.${gpgkid}.sec\
+                        --keyring ${gpgkp}.${gpgkid}.pub\
                         --list-secret-keys >/dev/null 2>&1
                     e=$?
                 fi
-            ;;
-            *:*)
-                core:raise EXCEPTION_BAD_FN_CALL
             ;;
         esac
 
@@ -72,12 +71,42 @@ function ::gpg:keypath() {
     return $e
 }
 
-function :gpg:list() {
+function ::gpg:kid() {
     local -i e=${CODE_FAILURE}
 
     if [ $# -le 1 ]; then
-        local -i data
-        ::gpg:keypath "${1:-*}"
+        local gpgkp
+        gpgkp=( $(::gpg:keypath "${1:-*}") )
+        e=$?
+        [ $e -ne ${CODE_SUCCESS} ] || echo "${gpgkp[1]}"
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+#. }=-
+
+#. encrypt/decrypt -={
+function :gpg:decrypt() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 2 ]; then
+        local input="${1}"
+        local output="${2}"
+        local gpgkid=$(::gpg:kid)
+
+        if [ -e ${output} ]; then
+            core:log WARN "Removed ${output}"
+            rm -f "${output}"
+        fi
+        gpg -q\
+            --batch\
+            --use-agent\
+            --trust-model always\
+            --decrypt\
+            --default-key ${gpgkid}\
+            -o ${output} ${input} 2>/dev/null
         e=$?
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -86,30 +115,34 @@ function :gpg:list() {
     return $e
 }
 
-function gpg:list:usage() { echo "[<gpg-key-id>]"; }
-function gpg:list() {
-    local -i e=${CODE_DEFAULT}
+function :gpg:encrypt() {
+    local -i e=${CODE_FAILURE}
 
-    if [ $# -le 1 ]; then
-        e=${CODE_FAILURE}
+    if [ $# -eq 2 ]; then
+        local input="${1}"
+        local output="${2}"
+        local gpgkid=$(::gpg:kid)
 
-        local -a data
-        data=( $(::gpg:keypath "${1:-*}") )
-        e=$?
-        if [ ${#data[@]} -eq 2 ]; then
-            read gpgkp gpgkid <<< "${data[@]}"
-            cpf "%{@path:%s/%s}..." ${gpgkp} ${gpgkid}
-            if [ $e -eq ${CODE_SUCCESS} ]; then
-                theme HAS_PASSED VALID
-            else
-                theme HAS_FAILED INVALID
-            fi
+        if [ -e ${output} ]; then
+            core:log WARN "Removed ${output}"
+            rm -f "${output}"
         fi
+        gpg -q -a\
+            --batch\
+            --use-agent\
+            --trust-model always\
+            --encrypt\
+            --recipient ${gpgkid}\
+            -o ${output} ${input} 2>/dev/null
+        e=$?
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
 }
-
+#. }=-
+#. create -={
 function :gpg:create() {
     local -i e=${CODE_FAILURE}
 
@@ -136,21 +169,26 @@ Expire-Date: 0
 %secring ${gpgkp}.sec
 %commit
 !
-            gpg2 -q --batch --gen-key ${gpgkp}.conf 2>&1 |
-                sed -e '/^$/d' -e 's/^/   * /'
+            gpg2 -q --batch --gen-key ${gpgkp}.conf 2>/dev/null |
+                sed -e '/^$/d' -e 's/^/   * /' 2>/dev/null
             if [ $? -eq 0 -a -e ${gpgkp}.sec -a -e ${gpgkp}.pub ]; then
-                export gpgkid=0x$(
+                local gpgkid
+                gpgkid=0x$(
                     gpg2 --no-default-keyring \
                         --secret-keyring ${gpgkp}.sec\
                         --keyring ${gpgkp}.pub\
-                        --list-secret-keys | awk -F '[ /]+' '$1~/^sec/{print$3}'
+                        --list-secret-keys 2>/dev/null |
+                            awk -F '[ /]+' '$1~/^sec/{print$3}'
                 )
-                if gpg -q --batch --import ${gpgkp}.sec; then
-                    if gpg -q --batch --import ${gpgkp}.pub; then
-                        mv ${gpgkp}.sec ${gpgkp}.${gpgkid}.sec
-                        mv ${gpgkp}.pub ${gpgkp}.${gpgkid}.pub
-                        mv ${gpgkp}.conf ${gpgkp}.${gpgkid}.conf
-                        e=${CODE_SUCCESS}
+                if [ ${PIPESTATUS[0]} -eq 0 ]; then
+                    if gpg -q --batch --import ${gpgkp}.sec; then
+                        if gpg -q --batch --import ${gpgkp}.pub; then
+                            mv ${gpgkp}.sec ${gpgkp}.${gpgkid}.sec
+                            mv ${gpgkp}.pub ${gpgkp}.${gpgkid}.pub
+                            mv ${gpgkp}.conf ${gpgkp}.${gpgkid}.conf
+                            echo ${gpgkid}
+                            e=${CODE_SUCCESS}
+                        fi
                     fi
                 fi
             fi
@@ -176,18 +214,17 @@ function gpg:create() {
         gpgkp=( $(::gpg:keypath '*') )
         e=$?
         if [ ${#gpgkp[@]} -eq 0 ]; then
-            cpf "Generating an RSA/ELG-E GPG key for (%{@user:%s}@%{@profile:%s}) %{r:%s}\n" "${USER_USERNAME}" "${SITE_PROFILE%%@*}" "-=["
-            if :gpg:create; then
-                cpf " * %{r:%s} GPG Key Generation..." "]=-"
-                theme HAS_PASSED "${gpgkp}.*"
-                e=${CODE_SUCCESS}
+            cpf "Generating an RSA/ELG-E GPG key for %{@user:%s}@%{@profile:%s}..." "${USER_USERNAME}" "${SITE_PROFILE%%@*}"
+            local gpgkid
+            gpgkid=$(:gpg:create)
+            e=$?
+            if [ $e -eq ${CODE_SUCCESS} ]; then
+                theme HAS_PASSED "${gpgkid}"
             else
-                cpf " * %{r:%s} GPG Key Generation..." "]=-"
                 theme HAS_FAILED
-                e=${CODE_FAILURE}
             fi
         elif [ ${#gpgkp[@]} -eq 2 ]; then
-            cpf "You already have a key for this profile: %{@hash:${gpgkp[1]}}\n"
+            theme HAS_WARNED "KEY_EXISTS:${gpgkp[1]}"
             e=${CODE_FAILURE}
         else
             core:raise EXCEPTION_BAD_FN_CALL
@@ -196,7 +233,8 @@ function gpg:create() {
 
     return $e
 }
-
+#. }=-
+#. delete -={
 function :gpg:delete() {
     local -i e=${CODE_FAILURE}
 
@@ -240,9 +278,10 @@ function gpg:delete() {
 
     if [ $# -eq 1 ]; then
         local gpgkid=$1
+        cpf "Removing GPG key %{@hash:${gpgkid}}..."
+
         :gpg:delete ${gpgkid}
         e=$?
-        cpf "Removing GPG key..."
         if [ $e -eq ${CODE_SUCCESS} ]; then
             theme HAS_PASSED "${gpgkid}"
         else
@@ -252,3 +291,44 @@ function gpg:delete() {
 
     return $e
 }
+#. }=-
+#. list -={
+function :gpg:list() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local -a data
+        data=( $(::gpg:keypath "${1}") )
+        e=$?
+        if [ ${#data[@]} -eq 2 ]; then
+            echo "${data[@]}"
+            e=${CODE_SUCCESS}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+function gpg:list:usage() { echo "[<gpg-key-id>]"; }
+function gpg:list() {
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -le 1 ]; then
+        local data
+        data=$(:gpg:list "${1:-*}")
+        e=$?
+
+        read gpgkp gpgkid <<< "${data[@]}"
+        cpf "Inspecting GPG Key..."
+        if [ $e -eq ${CODE_SUCCESS} ]; then
+            theme HAS_PASSED "${gpgkid}"
+        else
+            theme HAS_FAILED "NO_KEYS"
+        fi
+    fi
+
+    return $e
+}
+#. }=-
+#. }=-
