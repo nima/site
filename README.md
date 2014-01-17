@@ -1,40 +1,58 @@
-[![status](https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png)](https://sourcegraph.com/github.com/nima/site)
+[![Build Status](https://travis-ci.org/nima/site.png?branch=master)](https://travis-ci.org/nima/site)
 [![views](https://sourcegraph.com/api/repos/github.com/nima/site/counters/views.png)](https://sourcegraph.com/github.com/nima/site)
 [![authors](https://sourcegraph.com/api/repos/github.com/nima/site/badges/authors.png)](https://sourcegraph.com/github.com/nima/site)
+[![status](https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png)](https://sourcegraph.com/github.com/nima/site)
 
 # OVERVIEW
-**MISSION STATEMENT**: _To simplify group scripting, reporting and automation tasks for large teams of system engineers_
+**MISSION STATEMENT**: _To simplify and standardize collaborative scripting, reporting and automation tasks_
+
+**TARGET AUDIENCE**: _System Administrators, System Engineers, DevOps, System Reliability Engineers (SRE), Test Engineers_
 
 Site is written for system administrators, system engineers, devOps, or automation engineers.  It is a superset of bash, and structured to scale with your scripting requirements.
 
+## The Code
 Site is broken up into two main chunks:
 
-1. The bits that we write: the *site engine* (`lib/libsite`), and *core modules* `module/*`
-2. The bits that you write: *user modules* (`profile/${PROFILE}/module/*`)
+1. The bits that we write:
+    * the *site engine*: `libsite.sh`
+    * the *core modules*: `module/*`
 
-You can configure site in two places:
+2. The bits that you write:
+    * the *user modules*: `~/.site/module/*`
 
-1. `profile/${PROFILE}/etc/site.conf` - configuration specific to *your organization*
-2. `~/.siterc` - configuration specific to *you*
+## The Config
+Site is configured in two places:
+
+1. One for *your organization*: `~/.site/etc/site.conf`
+2. One just for *you*: `~/.siterc`
 
 
 # REQUIREMENTS
 
-1. Core Requirements
-    * You need bash v4.0+
-    * You need gnu grep v2.0+ (probably)
-2. Additional Requirements
-    * The site modules will themselves check for any python, ruby, or perl module you need for that particular module.
+## Core Requirements
+
+You need bash v4.0+ to start with, but this is easier than you might think:  if your version of bash is older, simply compile a newer one locally in you home directory, and set the environment variable `SITE_SHELL` to point to it.  You don't even need to do this in your user profile, simply place it (and any other overrides) into your `~/.siterc` or ~/.site/etc/site.conf`.  More on those files later!
+
+You also need a handful of utilities and interpreters such as gnu grep, gawk, gsed, nc, socat, etc. The full list is covered in the installation section bellow.
+
+## Additional Requirements
+
+The site modules will themselves check for any python, ruby, or perl module you need for that particular module.
 
 
 # INSTALLATION
-
-1. Clone It
+0. Clone It
 
     ```bash
     cd ~/
     git clone https://github.com/nima/site.git
     cd site
+    ```
+1. Install prerequisite software
+
+    Do what [Travis](https://travis-ci.org/nima/site/builds) does:
+    ```bash
+    sed -ne '/^before_install:/,/^$/{/^ /p}' .travis.yml
     ```
 2. Set up yout new `PROFILE`
 
@@ -57,10 +75,10 @@ Site is designed to be run by your local user; it is designed to be installed on
 ### Site will not crap all over your filesystem or home directory
 Here are the only files that will exist outside of `${SITE_SCM}` (where you cloned site to):
 
-* `~/bin/site`
-* `~/.site/`
-* `~/.siterc`
-* `~/.secrets`
+    * `~/bin/site`
+    * `~/.site/`
+    * `~/.siterc`
+    * `~/.secrets`
 
 The installer installs everything required monolithically under `~/.site/`, and even that is just a set of symbolic links pointing back to various folders within `${SITE_SCM}`.
 
