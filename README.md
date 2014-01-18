@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/nima/site.png?branch=master)](https://travis-ci.org/nima/site)
+[![Build Status](https://travis-ci.org/nima/site.png?branch=stable)](https://travis-ci.org/nima/site)
 [![views](https://sourcegraph.com/api/repos/github.com/nima/site/counters/views.png)](https://sourcegraph.com/github.com/nima/site)
 [![authors](https://sourcegraph.com/api/repos/github.com/nima/site/badges/authors.png)](https://sourcegraph.com/github.com/nima/site)
 [![status](https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png)](https://sourcegraph.com/github.com/nima/site)
@@ -152,3 +152,7 @@ It could however need root access when communicating tasks to remote hosts, and 
 All your passwords should be stored in `~/.secrets`, which is gnugp-encrypted with your user's public key; site will ask `gpg-agent` (or you) whenever it needs access to it.
 
 You can store any password you like in there, even remote host sudo passwords.
+
+---
+
+###### TAGS: `abstraction`, `automation`, `reporting`, `verifiability`, `standards`, `monitoring`, `unit-testing`, `bash`, `ssh`, `tmux`, `netgroup`, `hosts`, `users`, `ldap`, `mongo`, `softlayer`, `gnupg`, `remote-execution`, `sudo`, `tmux`, `shell-scripting`, `traceback`, `ldif`
