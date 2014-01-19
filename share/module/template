@@ -6,21 +6,32 @@ core:import util
 The module does X, Y and Z
 [core:docstring]
 
-function mymod:hello() {
-    local -i e=${CODE_DEFAULT?}
+function :template:funk() {
+    local -i e=${CODE_FAILURE}
 
-    if [ $# -gt 0 ]; then
-        local -a creatures
-        local whostr
-        shopt -s nocasematch
-        if [ $# -eq 1 ] && [[ $1 == "WORLD" ]]; then
-            whostr="WORLD!"
+    if [ $# -eq 2 ]; then
+        echo "*** main function logic ***"
+        e=$?
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function template:funk:usage() { echo "<mandatory> [<optional:default>]"; }
+function template:funk() {
+    local -i e=${CODE_DEFAULT}
+
+    if [ $# -le 1 ]; then
+        local mandatory=${1}
+        local optional="${2:-default}"
+        :template:funk "${mandatory}" "${optional}"
+        if [ $e -eq ${CODE_SUCCESS} ]; then
+            theme HAS_PASSED
         else
-            creatures=( "$@" )
-            whostr="$(:util:join , creatures), and of course ${name}!"
+            theme HAS_FAILED
         fi
-
-        e=${CODE_SUCCESS}
     fi
 
     return $e
