@@ -4,134 +4,7 @@
 Core utilities module
 [core:docstring]
 
-g_VAULT=${HOME}/.secrets
-g_VAULT_TMP=${HOME}/.vault/killme
-g_VAULT_BACKUP=${HOME}/.vault/vault-$(date +'%Y%m%d')
-#. Secrets -={
-#function ::util:secrets:draw() {
-#    ${HOME}/bin/gpg2png $1
-#    cp $1.png ~/vault.png
-#    cp $1-qr.png ~/g_VAULT-QR.PNG
-#    img2txt ~/vault.png ~/g_VAULT-QR.PNG
-#}
-
-function ::util:secrets:cleanup() {
-    for vault in ${g_VAULTS[@]}; do
-        test ! -f ${vault} || chmod 600 ${vault}
-    done
-    mkdir -p $(dirname ${g_VAULT_BACKUP})
-    chmod 700 $(dirname ${g_VAULT_BACKUP})
-    test ! -f ${g_VAULT_BACKUP} || chmod 600 ${g_VAULT_BACKUP}
-    find ${g_VAULT_TMP} -type f -exec shred -fuz {} \;
-    rm -f ${g_VAULT_TMP}.timestamp
-    #rmdir $(dirname ${g_VAULT_TMP})
-}
-
-function :util:secrets() {
-    local -i e=${CODE_FAILURE}
-
-    if [ $# -eq 1 ]; then
-        ${SITE_CORE_LIBEXEC}/secret $1
-        e=$?
-    else
-        core:raise EXCEPTION_BAD_FN_CALL
-    fi
-
-    return $e
-}
-
-function util:secrets:usage() { echo "list|edit|read <sid>"; }
-function util:secrets() {
-    local -i e=${CODE_DEFAULT}
-    trap ::util:secrets:cleanup INT
-
-    core:requires gpg
-
-    cpf "Checking your GPG id..."
-    if [ "${USER_GPG_ID}" != "UNSET" ]; then
-        theme HAS_PASSED ${USER_GPG_ID}
-
-        if [ ! -f ${g_VAULT} ]; then
-            cpf "Generating blank secrets file..."
-            echo "XXX" | gpg -q --batch --use-agent -r ${USER_GPG_ID} -e -a -o ${g_VAULT}
-            theme HAS_PASSED ${g_VAULT}
-        fi
-
-        if [ $# -eq 1 ]; then
-            case $1 in
-                edit)
-                    cpf "Checking for GPG keys..."
-                    if [ -e ${gpgkp}.pub ]; then
-                        theme HAS_PASSED
-
-                        cpf "Decrypting secrets..."
-                        mkdir -p $(dirname ${g_VAULT_TMP})
-                        chmod 700 $(dirname ${g_VAULT_TMP})
-                        gpg -q --batch --use-agent -d --default-key ${USER_GPG_ID} -o ${g_VAULT_TMP} ${g_VAULT}
-                        e=$?
-                        if [ $e -eq 0 ]; then
-                            theme HAS_PASSED
-                            touch ${g_VAULT_TMP}.timestamp
-                            ${EDITOR:-vim} -n ${g_VAULT_TMP}
-                            if [ ${g_VAULT_TMP} -nt ${g_VAULT_TMP}.timestamp ]; then
-                                cpf "Encrypting secrets..."
-                                #draw ${g_VAULT_TMP}
-                                mv ${g_VAULT} ${g_VAULT_BACKUP}
-                                gpg -q --batch --use-agent -r ${USER_GPG_ID} -e -a -o ${g_VAULT} ${g_VAULT_TMP}
-                                e=$?
-                                if [ $e -eq 0 ]; then
-                                    theme HAS_PASSED
-                                else
-                                    theme HAS_FAILED "ENCRYPTION"
-                                fi
-                            fi
-                        else
-                            theme HAS_FAILED "DECRYPTION"
-                        fi
-                        ::util:secrets:cleanup
-                    else
-                        theme HAS_FAILED "Missing ${gpgkp}.pub"
-                        e=${CODE_FAILURE}
-                    fi
-                ;;
-                list)
-                    local -a secrets=(
-                        $(gpg -q --batch --use-agent -d -o - ${g_VAULT}|awk '$1!~/^[\t ]*#/{print$1}')
-                    )
-                    e=${PIPESTATUS[0]}
-                    if [ $e -eq 0 ]; then
-                        for secret in ${secrets[@]}; do
-                            cpf "%{r:%s}\n" ${secret}
-                        done
-                    fi
-                ;;
-            esac
-        elif [ $# -eq 2 ]; then
-            case $1 in
-                read)
-                    local secret=$2
-                    cpf "Checking for secret id %{r:%s}..." ${secret}
-                    local -a secrets=(
-                        $(gpg -q --batch --use-agent -d -o - ${g_VAULT}|awk '$1~/^\<'${secret}'\>/{print$1}')
-                    )
-                    e=${PIPESTATUS[0]}
-                    if [ $e -eq 0 -a ${#secrets[@]} -eq 1 ]; then
-                        theme HAS_PASSED "SECRET_KEY_VALID"
-                    else
-                        theme HAS_FAILED "NO_SUCH_SECRET_ID"
-                    fi
-                ;;
-            esac
-        fi
-    else
-        theme HAS_FAILED "USER_GPG_ID_UNDEFINED"
-        e=${CODE_FAILURE}
-    fi
-
-    return $e
-}
-#. }=-
-
+#. Utilities -={
 #. Timeout -={
 #. Optional long help message
 function util:timeout:help() {
@@ -206,7 +79,6 @@ function util:timeout() {
     return $e
 }
 #. }=-
-
 #. Date -={
 function :util:date:i2s() {
     if [ $# -eq 1 ]; then
@@ -235,29 +107,50 @@ function :util:date:s2i() {
     fi
 }
 #. }=-
+#. Stat -={
+function :util:stat:mode() {
+    local -i e=${CODE_FAILURE}
 
+    local filepath="${1}"
+    if [ $# -eq 1 -a -e "${filepath}" ]; then
+        stat --printf '%a' "${filepath}"
+        e=$?
+    fi
+
+    return $e
+}
+#. }=-
 #. Misc -={
 function :util:listify() {
+    local -i e=${CODE_FAILURE}
+
     if [ $# -gt 0 ]; then
         #. Method 1
         IFS=, read -a s <<< "$*"
         echo ${s[@]}
-        return
+        e=${CODE_SUCCESS}
 
         #. Method 2
-        IFS=, read -a s <<< $*
-        echo ${s}
+        #IFS=, read -a s <<< $*
+        #echo ${s}
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
+
+    return $e
 }
 
 function :util:uniq() {
+    local -i e=${CODE_FAILURE}
+
     if [ $# -gt 0 ]; then
         tr ' ' '\n' <<< "${@}" | sort -u | tr '\n' ' '
+        e=$?
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
+
+    return $e
 }
 
 function :util:dups() {
@@ -305,17 +198,17 @@ function :util:is_int() {
 #    return $?
 #}
 #. }=-
-
 #. ANSI2HTML -={
 function :util:ansi2html() {
     ${SITE_CORE_LIBEXEC}/ansi2html
 }
 #. }=-
-
 #. Markdown Scaffolding -={
 function :util:markdown() {
-    if read -t 0 -N 0; then
-        if [ $# -gt 0 ]; then
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -gt 0 ]; then
+        if read -t 0 -N 0; then
             local op=$1
             shift
 
@@ -331,8 +224,13 @@ function :util:markdown() {
                 cat
                 echo "###### vim:syntax=markdown"
             } | vimcat
+            e=$?
         fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
+
+    return $e
 }
 #. Set Operations -={
 #function :util:sets:explode() {
@@ -357,4 +255,5 @@ function :util:markdown() {
 #    sd=( $(comm -3 <(explode $1) <(explode $2)) )
 #    explode sd
 #}
+#. }=-
 #. }=-

@@ -3,8 +3,7 @@
 #core|git
 #core|cpf
 #core|unit
-
-#. HGD (Host Group Directives) Module
+#. HGD (Host Group Directives) Module -={
 core|hgd|resolve|private||. &(#10.1.2.3/29)|300bd93c5aa2dca4df7515461048de08||0
 core|hgd|explode|private||. #10.1.2.3/29|8671846114c5b462c507ccd428776565||0
 core|hgd|resolve|internal||. &(#10.1.2.3/29)|10.1.2.6 10.1.2.4 10.1.2.5 10.1.2.2 10.1.2.3 10.1.2.1||0
@@ -16,21 +15,19 @@ core|hgd|load|internal||. ut-hgd-save|||0
 core|hgd|refresh|public||ut-hgd-save|||0
 core|hgd|refresh|internal||. ut-hgd-save|||0
 core|hgd|list|public||ut-hgd-save|^ut-hgd-save||0
-
-#. The Utility module
+#. }=-
+#. Utility Module -={
 core|util|date:i2s|internal||1369369079|20130524041759||0
 core|util|date:s2i|internal||20131230235959|1388447999||0
 core|util|listify|internal||b,a,d,b,e,e,f|b a d b e e f||0
 core|util|uniq|internal||b a d b e e f|a b d e f||0
-core|util|secrets:cleanup|internal|||||0
-core|util|secrets:cleanup|private|||||0
 core|util|is_int|internal||-1|||0
 core|util|is_int|internal||0|||0
 core|util|is_int|internal||1|||0
 core|util|is_int|internal||a2|||1
 core|util|is_int|internal||2a|||1
-
-#. Networking module
+# }=-
+#. Networking Module -={
 core|net|b2nm|internal||33|||1
 core|net|b2hm|internal||33|||1
 core|net|b2nm|internal||32|0xffffffff||0
@@ -52,7 +49,12 @@ core|net|portping|internal||. google-public-dns-a.google.com. 53|||0
 core|net|portping|public||google-public-dns-a.google.com. 53|||0
 core|net|portping|public||google-public-dns-a.google.com. 53|||0
 core|net|portping|public||google-public-dns-a.google.com. 12345|||1
-
+#. }=-
+#. Vault Module -={
+core|vault|cleanup|internal|||||0
+core|vault|cleanup|private|||||0
+#. }=-
+#. TODO -={
 core|ldap|ngldif|public||foo|||1
 core|ldap|mkldif|public||add user freddy/fatass balls one-medium one-large - shlong high-girth very-short|||0
 core|ldap|mkldif|private||add user freddy/fatass balls one-medium one-large - shlong high-girth very-short|55d303f117d5e1b7b4772b4a36aa3c3e||0
@@ -66,4 +68,5 @@ core|dns|subdomains|internal||p|||0
 #core|dns|tldids|public|||fe8f1ce743e355dd68c348838137be3b||0
 core|help|all|public|||||0
 core|help|module|public||help|||0
+#. }=-
 #. }=-

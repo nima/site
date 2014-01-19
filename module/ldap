@@ -100,7 +100,7 @@ function :ldap:authenticate() {
     local -i e=${CODE_FAILURE}
 
     if [ ${#g_PASSWD_CACHED} -eq 0 ]; then
-        g_PASSWD_CACHED="$(:util:secrets LDAP)"
+        g_PASSWD_CACHED="$(:vault:read LDAP)"
         e=$?
 
         local ldaphost_rw=$(:ldap:host_rw)
