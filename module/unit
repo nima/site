@@ -5,9 +5,41 @@ Core Unit-Testing Module
 [core:docstring]
 
 #. -={
-#. Pre/post test scaffolding -={
+#. Scaffolding -={
+moduleScaffold() {
+    local -i e=0
+
+    local cl=${1^}
+    local module=$2
+    cpf "%{@comment:${module}${cl}...}"
+
+    if [ -f ${g_RUNTIME_SCRIPT} ]; then
+        if [ $? -eq 0 ]; then
+            if [ "$(type -t ${module}${cl} 2>/dev/null)" == "function" ]; then
+                ${module}${cl}
+                e=$?
+                if [ $e -eq 0 ]; then
+                    theme HAS_PASSED
+                else
+                    theme HAS_FAILED
+                fi
+            else
+                theme HAS_WARNED "UNDEFINED:${module}${cl}"
+            fi
+        else
+            theme HAS_FAILED
+            e=${CODE_FAILURE}
+        fi
+    else
+        theme HAS_PASSED "DYNAMIC_ONLY"
+    fi
+
+    return $e
+}
+
 oneTimeSetUp() {
-    cpf "%{@comment:Set-up...}"
+    cpf "%{@comment:unitSetUp...}"
+    local -i e=${CODE_SUCCESS}
 
     declare -gi tid=0
 
@@ -16,22 +48,32 @@ oneTimeSetUp() {
 
     declare -g stdoutF="${oD}/stdout"
     declare -g stderrF="${oD}/stderr"
-
     theme HAS_PASSED
+
+    moduleScaffold setUp ${module?}
+    e=$?
+
+    return $e
 }
 
 oneTimeTearDown() {
-    cpf "%{@comment:Tear-down...}"
+    local -i e=${CODE_SUCCESS}
 
+    moduleScaffold tearDown ${module?}
+    e=$?
+
+    cpf "%{@comment:unitTearDown...}"
     rm -rf "${oD?}"
-
     theme HAS_PASSED
+
+    return $e
 }
 
 setUp() {
     : ${tid?}
     ((tid++))
-    cpf "%{@comment:Test} %{y:#${tid}: }"
+    tidstr=$(printf "%03d" ${tid})
+    cpf "%{@comment:Test} %{y:#%s} " "${tidstr}"
 }
 
 tearDown() {
@@ -66,7 +108,7 @@ function testCoverage() {
             for context in ${!fnregexes[@]}; do
                 local regex=$(printf "${fnregexes[${context}]}" ${module})
                 local -i count=$(grep -cE "${regex}" ${module})
-                cpf "    %{!module:${module}}: %{m:${context}}: %{@int:${count}}\n"
+                cpf "     %{m:${context}}:%{!module:${module}}:%{@int:${count} functions}\n"
                 if [ $count -gt 0 ]; then
                     local -a fns=(
                         $(grep -oE "${regex}" ${module}|sed -e "s/^function :\{0,2\}${module}:\(.*\)()/\1/")
@@ -139,6 +181,7 @@ function ${utf}Dyn${i}NoArgs() {
 #. Dynamic function ${i} for ${utf} [ site:${auto_profile}:${auto_module}.${auto_fn}() ] -={
 
 function ${utf}Dyn${i}() {
+    local regex_stdin="${auto_stdin?}";
     local regex_stdout='${auto_stdout?}';
     local regex_stderr='${auto_stderr?}';
 
@@ -262,11 +305,10 @@ function ${utf}Dyn${i}() {
 #. }=-
 #. Unit-test `site' module function -={
 
-function ::unit:prime() {
-    local -i e=${CODE_DEFAULT?}
+function ::unit:test() {
+    declare -g g_MODE
 
-    local valid=0
-    [ $# -ne 0 ] || valid=1
+    local -i e=0
 
     local -A profiles=(
         [core]=${SITE_CORE_MOD}
@@ -278,7 +320,8 @@ function ::unit:prime() {
             local module script
             for module in *; do
                 if [ ${#g_MODULES[@]} -eq 0 -o ${g_MODULES[${module}]--1} -eq 1 ]; then
-                    cpf "%{@comment:${profile}.${module}}.%{r:prime -=[}\n";
+                    g_MODE="prime"
+                    cpf "%{@comment:${profile}.${module}}.%{r:${g_MODE} -=[}\n";
                     (
                         export g_RUNTIME_CWD=${profiles[${profile}]}
                         export g_RUNTIME_PROFILE=${profile}
@@ -299,35 +342,37 @@ function ::unit:prime() {
                         source ${g_RUNTIME_SCRIPT}
                         SHUNIT_PARENT="${SITE_CORE_MOD}/unit" source ${SHUNIT2}
                     )
-                    e=$?
+                    local -i ep=$?
 
                     cpf "%{r:]=-} "
-                    if [ ${e} -eq 0 ]; then
-                        cpf "%{@comment:exit}:%{g:PASSED(${e})}\n"
+                    if [ ${ep} -eq 0 ]; then
+                        theme HAS_PASSED
                     else
-                        cpf "%{@comment:exit}:%{r:FAILED(${e})}\n"
+                        theme HAS_FAILED
+                        let e++
                     fi
                     cpf "%{@comment:#############################################################################}\n"
 
-                    cpf "%{@comment:${profile}.${module}}.%{r:execute -=[}\n";
+                    g_MODE="execute"
+                    cpf "%{@comment:${profile}.${module}}.%{r:${g_MODE} -=[}\n";
                     script=${SITE_USER_CACHE?}/unittest-${module}.sh
+                    local -i ee=-1
                     if [ -r "${script}" ]; then
                         (
                             export g_RUNTIME_SCRIPT="${script}"
                             source "${script}"
                             SHUNIT_PARENT="${script}" source "${SHUNIT2}"
                         )
-                        e=$?
-
-                        cpf "%{r:]=-} "
-                        if [ ${e} -eq 0 ]; then
-                            cpf "%{@comment:exit}:%{g:PASSED(${e})}\n"
-                        else
-                            cpf "%{@comment:exit}:%{r:FAILED(${e})}\n"
-                        fi
+                        ee=$?
+                    fi
+                    cpf "%{r:]=-} %{@comment:exit}..."
+                    if [ ${ee} -eq 0 ]; then
+                        theme HAS_PASSED
+                    elif [ ${ee} -eq -1 ]; then
+                        theme HAS_WARNED "SKIPPED"
                     else
-                        cpf "%{r:]=-} "
-                        cpf "%{@comment:exit}:%{y:SKIPPED}\n"
+                        theme HAS_FAILED
+                        let e++
                     fi
                     cpf "%{@comment:#############################################################################}\n"
                 fi
@@ -360,7 +405,7 @@ function unit:test() {
             cpf "%{@comment:#############################################################################}\n"
             #. Only regenerate the script if it doesn't exist, or if it is
             #. older than the input unittest csv file.
-            ::unit:prime
+            ::unit:test
             local -i e=$?
 
             cpf "Unit-testing overal result..."
