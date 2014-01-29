@@ -9,22 +9,17 @@ branches:
 
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq make
-  - sudo apt-get install -qq bash sed gawk git socat netcat gnupg2
-  - sudo apt-get install -qq python python-virtualenv
-  - sudo apt-get install -qq net-tools
+  - share/unit/travis before_install
 
 env:
   global:
     - SITE_PROFILE="TRAVIS"
     - PATH="${PATH}:${HOME}/bin"
+  matrix:
+    - CONTEXT=install MODULE=-
+    - CONTEXT=execute MODULE=hgd #. nima/site#3
+    - CONTEXT=execute MODULE=gpg #. nima/site#5
+    - CONTEXT=execute MODULE=net #. nima/site#7
 
 script:
-  - make install       #. Test fresh install
-  - make uninstall     #. Test uninstall
-  - make install       #. Test reinstall
-  - make purge         #. Test purge
-  - make install       #  Install again now for unit-testing
-  - site unit test hgd #. nima/site#3
-  - site unit test gpg #. nima/site#5
-  - site unit test net #. nima/site#7
+  - share/unit/travis script
