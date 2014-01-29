@@ -51,6 +51,12 @@ carried out by a public function; the public function therefore is primarily
 providing the "view" component of an MVC architecture.  It also handles
 argument parsing.
 
+Finally public functions should handle all default argument values; that is
+these functions are the only ones that should accept a variable `$#`.  They
+should then work out via whatever logic what variables need to take on
+default/placeholder values, and then pass the full set of arguments to the
+private/internal functions.
+
 #### :Internal Functions
 :internal functions can be called from any function from any module are the
 major workhorse of the framework, and there are many of them.
@@ -58,6 +64,9 @@ major workhorse of the framework, and there are many of them.
 They should not take variable arguments, and any variables that can take a
 default value must be predetermined by the public caller at the start of the
 chain of calls.
+
+These functions must take a non-variable `$#` as described in the public
+function documentation above.
 
 #### ::Private Functions
 ::private function must not be called from outside of their module.  These
@@ -67,6 +76,9 @@ only have a single :private caller, and thus named after the caller
 (prefixed with a colon).  Don't write these unless you want/need to hide
 away something in order to make reading the :internal function that calls
 it better; these functions should be thought of as the `third leg'.
+
+These functions must take a non-variable `$#` as described in the public
+function documentation above.
 
 ---
 
