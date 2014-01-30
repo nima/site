@@ -369,7 +369,7 @@ function ldap:checksum() {
                 for lh in ${ldaphosts[@]}; do
                     if [ ${lh} != ${ldaphost} ]; then
                         cpf "%{@host:${ldaphost}} vs %{@host:${lh}}...\n"
-                        ${USER_DIFF} -T -a -U3\
+                        diff -T -a -U3\
                             <(echo "${dump[${ldaphost}]}")\
                             <(echo "${dump[${lh}]}")
                     fi
@@ -409,7 +409,7 @@ function ldap:checksum() {
                 for lh in ${ldaphosts[@]}; do
                     if [ ${lh} != ${ldaphost} ]; then
                         cpf "%{@host:${ldaphost}} vs %{@host:${lh}}...\n"
-                        ${USER_DIFF} -T -a -U3\
+                        diff -T -a -U3\
                             <(echo "${dump[${ldaphost}]}")\
                             <(echo "${dump[${lh}]}")
                     fi
