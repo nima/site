@@ -5,6 +5,8 @@ BIN_VENV := virtualenv
 REQUIRED := ${BIN_PY27} ${BIN_VENV}
 export BIN_PY27 BIN_VENV
 
+.DEFAULT: help
+
 #. Site Bootstrap -={
 #. SITE_PROFILE Check -={
 ifeq (${SITE_PROFILE},)
@@ -66,9 +68,11 @@ install: require sanity .install
 	@
 	@printf "Preparing /var/tmp/site/..."
 	@mkdir -p /var/tmp/site/var
-	@ln -sf /var/tmp/site/ $(HOME)/.site/var
+	@ln -sf /var/tmp/site/var $(HOME)/.site/var
 	@mkdir -p /var/tmp/site/log
-	@ln -sf /var/tmp/site/ $(HOME)/.site/log
+	@ln -sf /var/tmp/site/log $(HOME)/.site/log
+	@mkdir -p /var/tmp/site/tmp
+	@ln -sf /var/tmp/site/tmp $(HOME)/.site/tmp
 	@echo "DONE"
 	@
 	@touch .install
@@ -87,6 +91,7 @@ uninstall: unsanity
 	-rm $(HOME)/.site/module
 	-rm $(HOME)/.site/libexec
 	-rm $(HOME)/.site/var
+	-rm $(HOME)/.site/tmp
 	-rm $(HOME)/.site/log
 	@
 	-rm $(HOME)/bin/site
@@ -103,5 +108,10 @@ purge:
 	test ! -d ~/.site || find ~/.site -depth -type d -empty -exec rmdir {} \;
 	rm -rf /var/tmp/site/
 	rm -f .install
+#. }=-
+#. Devel -={
+travis:
+	@travis sync
+	@while true; do clear; travis branches; sleep 10; done
 #. }=-
 #. }=-
