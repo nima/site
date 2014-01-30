@@ -30,7 +30,8 @@ export SITE_UNIT_DYNAMIC=${SITE_CORE_LIBSH}/libsite/unit/dynamic.csv
 export SITE_USER=${HOME}/.site
 export SITE_USER_CACHE=${SITE_USER}/var/cache/
 export SITE_USER_ETC=${SITE_USER}/etc
-export SITE_USER_LOG=${SITE_USER}/log/site.log
+export SITE_USER_LOG=${SITE_USER}/var/log/site.log
+export SITE_USER_TMP=${SITE_USER}/tmp
 export SITE_USER_MOD=${SITE_USER}/module
 export SITE_USER_LIBEXEC=${SITE_USER}/libexec
 export SITE_USER_EXTERN=${SITE_USER}/extern
@@ -160,6 +161,7 @@ function core:log() {
         declare ts=$(date +"${SITE_DATE_FORMAT}")
 
         declare msg=$(printf "%s; %5d; %8s[%24s];" "${ts}" "${$--1}" "${code}" "${caller}")
+        [ -e ${SITE_USER_LOG} ] || touch ${SITE_USER_LOG}
         if [ -f ${SITE_USER_LOG} ]; then
             echo "${msg} $@" >> ${SITE_USER_LOG}
         fi
@@ -168,34 +170,70 @@ function core:log() {
 }
 #. }=-
 #. 1.9  Modules -={
-declare -A SITE_IMPORTED
+declare -A g_SITE_IMPORTED_EXIT
 function core:softimport() {
+    #. 0: good module
+    #. 1: administratively disabled
+    #. 2: invalid/bad module (can't source/parse)
+    #. 3: no such module
+    #. 4: no module set
     local -i e=9
 
     if [ $# -eq 1 ]; then
         local module=$1
-        if [ -z "${SITE_IMPORTED[${module}]}" ]; then
-            e=2 #. No such module
+        if [ -z "${g_SITE_IMPORTED_EXIT[${module}]}" ]; then
             if [ ${USER_MODULES[${module}]-9} -eq 1 ]; then
                 if [ -f ${SITE_USER_MOD}/${module} ]; then
-                    SITE_IMPORTED[${module}]=0
-                    source ${SITE_USER_MOD}/${module}
-                    e=$?
+                    if ( source ${SITE_USER_MOD}/${module} >/tmp/site.ouch 2>&1 ); then
+                        source ${SITE_USER_MOD}/${module}
+                        #. Good module
+                        e=0
+                    else
+                        #. Bad module
+                        e=2
+                    fi
+                else
+                    #. No such module
+                    e=2
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
                 if [ -f ${SITE_CORE_MOD}/${module} ]; then
-                    SITE_IMPORTED[${module}]=0
-                    source ${SITE_CORE_MOD}/${module}
-                    e=$?
+                    if ( source ${SITE_CORE_MOD}/${module} >/tmp/site.ouch 2>&1 ); then
+                        source ${SITE_CORE_MOD}/${module}
+                        #. Good module
+                        e=0
+                    else
+                        #. Bad module
+                        e=2
+                    fi
+                else
+                    #. No such module
+                    e=3
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 0 -o ${USER_MODULES[${module}]-9} -eq 0 ]; then
-                e=${CODE_FAILURE} #. Disabled
+                #. Disabled
+                e=${CODE_FAILURE}
+            elif [ "${module}" == "-" ]; then
+                #. No module set
+                e=4
+            else
+                #. Administratively disabled
+                e=1
             fi
-            SITE_IMPORTED[${module}]=$e
+            g_SITE_IMPORTED_EXIT[${module}]=${e}
         else
-            e=${SITE_IMPORTED[${module}]}
+            #. Import already attempted, reuse that result
+            e=${g_SITE_IMPORTED_EXIT[${module}]}
         fi
     fi
+
+    return $e
+}
+
+function core:import() {
+    core:softimport $@
+    local -i e=$?
+    [ $e -eq 0 ] || core:raise EXCEPTION_BAD_MODULE
 
     return $e
 }
@@ -220,16 +258,8 @@ function core:docstring() {
         elif [ ${CORE_MODULES[${module}]-9} -eq 0 -o ${USER_MODULES[${module}]-9} -eq 0 ]; then
             e=${CODE_FAILURE} #. Disabled
         fi
-        SITE_IMPORTED[${module}]=$e
+        g_SITE_IMPORTED_EXIT[${module}]=$e
     fi
-
-    return $e
-}
-
-function core:import() {
-    core:softimport $@
-    local -i e=$?
-    [ $e -eq 0 ] || core:raise EXCEPTION_BAD_MODULE
 
     return $e
 }
@@ -261,13 +291,13 @@ function core:requires() {
     case $#:${1} in
         1:*)
             if ! :core:requires $1; then
-                local caller="${FUNCNAME[1]}"
+                e=${CODE_FAILURE}
+                #local caller="${FUNCNAME[1]}"
                 #. TODO: Check if ${caller} is a valid/plausible executable name
-                local caller_is_mod=$(( ${USER_MODULES[${caller/:*/}]-0} + ${CORE_MODULES[${caller/:*/}]-0} ))
-                if [ ${caller_is_mod} -ne 0 ]; then
-                    #core:raise EXCEPTION_MISSING_EXEC $1
-                    e=${CODE_FAILURE}
-                fi
+                #local caller_is_mod=$(( ${USER_MODULES[${caller/:*/}]-0} + ${CORE_MODULES[${caller/:*/}]-0} ))
+                #if [ ${caller_is_mod} -ne 0 ]; then
+                #    core:raise EXCEPTION_MISSING_EXEC $1
+                #fi
             fi
         ;;
         *:PERL)
@@ -808,15 +838,23 @@ function :core:usage() {
         for profile in USER_MODULES CORE_MODULES; do
             eval $(::core:eval:dereference profile) #. Will create ${profile} array
             for module in ${!profile[@]}; do (
-                core:import ${module}
-                local -a fn_public=( $(:core:functions public ${module}) )
-                local -a fn_private=( $(:core:functions private ${module}) )
-                if [ ${#fn_public[@]} -gt 0 ]; then
-                    local docstring=$(core:docstring ${module})
-                    cpf "    %{bl:${SITE_BASENAME}} %{!module:${module}}:%{@int:%s}/%{@int:%s}%{@comment:%s}\n"\
-                        "${#fn_public[@]}" "${#fn_private[@]}" "${docstring:+; ${docstring}}"
+                local docstring="{no-docstr}"
+                core:softimport ${module}
+                if [ $? -eq ${CODE_SUCCESS} ]; then
+                    local -a fn_public=( $(:core:functions public ${module}) )
+                    local -a fn_private=( $(:core:functions private ${module}) )
+                    if [ ${#fn_public[@]} -gt 0 ]; then
+                        docstring=$(core:docstring ${module})
+                        cpf "    "
+                    else
+                        #cpf "%{y:!   }"
+                        docstring=''
+                    fi
                 else
-                    cpf "!   %{bl:${SITE_BASENAME}} %{!module:${module}}:%{@int:%s}/%{@int:%s}%{@comment:%s}\n"\
+                    cpf "%{r:ERR }"
+                fi
+                if [ -n "${docstring}" ]; then
+                    cpf "%{bl:${SITE_BASENAME}} %{!module:${module}}:%{@int:%s}/%{@int:%s}%{@comment:%s}\n"\
                         "${#fn_public[@]}" "${#fn_private[@]}" "${docstring:+; ${docstring}}"
                 fi
             ); done
@@ -910,13 +948,12 @@ function core:wrapper() {
     local -i e_shflags
     setdata="$(::core:shflags "${@}")"
     e_shflags=$?
-    eval "${setdata}"
+    eval "${setdata}" #. sets module, fn, etc.
 
     local regex=':+[a-z0-9]+(:[a-z0-9]+) |*'
     core:softimport "${module?}"
-
     case $?/${module?}/${fn?} in
-        0/-/-)                                                                                       e=${CODE_USAGE_MODS} ;;
+        4/-/-)                                                                                       e=${CODE_USAGE_MODS} ;;
         0/*/-)    :core:execute          ${module}                2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
         0/*/::*) ::core:execute:private  ${module} ${fn:2} "${@}" 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
         0/*/:*)  ::core:execute:internal ${module} ${fn:1} "${@}" 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
@@ -968,9 +1005,13 @@ function core:wrapper() {
                 e=${CODE_USAGE_MOD}
             fi
         ;;
-        2/-/-) e=${CODE_USAGE_MODS};;
-        2/*/*)
+        3/-/-) e=${CODE_USAGE_MODS};;
+        3/*/*)
             theme ERR_USAGE "Module ${module} has not been defined"
+            e=${CODE_FAILURE}
+        ;;
+        2/*/*)
+            theme HAS_FAILED "Module ${module} has errors"
             e=${CODE_FAILURE}
         ;;
         1/*/*)
