@@ -1,26 +1,28 @@
 #. Copy this file to ~/.siterc, and set/uncomment variables as required.
 
 #. Set your SITE_PROFILE here:
-export SITE_PROFILE="SITE01"
+: ${SITE_PROFILE:=SITE01}
+: ${USER_USERNAME:=tyrion}
+: ${USER_FULLNAME:=Tyrion Lannister}
+: ${USER_EMAIL:=tyrion.lannister@lannister.casterlyrock.com}
 
-export USER_USERNAME="tyrion"
-export USER_FULLNAME="Tyrion Lannister"
-export USER_EMAIL="tyrion.lannister@lannister.casterlyrock.com"
-export USER_GPG_ID="0xBADB00B5"
-export USER_DIFF=$(which colordiff || which diff)
-
-#. Executable Overrides -={
+#. Mac OS X (GNU override of BSD commands) -={
 #. Override your BASH if it's old, on Mac OS X, get the GNU utilities via
-#. brew; brew install coreutils findutils:
+#. brew:
+#. brew install bash
+#. brew install coreutils
+#. brew install findutils
+#. brew install gwhich gawk gsed
+#. brew install colordiff
+#. brew tap homebrew/dupes
+#. brew install homebrew/dupes/grep
 
-#. The bash binary itself:
-#SITE_SHELL=/bin/bash
-
-#. Other important binaries:
-#function grep() {    /bin/grep "$@"; return $?; }
-#function sed()  {     /bin/sed "$@"; return $?; }
-#function awk()  { /usr/bin/awk "$@"; return $?; }
-#function anything() { ...; }
+#SITE_SHELL=/usr/local/bin/bash
+#function sed()   { /usr/local/bin/gsed "$@"; return $?; }
+#function awk()   { /usr/local/bin/gawk "$@"; return $?; }
+#function grep()  { /usr/local/bin/ggrep "$@"; return $?; }
+#function which() { /usr/local/bin/gwhich "$@"; return $?; }
+#function diff()  { /usr/local/bin/colordiff "$@"; return $?; }
 #. }=-
 
-#. vim:syntax=sh
+# vim: tw=0:ts=4:sw=4:et:ft=bash
