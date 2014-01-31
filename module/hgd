@@ -7,6 +7,7 @@ core:import util
 core:import mongo
 
 declare -g g_HGD_CACHE=${SITE_USER_CACHE}/hgd.conf
+[ -e ${g_HGD_CACHE} ] || touch ${g_HGD_CACHE}
 
 #. HGD -={
 #. HGD Resolvers -={
