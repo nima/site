@@ -1,0 +1,52 @@
+#!/bin/bash
+
+declare EXIT=9
+
+echo "#. travis[$1].${CONTEXT}(${MODULE}) -=["
+if [ $# -eq 1 ]; then
+    case $1 in
+        script)
+            case ${CONTEXT}:${MODULE} in
+                install:-)
+                    EXIT=0
+                    make install   ;((EXIT|=$?)) #. Test fresh install
+                    make uninstall ;((EXIT|=$?)) #. Test uninstall
+                    make install   ;((EXIT|=$?)) #. Test reinstall
+                    make purge     ;((EXIT|=$?)) #. Test purge
+                ;;
+                execute:*)
+                    EXIT=0
+                    make install             ;((EXIT|=$?))
+                    site unit test ${MODULE} ;((EXIT|=$?))
+                    make uninstall           ;((EXIT|=$?))
+                ;;
+                *:*)
+                    EXIT=1
+                ;;
+            esac
+        ;;
+
+        before_install)
+            EXIT=0
+            sudo apt-get install -qq make                      ;((EXIT|=$?))
+            sudo apt-get install -qq bash sed gawk             ;((EXIT|=$?))
+            sudo apt-get install -qq git socat netcat          ;((EXIT|=$?))
+            sudo apt-get install -qq gnupg2 coreutils          ;((EXIT|=$?))
+            sudo apt-get install -qq python python-virtualenv  ;((EXIT|=$?))
+            sudo apt-get install -qq net-tools                 ;((EXIT|=$?))
+            sudo install -m 0644\
+                share/unit/apt.conf\
+                /etc/apt/apt.conf.d/99SiteUnitTest             ;((EXIT|=$?))
+
+            case ${MODULE} in
+                gpg)
+                    #. FIXME: this fails on Travis CI
+                    sudo apt-get install -qq rng-tools         ;((EXIT|=$?))
+                ;;
+            esac
+        ;;
+    esac
+fi
+echo "#. ]=-"
+
+exit $EXIT
