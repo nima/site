@@ -17,9 +17,11 @@ env:
     - PATH="${PATH}:${HOME}/bin"
   matrix:
     - CONTEXT=install MODULE=-
-    - CONTEXT=execute MODULE=hgd #. nima/site#3
-    - CONTEXT=execute MODULE=gpg #. nima/site#5
-    - CONTEXT=execute MODULE=net #. nima/site#7
+    - CONTEXT=execute MODULE=net   #. nima/site#7
+    - CONTEXT=execute MODULE=hgd   #. nima/site#3
+    - CONTEXT=execute MODULE=gpg   #. nima/site#5
+    - CONTEXT=execute MODULE=util  #. nima/site#4
+    - CONTEXT=execute MODULE=vault #. nima/site#17
 
 script:
   - share/unit/travis script
