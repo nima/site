@@ -1068,7 +1068,7 @@ function core:raise() {
     local -i e=$1
 
     if [[ $- =~ x ]]; then
-        :!!! Exiting raise function early as we are being traced !!!
+        : !!! Exiting raise function early as we are being traced !!!
     else
         cpf "%{r}EXCEPTION%{+bo}[%s->%s]%{-bo}: %s%{N}:\n" "${e}" "$1" "${RAISE[$e]-[UNKNOWN EXCEPTION:$e]}" >&2
 
