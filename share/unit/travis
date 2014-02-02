@@ -39,8 +39,12 @@ if [ $# -eq 1 ]; then
                 /etc/apt/apt.conf.d/99SiteUnitTest             ;((EXIT|=$?))
 
             case ${MODULE} in
-                gpg)
-                    #. FIXME: this fails on Travis CI
+                gpg|vault)
+                    sudo rm -f /dev/random
+                    sudo mknod -m 0666 /dev/random c 1 9 #. urandom
+                    sudo install -m 0644\
+                        share/unit/rng-tools\
+                        /etc/default/rng-tools                 ;((EXIT|=$?))
                     sudo apt-get install -qq rng-tools         ;((EXIT|=$?))
                 ;;
             esac
