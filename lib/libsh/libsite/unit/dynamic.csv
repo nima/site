@@ -17,6 +17,20 @@ core|hgd|refresh|public||ut-hgd-save|||0
 core|hgd|refresh|internal||. ut-hgd-save|||0
 core|hgd|list|public||ut-hgd-save|^ut-hgd-save||0
 
+#. The Utility module
+core|util|date:i2s|internal||1369369079|20130524041759||0
+core|util|date:s2i|internal||20131230235959|1388447999||0
+core|util|listify|internal||b,a,d,b,e,e,f|b a d b e e f||0
+core|util|uniq|internal||b a d b e e f|a b d e f||0
+core|util|secrets:cleanup|internal|||||0
+core|util|secrets:cleanup|private|||||0
+core|util|is_int|internal||-1|||0
+core|util|is_int|internal||0|||0
+core|util|is_int|internal||1|||0
+core|util|is_int|internal||a2|||1
+core|util|is_int|internal||2a|||1
+
+#. Networking module
 core|net|b2nm|internal||33|||1
 core|net|b2hm|internal||33|||1
 core|net|b2nm|internal||32|0xffffffff||0
@@ -49,25 +63,6 @@ core|dns|cname|public||-T p @notahost notadomain|||1
 #core|dns|subdomains|public||-T p|||0
 core|dns|subdomains|internal||p|||0
 #core|dns|tldids|public|||fe8f1ce743e355dd68c348838137be3b||0
-#core|util|timeout|public
-core|util|date:i2s|internal||1369369079|20130524041759||0
-core|util|date:s2i|internal||20131230235959|1388447999||0
-core|util|listify|internal||b,a,d,b,e,e,f|b a d b e e f||0
-core|util|uniq|internal||b a d b e e f|a b d e f||0
-core|util|secrets:cleanup|internal|||||0
-core|util|secrets:cleanup|private|||||0
-core|util|is_int|internal||-1|||0
-core|util|is_int|internal||0|||0
-core|util|is_int|internal||1|||0
-core|util|is_int|internal||a2|||1
-core|util|is_int|internal||2a|||1
-#core|util|secrets|public
-#core|util|secrets|internal
-#core|util|dups|internal
-#core|util|join|internal
-#core|util|ansi2html|internal
-#core|util|gpgkeygen|internal
-#core|util|gpg|public
 core|help|all|public|||||0
 core|help|module|public||help|||0
 #. }=-
