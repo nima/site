@@ -7,7 +7,7 @@ if [ $# -eq 1 ]; then
     case $1 in
         script)
             case ${CONTEXT}:${MODULE} in
-                install:-)
+                installer:-)
                     EXIT=0
                     make install   ;((EXIT|=$?)) #. Test fresh install
                     make uninstall ;((EXIT|=$?)) #. Test uninstall
@@ -16,8 +16,11 @@ if [ $# -eq 1 ]; then
                 ;;
                 execute:*)
                     EXIT=0
+                    echo '$ make install'
                     make install             ;((EXIT|=$?))
+                    echo "$ site unit test ${MODULE}"
                     site unit test ${MODULE} ;((EXIT|=$?))
+                    echo '$ make uninstall'
                     make uninstall           ;((EXIT|=$?))
                 ;;
                 *:*)
@@ -29,23 +32,36 @@ if [ $# -eq 1 ]; then
         before_install)
             EXIT=0
             sudo apt-get install -qq make                      ;((EXIT|=$?))
-            sudo apt-get install -qq bash sed gawk             ;((EXIT|=$?))
-            sudo apt-get install -qq git socat netcat          ;((EXIT|=$?))
-            sudo apt-get install -qq gnupg2 coreutils          ;((EXIT|=$?))
+            sudo apt-get install -qq coreutils bash sed gawk   ;((EXIT|=$?))
+            sudo apt-get install -qq git                       ;((EXIT|=$?))
             sudo apt-get install -qq python python-virtualenv  ;((EXIT|=$?))
-            sudo apt-get install -qq net-tools                 ;((EXIT|=$?))
+            sudo install -d /var/tmp -m 1777                   ;((EXIT|=$?))
             sudo install -m 0644\
                 share/unit/apt.conf\
                 /etc/apt/apt.conf.d/99SiteUnitTest             ;((EXIT|=$?))
 
             case ${MODULE} in
-                gpg|vault)
+                gpg|vault|git)
                     sudo rm -f /dev/random
                     sudo mknod -m 0666 /dev/random c 1 9 #. urandom
                     sudo install -m 0644\
                         share/unit/rng-tools\
                         /etc/default/rng-tools                 ;((EXIT|=$?))
                     sudo apt-get install -qq rng-tools         ;((EXIT|=$?))
+                ;;
+            esac
+
+            case ${MODULE} in
+                gpg|vault)
+                    sudo apt-get install -qq gnupg2            ;((EXIT|=$?))
+                    sudo apt-get install -qq pwgen             ;((EXIT|=$?))
+                    sudo apt-get install -qq xclip             ;((EXIT|=$?))
+                ;;
+                net)
+                    sudo apt-get install -qq iproute           ;((EXIT|=$?))
+                    sudo apt-get install -qq net-tools         ;((EXIT|=$?))
+                    sudo apt-get install -qq netcat            ;((EXIT|=$?))
+                    sudo apt-get install -qq socat             ;((EXIT|=$?))
                 ;;
             esac
         ;;
