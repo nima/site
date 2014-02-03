@@ -4,7 +4,7 @@
 #core|cpf
 #core|unit
 
-#. HGD (Host Group Directives)
+#. HGD (Host Group Directives) Module
 core|hgd|resolve|private||. &(#10.1.2.3/29)|300bd93c5aa2dca4df7515461048de08||0
 core|hgd|explode|private||. #10.1.2.3/29|8671846114c5b462c507ccd428776565||0
 core|hgd|resolve|internal||. &(#10.1.2.3/29)|10.1.2.6 10.1.2.4 10.1.2.5 10.1.2.2 10.1.2.3 10.1.2.1||0
