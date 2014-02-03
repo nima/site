@@ -45,6 +45,7 @@ install: require sanity .install
 	@
 	@$(MAKE) -C extern install
 	@printf "Installing symbolic links in $(HOME)/.site/..."
+	@ln -sf $(PWD) $(HOME)/.site/.scm
 	@ln -sf $(PWD)/lib $(HOME)/.site/lib
 	@ln -sf $(PWD)/profile/${SITE_PROFILE}/etc $(HOME)/.site/etc
 	@ln -sf $(PWD)/profile/${SITE_PROFILE}/module $(HOME)/.site/module
@@ -69,6 +70,8 @@ install: require sanity .install
 	@printf "Preparing /var/tmp/site/..."
 	@mkdir -p /var/tmp/site/var
 	@ln -sf /var/tmp/site/var $(HOME)/.site/var
+	@mkdir -p /var/tmp/site/var/cache
+	@mkdir -p /var/tmp/site/var/run
 	@mkdir -p /var/tmp/site/log
 	@ln -sf /var/tmp/site/log $(HOME)/.site/log
 	@mkdir -p /var/tmp/site/tmp
@@ -98,6 +101,7 @@ uninstall: unsanity
 	-rm $(HOME)/bin/ssm
 	-rm $(HOME)/bin/ssp
 	@
+	-rm $(HOME)/.site/.scm
 	@-rm .install
 	rmdir $(HOME)/.site
 	@

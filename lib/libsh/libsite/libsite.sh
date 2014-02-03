@@ -11,6 +11,8 @@ export PS4=":\${BASH_SOURCE//\${SITE_USER}/}:\${LINENO} -> "
 : ${SITE_PROFILE?}
 export SITE_SITE_BASENAME=$(basename $0)
 
+export SITE_SCM=$(readlink ~/.site/.scm)
+
 export SITE_CORE=$(dirname $(dirname $(readlink ~/bin/site)))
 export SITE_CORE_MOD=${SITE_CORE}/module
 export SITE_CORE_LIBEXEC=${SITE_CORE}/libexec
@@ -28,6 +30,8 @@ export SITE_UNIT_STATIC=${SITE_CORE_LIBSH}/libsite/unit/static.sh
 export SITE_UNIT_DYNAMIC=${SITE_CORE_LIBSH}/libsite/unit/dynamic.csv
 
 export SITE_USER=${HOME}/.site
+export SITE_USER_VAR=${SITE_USER}/var
+export SITE_USER_RUN=${SITE_USER}/var/run
 export SITE_USER_CACHE=${SITE_USER}/var/cache/
 export SITE_USER_ETC=${SITE_USER}/etc
 export SITE_USER_LOG=${SITE_USER}/var/log/site.log
@@ -172,6 +176,7 @@ function core:log() {
 #. }=-
 #. 1.9  Modules -={
 declare -A g_SITE_IMPORTED_EXIT
+
 function core:softimport() {
     #. 0: good module
     #. 1: administratively disabled
@@ -187,6 +192,7 @@ function core:softimport() {
                 if [ -f ${SITE_USER_MOD}/${module} ]; then
                     if ( source ${SITE_USER_MOD}/${module} >/tmp/site.ouch 2>&1 ); then
                         source ${SITE_USER_MOD}/${module}
+                        rm -f /tmp/site.ouch
                         #. Good module
                         e=0
                     else
@@ -195,12 +201,13 @@ function core:softimport() {
                     fi
                 else
                     #. No such module
-                    e=2
+                    e=3
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
                 if [ -f ${SITE_CORE_MOD}/${module} ]; then
                     if ( source ${SITE_CORE_MOD}/${module} >/tmp/site.ouch 2>&1 ); then
                         source ${SITE_CORE_MOD}/${module}
+                        rm -f /tmp/site.ouch
                         #. Good module
                         e=0
                     else
@@ -212,14 +219,14 @@ function core:softimport() {
                     e=3
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 0 -o ${USER_MODULES[${module}]-9} -eq 0 ]; then
-                #. Disabled
-                e=${CODE_FAILURE}
+                #. Implicitly disabled
+                e=1
             elif [ "${module}" == "-" ]; then
                 #. No module set
                 e=4
             else
-                #. Administratively disabled
-                e=1
+                #. No such module
+                e=3
             fi
             g_SITE_IMPORTED_EXIT[${module}]=${e}
         else
@@ -234,9 +241,24 @@ function core:softimport() {
 function core:import() {
     core:softimport $@
     local -i e=$?
-    [ $e -eq 0 ] || core:raise EXCEPTION_BAD_MODULE
+    #. Don't raise an exception; that will break softimport too
+    [ $e -eq ${CODE_SUCCESS} ] || exit 99 #core:raise EXCEPTION_BAD_MODULE
 
     return $e
+}
+
+function core:imported() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local module=${1}
+        e=${g_SITE_IMPORTED_EXIT[${module}]}
+        [ ${#e} -gt 0 ] || e=-1
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return ${e}
 }
 
 function core:docstring() {
@@ -588,7 +610,7 @@ function ::core:execute:private() {
     return $?
 }
 
-function ::core:shflags() {
+function ::core:shflags.eval() {
     local -i e=${CODE_FAILURE}
 
     #. Extract the first 2 non-flag tokens as module and function
@@ -758,13 +780,12 @@ function :core:execute() {
 }
 
 function :core:git() {
-    local root=$(dirname $(readlink ~/.site/module))
-    cd ${root}
+    cd ${SITE_SCM?}
     git "$@"
     return $?
 }
 
-function ::core:eval:dereference() {
+function ::core:dereference.eval() {
     #. NOTE: you myst eval the output of this function!
     #. take $1, and make it equal to ${$1}
     #.
@@ -837,7 +858,7 @@ function :core:usage() {
         #. Usage for site
         cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${SITE_PROFILE}}\n"
         for profile in USER_MODULES CORE_MODULES; do
-            eval $(::core:eval:dereference profile) #. Will create ${profile} array
+            eval $(::core:dereference.eval profile) #. Will create ${profile} array
             for module in ${!profile[@]}; do (
                 local docstring="{no-docstr}"
                 core:softimport ${module}
@@ -947,7 +968,7 @@ function core:wrapper() {
 
     local setdata
     local -i e_shflags
-    setdata="$(::core:shflags "${@}")"
+    setdata="$(::core:shflags.eval "${@}")"
     e_shflags=$?
     eval "${setdata}" #. sets module, fn, etc.
 
@@ -1063,7 +1084,18 @@ declare -A RAISE=(
 )
 function core:raise() {
     : !!! CRITICAL FAILURE !!!
-    touch ${SITE_DEADMAN?}
+    (
+        cpf " %{r:failed with exception} %{g:$e}; %{c:traceback}:\n"
+        local i=0
+        local -i frames=${#BASH_LINENO[@]}
+        #. ((frames-2)): skips main, the last one in arrays
+        for ((i=frames-2; i>=0; i--)); do
+            cpf "  File %{g:${BASH_SOURCE[i+1]}}, line %{g:${BASH_LINENO[i]}}, in %{r:${FUNCNAME[i+1]}()}\n"
+            # Grab the source code of the line
+            local code=$(sed -n "${BASH_LINENO[i]}{s/^ *//;p}" "${BASH_SOURCE[i+1]}")
+            cpf "    %{wh:>>>} %{c}${code}%{N}\n"
+        done
+    ) > ${SITE_DEADMAN?}
 
     local -i e=$1
 

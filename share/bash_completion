@@ -10,7 +10,7 @@ _site() {
         site)
             local opts
             for profile in USER_MODULES CORE_MODULES; do
-                eval $(core:dereference profile) #. Will create ${profile}
+                eval $(core:dereference.eval profile) #. Will create ${profile}
                 for module in ${!profile[@]}; do
                     if [ ${profile[${module}]} -eq 1 ]; then
                         opts="${opts} ${module}"
