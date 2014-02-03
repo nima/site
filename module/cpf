@@ -130,6 +130,12 @@ function theme() {
             HAS_PASSED)          fmt="%{g}PASS";;
             HAS_WARNED)          fmt="%{y}WARN";;
             HAS_FAILED)          fmt="%{r}FAIL";;
+            HAS_AUTOED)
+                case $1 in
+                    0)           fmt="%{g}PASS"; shift;;
+                    *)           fmt="%{r}FAIL"; shift;;
+                esac
+            ;;
 
             FALSE)               fmt="%{r}FALSE";;
             TRUE)                fmt="%{g}TRUE";;
@@ -182,7 +188,7 @@ function ::cpf:module_is_modified() {
         local amended=$(:core:git status --porcelain "${path}"|wc -l)
         [ ${PIPESTATUS[0]} -ne 0 ] || e=${amended}
     fi
-    cd ${OLDPWD}
+    #cd ${OLDPWD}
 
     return $e
 }
