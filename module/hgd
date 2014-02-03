@@ -3,8 +3,14 @@
 Core HGD (Host-Group Directive) module
 [core:docstring]
 
+core:requires python
+
+core:import dns
+core:import net
 core:import util
-core:import mongo
+
+core:softimport ng
+core:softimport mongo
 
 declare -g g_HGD_CACHE=${SITE_USER_CACHE}/hgd.conf
 [ -e ${g_HGD_CACHE} ] || touch ${g_HGD_CACHE}
@@ -13,10 +19,6 @@ declare -g g_HGD_CACHE=${SITE_USER_CACHE}/hgd.conf
 #. HGD Resolvers -={
 function ::hgd:explode() {
     local -i e=${CODE_FAILURE}
-
-    core:import ng
-    core:import dns
-    core:import net
 
     if [ $# -eq 2 ]; then
         e=${CODE_SUCCESS}
@@ -29,19 +31,27 @@ function ::hgd:explode() {
 
         case ${hgdc} in
             '+')
-                local hosts
-                hosts="$(:ng:resolve ${tldid} ${hgdn})"
-                if [ $? -eq ${CODE_SUCCESS} ]; then
-                    echo "${hosts}"
+                if core:imported ng; then
+                    local hosts
+                    hosts="$(:ng:resolve ${tldid} ${hgdn})"
+                    if [ $? -eq ${CODE_SUCCESS} ]; then
+                        echo "${hosts}"
+                    else
+                        e=${CODE_FAILURE}
+                    fi
                 else
                     e=${CODE_FAILURE}
                 fi
             ;;
             '=')
-                local hosts
-                hosts="$(:ng:resolve ${tldid} ${hgdn})"
-                if [ $? -eq ${CODE_SUCCESS} ]; then
-                    echo "${hosts}"
+                if core:imported ng; then
+                    local hosts
+                    hosts="$(:ng:resolve ${tldid} ${hgdn})"
+                    if [ $? -eq ${CODE_SUCCESS} ]; then
+                        echo "${hosts}"
+                    else
+                        e=${CODE_FAILURE}
+                    fi
                 else
                     e=${CODE_FAILURE}
                 fi
@@ -56,11 +66,15 @@ function ::hgd:explode() {
                 fi
             ;;
             '%')
-                local -a filters
-                IFS=% read -a filters <<< "${hgdn}"
-                local -a hosts
-                :mongo:query ${SITE_PROFILE//@*} qdn ${filters[@]}
-                [ $? -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
+                if core:imported mongo; then
+                    local -a filters
+                    IFS=% read -a filters <<< "${hgdn}"
+                    local -a hosts
+                    :mongo:query ${SITE_PROFILE//@*} qdn ${filters[@]}
+                    [ $? -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
+                else
+                    e=${CODE_FAILURE}
+                fi
             ;;
             '#')
                 if [ "${hgdn//[^\/]/}" == "/" ]; then
@@ -106,8 +120,6 @@ function ::hgd:explode() {
 }
 
 function ::hgd:resolve() {
-    core:requires python
-
     local -i e=${CODE_FAILURE}
 
     local hgd
@@ -307,14 +319,17 @@ function hgd:list() {
             while read line; do
                 read -a data <<< "$line"
                 cpf '%{y:%-24s} %{@tldid:%s} %{@int:%3s} %{bl:%s} %{@hgd:%s}\n'\
-                    ${data[0]} ${data[1]} $((${#data[@]}-4)) $(:util:date:i2s ${data[2]}) ${data[3]}
+                    ${data[0]} ${data[1]} $((${#data[@]}-4))\
+                    $(:util:date:i2s ${data[2]}) ${data[3]}
             done <<< "${data}"
         ;;
-        0:2) theme HAS_WARNED "You have no saved sessions"; e=${CODE_SUCCESS};;
-        1:3) theme HAS_FAILED "You have no saved sessions by that name"; e=${CODE_FAILURE};;
-        *)
-            theme EXCEPTION "$#:$e is unhandled."
-            core:raise EXCEPTION_UNHANDLED
+        0:2)
+            theme HAS_WARNED "You have no saved sessions"
+            e=${CODE_SUCCESS}
+        ;;
+        1:3)
+            theme HAS_FAILED "You have no saved sessions by that name"
+            e=${CODE_FAILURE}
         ;;
     esac
 
