@@ -1,12 +1,16 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
+function testCoreHgdImport() {
+    core:softimport hgd
+    assertTrue 0x0 $?
+}
+
 function testCoreHgdSavePublic() { return 0; }
 function testCoreHgdListPublic() { return 0; }
 function testCoreHgdRenamePublic() { return 0; }
 function testCoreHgdDeletePublic() { return 0; }
 function testCoreHgdMultiPublic() {
-    core:softimport hgd
-    assertEquals 'core:softimport hgd' 0 $?
+    core:import hgd
 
     local session=${FUNCNAME}
     core:wrapper hgd save -T. ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
@@ -46,8 +50,7 @@ function testCoreHgdListInternal() { return 0; }
 function testCoreHgdRenameInternal() { return 0; }
 function testCoreHgdDeleteInternal() { return 0; }
 function testCoreHgdMultiInternal() {
-    core:softimport hgd
-    assertEquals 'core:softimport hgd' 0 $?
+    core:import hgd
 
     local session=${FUNCNAME}
     :hgd:save . ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
