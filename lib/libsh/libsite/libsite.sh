@@ -58,6 +58,7 @@ declare -g -A CORE_MODULES=(
     [help]=1
     [tutorial]=1
     [softlayer]=1
+    [pagerduty]=1
     [hgd]=1
     [remote]=1
     [git]=1
@@ -387,8 +388,8 @@ function core:requires() {
         *) core:raise EXCEPTION_BAD_FN_CALL "${@}";;
     esac
 
+    test $e -eq 0 && return $e || exit $e
     return $e
-    #test $e -eq 0 && return $e || exit $e
 }
 
 declare -gA g_SIDS
