@@ -35,7 +35,7 @@ export SITE_USER_RUN=${SITE_USER}/var/run
 export SITE_USER_CACHE=${SITE_USER}/var/cache/
 export SITE_USER_ETC=${SITE_USER}/etc
 export SITE_USER_LOG=${SITE_USER}/var/log/site.log
-export SITE_USER_TMP=${SITE_USER}/tmp
+export SITE_USER_TMP=${SITE_USER}/var/tmp
 export SITE_USER_MOD=${SITE_USER}/module
 export SITE_USER_LIBEXEC=${SITE_USER}/libexec
 export SITE_USER_EXTERN=${SITE_USER}/extern
@@ -54,7 +54,7 @@ export PYTHONPATH+=:${SITE_CORE_EXTERN_LIBPY}/pyobjpath
 declare -A USER_MODULES
 export USER_MODULES
 
-declare -A CORE_MODULES=(
+declare -g -A CORE_MODULES=(
     [help]=1
     [tutorial]=1
     [softlayer]=1
@@ -71,7 +71,6 @@ declare -A CORE_MODULES=(
     [gpg]=1
     [vault]=1
 )
-export CORE_MODULES
 
 source ${SITE_USER_ETC}/site.conf
 test ! -f ~/.siterc || source ~/.siterc
@@ -95,7 +94,6 @@ unset  CDPATH
 export SITE_DEADMAN=${SITE_USER_CACHE}/deadman
 export SITE_IN_COLOR=1
 source ${SITE_CORE_MOD?}/cpf
-[ ${#CORE_MODULES[@]} -gt 0 ] || : ${CORE_MODULES?}
 #. }=-
 #. 1.5  ShUnit2 -={
 export SHUNIT2=$(which shunit2)
@@ -113,16 +111,15 @@ false
 FALSE=$?
 CODE_FAILURE=${FALSE?}
 
-CODE_ERROR=1               #. 1..63   Errors
-CODE_E01=1
-CODE_E02=2
-CODE_E03=3
-CODE_E04=4
-CODE_E05=5
-CODE_E06=6
-CODE_E07=7
-CODE_E08=8
-CODE_E09=9
+CODE_E01=128               #. 128..255   Errors
+CODE_E02=129
+CODE_E03=130
+CODE_E04=131
+CODE_E05=132
+CODE_E06=133
+CODE_E07=134
+CODE_E08=135
+CODE_E09=136
 
 CODE_USER_MAX=63           #. 64..127 Internal
 CODE_DISABLED=64
@@ -132,6 +129,12 @@ CODE_USAGE_MOD=92
 CODE_USAGE_FN_GUESS=93
 CODE_USAGE_FN_SHORT=94
 CODE_USAGE_FN_LONG=95
+
+CODE_IMPORT_GOOOD=0 #. good module
+CODE_IMPORT_ADMIN=1 #. administratively disabled
+CODE_IMPORT_ERROR=2 #. invalid/bad module (can't source/parse)
+CODE_IMPORT_UNDEF=3 #. no such module
+CODE_IMPORT_UNSET=4 #. no module set
 
 export SITE_DELIM=$(printf "\x07")
 
@@ -155,11 +158,19 @@ function core:log() {
         ;;
     esac
 
-    local -i fi=1
-    case ${FUNCNAME[1]} in
-        plogger|profiles)  fi=2;;
-    esac
-    local caller=${FUNCNAME[${fi}]}
+    if [ ${#module} -gt 0 ]; then
+        caller=${module}
+        [ ${#fn} -eq 0 ] || caller+=":${fn}"
+    else
+        local -i fi=0
+        while true; do
+            case ${FUNCNAME[${fi}]} in
+                source|core:*|:core:*|::core:*) let fi++;;
+                *) break;;
+            esac
+        done
+        local caller=${FUNCNAME[${fi}]}
+    fi
 
     if [ ${SITE_LOG_NAMES[${USER_LOG_LEVEL}]} -ge ${level} ]; then
         shift 1
@@ -168,6 +179,7 @@ function core:log() {
         declare msg=$(printf "%s; %5d; %8s[%24s];" "${ts}" "${$--1}" "${code}" "${caller}")
         [ -e ${SITE_USER_LOG} ] || touch ${SITE_USER_LOG}
         if [ -f ${SITE_USER_LOG} ]; then
+            chmod 600 ${SITE_USER_LOG}
             echo "${msg} $@" >> ${SITE_USER_LOG}
         fi
         #printf "%s; %5d; %8s[%24s]; $@\n" "${ts}" "$$" "${code}" "$(sed -e 's/ /<-/g' <<< ${FUNCNAME[@]})" >> ${WMII_LOG}
@@ -181,7 +193,7 @@ function core:softimport() {
     #. 0: good module
     #. 1: administratively disabled
     #. 2: invalid/bad module (can't source/parse)
-    #. 3: no such module
+    #. 3: no such module defined
     #. 4: no module set
     local -i e=9
 
@@ -193,40 +205,32 @@ function core:softimport() {
                     if ( source ${SITE_USER_MOD}/${module} >/tmp/site.ouch 2>&1 ); then
                         source ${SITE_USER_MOD}/${module}
                         rm -f /tmp/site.ouch
-                        #. Good module
-                        e=0
+                        e=${CODE_IMPORT_GOOOD?}
                     else
-                        #. Bad module
-                        e=2
+                        e=${CODE_IMPORT_ERROR?}
                     fi
                 else
-                    #. No such module
-                    e=3
+                    e=${CODE_IMPORT_UNDEF?}
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
                 if [ -f ${SITE_CORE_MOD}/${module} ]; then
                     if ( source ${SITE_CORE_MOD}/${module} >/tmp/site.ouch 2>&1 ); then
                         source ${SITE_CORE_MOD}/${module}
                         rm -f /tmp/site.ouch
-                        #. Good module
-                        e=0
+                        e=${CODE_IMPORT_GOOOD?}
                     else
-                        #. Bad module
-                        e=2
+                        e=${CODE_IMPORT_ERROR?}
                     fi
                 else
-                    #. No such module
-                    e=3
+                    e=${CODE_IMPORT_UNDEF?}
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 0 -o ${USER_MODULES[${module}]-9} -eq 0 ]; then
                 #. Implicitly disabled
                 e=1
             elif [ "${module}" == "-" ]; then
-                #. No module set
-                e=4
+                e=${CODE_IMPORT_UNSET?}
             else
-                #. No such module
-                e=3
+                e=${CODE_IMPORT_UNDEF?}
             fi
             g_SITE_IMPORTED_EXIT[${module}]=${e}
         else
@@ -310,23 +314,24 @@ function core:requires() {
     #.     core:requires PERL LWP::Protocol::https
     local -i e=${CODE_SUCCESS}
 
+    local caller="${FUNCNAME[1]}"
+    #. TODO: Check if ${caller} is a valid/plausible executable name
+    #local caller_is_mod=$(( ${USER_MODULES[${caller/:*/}]-0} + ${CORE_MODULES[${caller/:*/}]-0} ))
+    #if [ ${caller_is_mod} -ne 0 ]; then
+    #    core:raise EXCEPTION_MISSING_EXEC $1
+    #fi
+
     local required;
     case $#:${1} in
         1:*)
             if ! :core:requires $1; then
                 e=${CODE_FAILURE}
-                #local caller="${FUNCNAME[1]}"
-                #. TODO: Check if ${caller} is a valid/plausible executable name
-                #local caller_is_mod=$(( ${USER_MODULES[${caller/:*/}]-0} + ${CORE_MODULES[${caller/:*/}]-0} ))
-                #if [ ${caller_is_mod} -ne 0 ]; then
-                #    core:raise EXCEPTION_MISSING_EXEC $1
-                #fi
             fi
         ;;
         *:PERL)
             for required in ${@:2}; do
                 if ! perl -M${required} -e ';' 2>/dev/null; then
-                    #core:raise EXCEPTION_MISSING_PERL_MOD ${required}
+                    core:log NOTICE "${caller} missing required perl module ${required}"
                     e=${CODE_FAILURE}
                 fi
             done
@@ -334,7 +339,7 @@ function core:requires() {
         *:PYTHON)
             for required in ${@:2}; do
                 if ! python -c "import ${required}" 2>/dev/null; then
-                    #core:raise EXCEPTION_MISSING_PYTHON_MOD ${required}
+                    core:log NOTICE "${caller} missing required python module ${required}"
                     e=${CODE_FAILURE}
                 fi
             done
@@ -342,9 +347,17 @@ function core:requires() {
         *:ENV)
             for required in ${@:2}; do
                 if [ -z "${!required}" ]; then
+                    core:log NOTICE "${caller} missing required environment variable ${required}"
                     e=${CODE_FAILURE}
-                    #core:raise EXCEPTION_MISSING_USER ${required}
                     break
+                fi
+            done
+        ;;
+        *:VAULT)
+            for required in ${@:2}; do
+                if [ ${g_SIDS[${required}]:-0} -ne 1 ]; then
+                    core:log NOTICE "${caller} missing required secret ${required}"
+                    e=${CODE_FAILURE}
                 fi
             done
         ;;
@@ -376,6 +389,14 @@ function core:requires() {
     return $e
     #test $e -eq 0 && return $e || exit $e
 }
+
+declare -gA g_SIDS
+core:softimport vault
+if [ $? -eq ${CODE_IMPORT_GOOOD?} ]; then
+    for sid in $(:vault:list ${SITE_USER_ETC}/site.vault); do
+        g_SIDS[$sid]=1
+    done
+fi
 #. }=-
 #. 1.10 Caching -={
 #. 0 means cache forever (default)
@@ -650,7 +671,7 @@ function ::core:shflags.eval() {
     local -a extra
     if [ ${#module} -gt 0 ]; then
         core:softimport ${module}
-        if [ $? -eq 0 ]; then
+        if [ $? -eq ${CODE_IMPORT_GOOOD?} ]; then
             if [ "$(type -t ${module}:${fn}:shflags)" == "function" ]; then
                 #. shflags function defined, so let's use it...
                 while read f_type f_long f_default f_desc f_short; do
@@ -861,23 +882,31 @@ function :core:usage() {
             eval $(::core:dereference.eval profile) #. Will create ${profile} array
             for module in ${!profile[@]}; do (
                 local docstring="{no-docstr}"
+                docstring=$(core:docstring ${module})
                 core:softimport ${module}
-                if [ $? -eq ${CODE_SUCCESS} ]; then
+                local -i ie=$?
+                if [ $ie -eq ${CODE_IMPORT_ADMIN?} ]; then
+                    continue
+                elif [ $ie -eq ${CODE_IMPORT_GOOOD?} ]; then
                     local -a fn_public=( $(:core:functions public ${module}) )
                     local -a fn_private=( $(:core:functions private ${module}) )
                     if [ ${#fn_public[@]} -gt 0 ]; then
-                        docstring=$(core:docstring ${module})
                         cpf "    "
                     else
-                        #cpf "%{y:!   }"
-                        docstring=''
+                        cpf "%{y:!   }"
                     fi
                 else
-                    cpf "%{r:ERR }"
+                    cpf "%{r:!!! }"
                 fi
-                if [ -n "${docstring}" ]; then
-                    cpf "%{bl:${SITE_BASENAME}} %{!module:${module}}:%{@int:%s}/%{@int:%s}%{@comment:%s}\n"\
-                        "${#fn_public[@]}" "${#fn_private[@]}" "${docstring:+; ${docstring}}"
+
+                cpf "%{bl:%s} %{!module:%s}:%{+bo}%{@int:%s}%{-bo}/%{@int:%s}"\
+                    "${SITE_BASENAME}" "${module}"\
+                    "${#fn_public[@]}" "${#fn_private[@]}"
+
+                if [ $ie -eq ${CODE_IMPORT_GOOOD?} ]; then
+                    cpf "%{@comment:%s}\n" "${docstring:+; ${docstring}}"
+                else
+                    cpf "; %{@warn:This module has not been set-up for use}\n"
                 fi
             ); done
         done
@@ -948,10 +977,10 @@ function :core:complete() {
     local module=$1
     local fn=$2
     for afn in $(declare -F|awk -F'[ :]' '$3~/^'${module}'$/{print$4}'|sort -n); do
-        local AC_${module}_${afn}
+        local AC_${module}_${afn//./_}
     done
-    local -a completed=( $(eval echo \${!AC_${module}_${fn}*}) )
-    if echo ${completed[@]} | grep -qE "\<AC_${module}_${fn}\>"; then
+    local -a completed=( $(eval echo \${!AC_${module}_${fn//./_}*}) )
+    if echo ${completed[@]} | grep -qE "\<AC_${module}_${fn//./_}\>"; then
         echo ${fn}
     else
         echo ${completed[@]//AC_${module}_/}
@@ -975,11 +1004,11 @@ function core:wrapper() {
     local regex=':+[a-z0-9]+(:[a-z0-9]+) |*'
     core:softimport "${module?}"
     case $?/${module?}/${fn?} in
-        4/-/-)                                                                                       e=${CODE_USAGE_MODS} ;;
-        0/*/-)    :core:execute          ${module}                2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
-        0/*/::*) ::core:execute:private  ${module} ${fn:2} "${@}" 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
-        0/*/:*)  ::core:execute:internal ${module} ${fn:1} "${@}" 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
-        0/*/*)
+        ${CODE_IMPORT_UNSET?}/-/-)                                                                                       e=${CODE_USAGE_MODS} ;;
+        ${CODE_IMPORT_GOOOD?}/*/-)    :core:execute          ${module}                2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
+        ${CODE_IMPORT_GOOOD?}/*/::*) ::core:execute:private  ${module} ${fn:2} "${@}" 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
+        ${CODE_IMPORT_GOOOD?}/*/:*)  ::core:execute:internal ${module} ${fn:1} "${@}" 2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
+        ${CODE_IMPORT_GOOOD?}/*/*)
             local -a completed=( $(:core:complete ${module} ${fn}) )
 
             local -A supported_formats=( [html]=1 [email]=1 [ansi]=1 [text]=1 [dot]=0 )
@@ -1027,16 +1056,16 @@ function core:wrapper() {
                 e=${CODE_USAGE_MOD}
             fi
         ;;
-        3/-/-) e=${CODE_USAGE_MODS};;
-        3/*/*)
+        ${CODE_IMPORT_UNDEF?}/-/-) e=${CODE_USAGE_MODS};;
+        ${CODE_IMPORT_UNDEF?}/*/*)
             theme ERR_USAGE "Module ${module} has not been defined"
             e=${CODE_FAILURE}
         ;;
-        2/*/*)
+        ${CODE_IMPORT_ERROR?}/*/*)
             theme HAS_FAILED "Module ${module} has errors"
             e=${CODE_FAILURE}
         ;;
-        1/*/*)
+        ${CODE_IMPORT_ADMIN?}/*/*)
             theme ERR_USAGE "Module ${module} has been administratively disabled"
             e=${CODE_DISABLED}
         ;;

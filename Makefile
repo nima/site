@@ -69,13 +69,11 @@ install: require sanity .install
 	@
 	@printf "Preparing /var/tmp/site/..."
 	@mkdir -p /var/tmp/site/var
-	@ln -sf /var/tmp/site/var $(HOME)/.site/var
 	@mkdir -p /var/tmp/site/var/cache
 	@mkdir -p /var/tmp/site/var/run
-	@mkdir -p /var/tmp/site/log
-	@ln -sf /var/tmp/site/log $(HOME)/.site/log
-	@mkdir -p /var/tmp/site/tmp
-	@ln -sf /var/tmp/site/tmp $(HOME)/.site/tmp
+	@mkdir -p /var/tmp/site/var/log
+	@mkdir -p /var/tmp/site/var/tmp
+	@ln -sf /var/tmp/site/var $(HOME)/.site/var
 	@echo "DONE"
 	@
 	@touch .install
@@ -94,8 +92,6 @@ uninstall: unsanity
 	-rm $(HOME)/.site/module
 	-rm $(HOME)/.site/libexec
 	-rm $(HOME)/.site/var
-	-rm $(HOME)/.site/tmp
-	-rm $(HOME)/.site/log
 	@
 	-rm $(HOME)/bin/site
 	-rm $(HOME)/bin/ssm
