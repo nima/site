@@ -13,7 +13,7 @@ core:requires ENV USER_USERNAME
 core:requires ENV USER_FULLNAME
 core:requires ENV USER_EMAIL
 
-#. Private -={
+#. private -={
 function ::gpg:keypath() {
     #. Prints:
     #. . -> <path>
@@ -87,7 +87,7 @@ function ::gpg:kid() {
 }
 #. }=-
 
-#. encrypt/decrypt -={
+#. decrypt -={
 function :gpg:decrypt() {
     local -i e=${CODE_FAILURE}
 
@@ -114,7 +114,8 @@ function :gpg:decrypt() {
 
     return $e
 }
-
+#. }=-
+#. encrypt -={
 function :gpg:encrypt() {
     local -i e=${CODE_FAILURE}
 
