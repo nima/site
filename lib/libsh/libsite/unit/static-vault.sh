@@ -16,7 +16,6 @@ function vaultSetUp() {
         ;;
         execute)
             export SITE_PROFILE=UNITTEST
-            sudo install -d /var/tmp -m 1777
             g_GPGKID=$(:gpg:create)
         ;;
         *)
@@ -57,6 +56,7 @@ function testCoreVaultCleanPrivate() {
 
     chmod 1777 ${g_VAULT?}
     for f in "${g_VAULT_TS?}" "${g_VAULT_TMP?}" "${g_VAULT_BU?}"; do
+        rm -f ${f}
         touch ${f}
         echo "secret" > ${f}
         chmod 7777 ${f}
@@ -122,6 +122,16 @@ function testCoreVaultEditPublic() {
     #mode=$(:util:stat:mode ${g_VAULT_BU?})
     #assertTrue '0x3' $?
     #assertEquals '0x4' 400 ${mode}
+}
+
+function testCoreVaultReadInternal() {
+    core:import vault
+
+    :vault:read MY_SECRET_1 >${stdoutF?} 2>${stderrF?}
+    assertTrue '0x1' $?
+
+    :vault:read MY_SECRET_111 >${stdoutF?} 2>${stderrF?}
+    assertFalse '0x2' $?
 }
 
 function testCoreVaultReadPublic() {
