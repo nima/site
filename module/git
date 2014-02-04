@@ -8,66 +8,95 @@ core:requires git
 
 #. Internal Functions -={
 function :git:basedir() {
-    local -i e=${CODE_FAILURE}
-    local filename=$(readlink -f $1)
-    if [ -e "${filename}" ]; then
-        local gitbasedir=${filename}
-        if [ ! -d "${gitbasedir}" ]; then
-            gitbasedir="$(readlink -f $(dirname ${gitbasedir}))"
-        fi
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local cwd="$(pwd)"
+        local filename="${1}"
+
+        [ "${filename:0:1}" == '/' ] || filename="${cwd}/${filename}"
 
         local found=0
+        local gitbasedir=$(readlink -m "${filename}")
         while [ ${found} -eq 0 -a "${gitbasedir}" != "/" ]; do
             if [ -d "${gitbasedir}/.git" ]; then
                 found=1
             else
-                gitbasedir="$(readlink -f ${gitbasedir}/..)";
+                gitbasedir=$(readlink -m "${gitbasedir}/..")
             fi
         done
         if [ ${found} -eq 1 ]; then
-            echo ${gitbasedir}/ ${filename/${gitbasedir}\//}
+            echo ${gitbasedir} ${filename/${gitbasedir}\//./}
             e=${CODE_SUCCESS}
         fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
+
     return $e
 }
 #. }=-
 #. Public Functions -={
-function git:usage:usage() { echo "<path>"; }
+function git:size:usage() { echo "[<git-path:pwd>]"; }
+function git:size() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 0 -o $# -eq 1 ]; then
+        e=${CODE_FAILURE}
+
+        local cwd=$(pwd)
+        local data
+        data=$(:git:basedir ${1:-${cwd}})
+        if [ $? -eq ${CODE_SUCCESS} ]; then
+            read gitbasedir gitrelpath <<< "${data}"
+            cd ${gitbasedir}
+            git l|wc -l|tr '\n' ' '
+            du -sh .git|awk '{print $1}'
+            git count-objects -v
+            e=$?
+        else
+            theme ERR_USAGE "Not a git repository:${1:-${cwd}}"
+        fi
+    fi
+
+    return $e
+}
+
+function git:usage:usage() { echo "[<git-path:pwd>]"; }
 function git:usage() {
     local -i e=${CODE_DEFAULT?}
-    if [ $# -eq 1 ]; then
-        read gitbasedir gitrelpath <<< $(:git:basedir $1)
-        if [ $? -eq 0 ]; then
-            if cd ${gitbasedir} >/dev/null 2>&1; then
-                if [ -d .git/objects/pack ]; then
-                    while read sha1 obj size; do
-                        cpf "%{y:%-6s %8s} %{@hash:%s}" "${obj}" "${size}" "${sha1}"
-                        read sha1 path <<< $(git rev-list --objects --all | grep ${sha1})
-                        if [ -e "${path}" ]; then
-                            cpf " %{@path:%s}" "${path}"
-                        else
-                            cpf " %{@bad_path:%s}" "${path}"
-                            in_pack_only=$(git log -- "${path}")
-                            if [ -z "${in_pack_only}" ]; then
-                                cpf " %{@alert:[PACK_ONLY]}"
-                            fi
+
+    if [ $# -eq 0 -o $# -eq 1 ]; then
+        e=${CODE_FAILURE}
+
+        local cwd=$(pwd)
+        read gitbasedir gitrelpath <<< $(:git:basedir ${1:-${cwd}})
+        if [ $? -eq ${CODE_SUCCESS} ]; then
+            cd ${gitbasedir}
+            if [ -d .git/objects/pack ]; then
+                while read sha1 obj size; do
+                    cpf "%{y:%-6s %8s} %{@hash:%s}" "${obj}" "${size}" "${sha1}"
+                    read sha1 path <<< $(git rev-list --objects --all | grep ${sha1})
+                    if [ -e "${path}" ]; then
+                        cpf " %{@path:%s}" "${path}"
+                    else
+                        cpf " %{@bad_path:%s}" "${path}"
+                        in_pack_only=$(git log -- "${path}")
+                        if [ -z "${in_pack_only}" ]; then
+                            cpf " [%{@warn:PACK_ONLY}]"
                         fi
-                        echo
-                    done < <(
-                        git verify-pack -v .git/objects/pack/pack-*.idx\
-                            | grep -E '^[a-f0-9]{40}'\
-                            | sort -k 3 -n\
-                            | tail -n 64\
-                            | awk '{print$1,$2,$3}'\
-                    )
-                    e=$?
-                    if [ -d .git/refs/original/ -o -d .git/logs/ ]; then
-                        theme NOTE "You should run git:vacuum to reflect recent changes"
                     fi
-                else
-                    theme INFO "This repository has no packs"
-                    e=${CODE_SUCCESS}
+                    echo
+                done < <(
+                    git verify-pack -v .git/objects/pack/pack-*.idx\
+                        | grep -E '^[a-f0-9]{40}'\
+                        | sort -k 3 -n\
+                        | tail -n 64\
+                        | awk '{print$1,$2,$3}'\
+                )
+                e=$?
+                if [ -d .git/refs/original/ -o -d .git/logs/ ]; then
+                    theme NOTE "You should run git:vacuum to reflect recent changes"
                 fi
             else
                 theme ERR_USAGE "Error: could not chdir to ${1}"
@@ -81,55 +110,29 @@ function git:usage() {
     return $e
 }
 
-function git:rm:usage() { echo "<git-repo-dir> <path-glob> [<path-glob> [...]]"; }
+function git:rm:usage() { echo "<git-path-glob> [<git-path-glob> [...]]"; }
 function git:rm() {
     local -i e=${CODE_DEFAULT?}
-    if [ $# -ge 2 ]; then
-        if pushd $1 >/dev/null 2>&1; then
-            shift
-            #if [ $# -eq 1 ]; then
-            #    file=$1
-            #    local sha1=$(git log --reverse --pretty="format:%H" -- "${file}" 2>/dev/null| head -n1)
-            #    if [ -n "${sha1}" ]; then
-            #        #. Try the quicker method first, start from ${sha1}^
-            #        git filter-branch --force --index-filter "git rm -rf --cached --ignore-unmatch ${file}" -- ${sha1}^..
-            #        e=$?
-            #    else
-            #        #. The slower full-proof method; [PACK_ONLY] files should get cleaned here hopefully...
-            #        git filter-branch --force --index-filter "git rm -rf --cached --ignore-unmatch ${file}" -- --all
-            #        e=$?
-            #    fi
-            #    if [ $e -eq 0 ]; then
-            #        theme INFO "You should run git:vacuum to clean up references to removed objects"; echo
-            #    fi
-            #elif [ $# -gt 1 ]; then
-                git filter-branch --force --index-filter \
-                    "git rm -rf --cached --ignore-unmatch ${*}" \
-                        --prune-empty --tag-name-filter cat -- --all
-                e=$?
-            #fi
-        else
-            theme ERR_USAGE "Error: could not chdir to ${1}"
-            e=${CODE_FAILURE}
-        fi
-    fi
-    return $e
-}
 
-function git:size:usage() { echo "<git-repo-dir>"; }
-function git:size() {
-    local -i e=${CODE_DEFAULT?}
-    if [ $# -eq 1 ]; then
-        if pushd $1 >/dev/null 2>&1; then
-            git l|wc -l|tr '\n' ' '
-            du -sh .git|awk '{print $1}'
-            git count-objects -v
-            e=$?
-        else
-            theme ERR_USAGE "Error: could not chdir to ${1}"
-            e=${CODE_FAILURE}
-        fi
+    if [ $# -ge 1 ]; then
+        e=${CODE_FAILURE}
+
+        local cwd=$(pwd)
+        for filename in "${@}"; do
+            read gitbasedir gitrelpath <<< $(:git:basedir ${1})
+            if [ $? -eq ${CODE_SUCCESS} ]; then
+                cd ${gitbasedir}
+
+                git filter-branch\
+                    --force\
+                    --index-filter "git rm -rf --cached --ignore-unmatch ${gitrelpath}" \
+                    --prune-empty --tag-name-filter cat -- --all
+
+                e=${CODE_SUCCESS}
+            fi
+        done
     fi
+
     return $e
 }
 
@@ -139,15 +142,6 @@ function git:vacuum() {
     if [ $# -eq 1 ]; then
         if pushd $1 >/dev/null 2>&1; then
             rm -Rf .git/refs/original/ .git/logs/
-            git:size $1
-            #. don't skip empty merge commits; only skip non-merge commits that are no-ops
-            #git filter-branch -d /dev/shm/wmii/tmp --commit-filter '\
-            #    if [ $# -ge 3 ] && [ \"$1\" = \"$(git rev-parse $3^{tree})\" ]; then\
-            #        skip_commit \"$@\";\
-            #    else\
-            #        git commit-tree \"$@\";\
-            #    fi;\
-            #' HEAD;
             e=$?
             if [ $e -eq 0 ]; then
                 rm -Rf .git/refs/original/ .git/logs/
@@ -156,7 +150,6 @@ function git:vacuum() {
                 git gc --aggressive --prune=now
                 git repack -a -d -f --depth=250 --window=250
                 git prune --expire=${CODE_SUCCESS} --progress
-                git:size $1
             fi
         else
             theme ERR_USAGE "Error: could not chdir to ${1}"
@@ -203,10 +196,11 @@ function git:rebasesearchstr() {
     return $e
 }
 
+function git:split:usage() { echo "<git-commit-sha1>"; }
 function git:split() {
     local -i e=${CODE_DEFAULT?}
 
-    if [ $# -ge 1 ]; then
+    if [ $# -eq 1 ]; then
         local sha1=$1
         git rebase -i ${sha1}^
         e=${CODE_SUCCESS}
@@ -260,38 +254,58 @@ function git:serve() {
     return $e
 }
 
+#. Git playground -={
+function ::git:mkci() {
+    { git checkout -b $1 || git checkout $1; } 2>/dev/null
+    shift 1
+    for fN in $@; do
+        echo ${fN} > ${fN}
+        git add ${fN} >/dev/null
+        git commit -q ${fN} -m "Add ${fN}"
+        printf '.'
+    done
+}
+
 function git:playground:usage() { echo "<git-repo-dir>"; }
 function git:playground() {
     local -i e=${CODE_DEFAULT?}
     if [ $# -eq 1 ]; then
-        if [ ! -d $1 ]; then
-            printf "Creating git playground $1..."
-            mkdir -p $1
-            cd $1
-            git init -q
-            echo ${1^^} > .git/description
-            :git:mkci 'master'  m{A,B,C,D}
-            :git:mkci 'topic-a' a{E,F}
-            :git:mkci 'topic-b' b{G,H,I}
-            :git:mkci 'topic-a' a{J,K}
-            :git:mkci 'master'  m{L,M}
-            :git:mkci 'topic-b' b{N,O,P,Q,R}
-            :git:mkci 'master'  m{S,T,U,V}
-            for fN in n{W,X,Y,Z}; do
-                echo ${fN} > $fN
-            done
-            e=${CODE_SUCCESS}
-            printf "Done!\n"
 
-            git log --graph --all
+        if [ ! -d $1 ]; then
+            cpf "Creating git playground %{@path:$1}..."
+            if mkdir -p $1 2>/dev/null; then
+                cd $1
+
+                git init -q
+                echo $(basename ${1^^}) > .git/description
+                ::git:mkci 'master'  m{A,B,C,D}
+                ::git:mkci 'topic-a' a{E,F}
+                ::git:mkci 'topic-b' b{G,H,I}
+                ::git:mkci 'topic-a' a{J,K}
+                ::git:mkci 'master'  m{L,M}
+                ::git:mkci 'topic-b' b{N,O,P,Q,R}
+                ::git:mkci 'master'  m{S,T,U,V}
+                for fN in n{W,X,Y,Z}; do
+                    echo ${fN^^} > ${fN}
+                done
+                e=${CODE_SUCCESS}
+                theme HAS_PASSED
+            else
+                theme ERR_USAGE "Directory $1 already exists; cowardly refusing to create playground."
+                e=${CODE_FAILURE}
+            fi
+
+            #git log --graph --all
         else
             theme ERR_USAGE "Directory $1 already exists; cowardly refusing to create playground."
+            e=${CODE_FAILURE}
         fi
     fi
 
     return $e
 }
-
+#. }=-
+#. Gource wrapper -={
 function git:gource:usage() { echo "<git-repo-dir>"; }
 function git:gource() {
     core:requires gource
@@ -309,17 +323,6 @@ function git:gource() {
 }
 #. }=-
 #. Debugging/Academic -={
-function _:git:mkci() {
-    { git checkout -b $1 || git checkout $1; } 2>/dev/null
-    shift 1
-    for fN in $@; do
-        echo ${fN} > ${fN}
-        git add ${fN} >/dev/null
-        git commit -q ${fN} -m "Add ${fN}"
-        printf '.'
-    done
-}
-
 function _:git:add:usage() { echo "<git-repo-dir> <file>"; }
 function _:git:add() {
     local -i e=${CODE_DEFAULT?}

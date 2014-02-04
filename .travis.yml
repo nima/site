@@ -22,6 +22,7 @@ env:
     - CONTEXT=execute MODULE=gpg   #. nima/site#5
     - CONTEXT=execute MODULE=util  #. nima/site#4
     - CONTEXT=execute MODULE=vault #. nima/site#17
+    - CONTEXT=execute MODULE=git   #. nima/site#9
 
 script:
   - share/unit/travis script

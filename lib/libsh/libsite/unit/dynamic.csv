@@ -1,6 +1,5 @@
 #. format: profile|module|function|context|stdin|arguments|stdout|stderr|exitcode
 #. core -={
-#core|git
 #core|cpf
 #core|unit
 #. HGD (Host Group Directives) Module -={
@@ -56,6 +55,18 @@ core|net|portping|public||google-public-dns-a.google.com. 12345|||1
 #. Vault Module -={
 core|vault|cleanup|internal|||||0
 core|vault|cleanup|private|||||0
+#. }=-
+#. Git -={
+#core|git|size|public|||||0
+core|git|size|public||${SITE_SCM?}|||0
+core|git|size|public||${SITE_SCM?}/module|||0
+#core|git|usage|public|||||0
+core|git|usage|public||${SITE_SCM?}|||0
+core|git|usage|public||${SITE_SCM?}/module|||0
+#core|git|gource|public
+#core|git|serve|public
+#core|git|mkci|private
+#core|git|rebasesearchstr|public
 #. }=-
 #. TODO -={
 core|ldap|ngldif|public||foo|||1

@@ -28,7 +28,7 @@ Here are the currently developing site modules:
 | vault         | :full_moon:             | Core vault and secrets management module                            |
 | remote        | :last_quarter_moon:     | The site remote access/execution module (ssh, ssh/sudo, tmux, etc.) |
 | ng            | :last_quarter_moon:     | Core Netgroup module                                                |
-| git           | :last_quarter_moon:     | Auxiliary Git helper module                                         |
+| git           | :full_moon:             | Auxiliary Git helper module                                         |
 | dns           | :last_quarter_moon:     | Core DNS module                                                     |
 | ldap          | :last_quarter_moon:     | The site LDAP module                                                |
 | mongo         | :last_quarter_moon:     | MongoDB helper module                                               |
