@@ -12,18 +12,43 @@ function testCoreNetPortpersistInternal() {
         $(netstat -ntl|awk -F '[: ]+' '$1~/^tcp$/&&$8~/^LISTEN$/{print$5}')
     )
 
-    local -i i=0
     local -A scanned
     for tcpPort in ${tcpPorts[@]}; do
         :net:portpersist . localhost ${tcpPort} 1
-        assertTrue ":net:portpersist(${tcpPort}).true?" $?
+        assertTrue 0x1 $?
         scanned[${tcpPort}]=1
     done
 
     for tcpPort in {16..32}; do
         if [ ${scanned[${tcpPort}]-0} -eq 0 ]; then
             :net:portpersist . localhost ${tcpPort} 1
-            assertFalse ":net:portpersist(${tcpPort}).false?" $?
+            assertFalse 0x2 $?
         fi
+    done
+}
+
+function testCoreNetLocalportpingInternal() {
+    core:import net
+
+    :net:localportping 22
+    assertFalse 0x1 $?
+
+    :net:localportping 5000
+    assertFalse 0x2 $?
+}
+
+function testCoreNetFreelocalportInternal() {
+    core:import net
+
+    local -i port
+    for ((i=0; i<10; i++)); do
+        port=$(:net:freelocalport)
+        assertTrue 0x1 $?
+
+        [ ${port} -lt 65536 ]
+        assertTrue 0x2 $?
+
+        [ ${port} -ge 1024 ]
+        assertTrue 0x3 $?
     done
 }

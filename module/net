@@ -5,8 +5,8 @@ core:import dns
 Core networking module
 [core:docstring]
 
-#. -={
-#. TCP/IP Networking Utility Functions -={
+#. Network Utilities -={
+#. IP Functions -={
 #. IPv4: Bits to Netmask
 function :net:b2nm() {
     #. input  24
@@ -162,7 +162,70 @@ function :net:firsthost() {
     return $e
 }
 #. }=-
+#. PortPersist -={
+function :net:portpersist() {
+    core:requires socat
+
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 4 ]; then
+        local tldid=$1
+        local qdn=$2
+        local port=$3
+        local -i attempts=$4
+        local -i i=0
+        while ((i < attempts)) && ((e == ${CODE_FAILURE})); do
+            :net:portping ${tldid} ${qdn} ${port}
+            e=$?
+            ((i++))
+        done
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+#. }=-
 #. PortPing -={
+function :net:localportping() {
+    local -i e=${CODE_FAILURE}
+
+    if [ $# -eq 1 ]; then
+        local -i lport=$1
+        netstat -ntl |
+            awk 'BEGIN{e=1};$4~/^127.0.0.1:'${lport}'$/{e=0};END{exit(e)}'
+        e=$?
+    fi
+
+    return $e
+}
+
+function :net:freelocalport() {
+    local -i e=${CODE_FAILURE}
+
+    freeport=0
+    for port in $@; do
+        if ! :net:localportping ${port}; then
+            freeport=$port
+            e=${CODE_SUCCESS}
+            break
+        fi
+    done
+
+    while [ ${freeport} -eq 0 ]; do
+        ((port=1024+RANDOM))
+        if ! :net:localportping ${lport}; then
+            freeport=${port}
+            e=${CODE_SUCCESS}
+            break
+        fi
+    done
+
+    [ ${freeport} -eq 0 ] || echo ${freeport}
+
+    return $e
+}
+
 function :net:portping() {
     core:requires nc
     core:requires socat
@@ -190,29 +253,6 @@ function :net:portping() {
         fi
     else
         theme EXCEPTION "$# / $*"
-        core:raise EXCEPTION_BAD_FN_CALL
-    fi
-
-    return $e
-}
-
-function :net:portpersist() {
-    core:requires socat
-
-    local -i e=${CODE_FAILURE}
-
-    if [ $# -eq 4 ]; then
-        local tldid=$1
-        local qdn=$2
-        local port=$3
-        local -i attempts=$4
-        local -i i=0
-        while ((i < attempts)) && ((e == ${CODE_FAILURE})); do
-            :net:portping ${tldid} ${qdn} ${port}
-            e=$?
-            ((i++))
-        done
-    else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
 
