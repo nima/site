@@ -70,6 +70,7 @@ declare -g -A CORE_MODULES=(
     [util]=1
     [gpg]=1
     [vault]=1
+    [tunnel]=1
 )
 
 source ${SITE_USER_ETC}/site.conf
