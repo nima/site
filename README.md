@@ -3,7 +3,6 @@
 [![status](https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png)](https://sourcegraph.com/github.com/nima/site)
 
 ## Development Status
-Here are the currently developing site modules:
 <!--
 :new_moon:
 :waxing_crescent_moon:
@@ -16,23 +15,32 @@ Here are the currently developing site modules:
 :new_moon:
 -->
 
-| Module        | Code-Complete           | Description                                                         |
+Here are the currently developing site modules:
+
+| Core Module   | Code-Complete           | Description                                                         |
 | ------------- | ----------------------- | ------------------------------------------------------------------- |
 | unit          | :last_quarter_moon:     | Core Unit-Testing module                                            |
 | util          | :full_moon:             | Core utilities module                                               |
 | help          | :last_quarter_moon:     | Core help module                                                    |
-| tutorial      | :waning_crescent_moon:  | The site module aims to serve as a tutorial for new site users      |
 | hgd           | :waning_gibbous_moon:   | Core HGD (Host-Group Directive) module                              |
 | net           | :full_moon:             | Core networking module                                              |
 | gpg           | :full_moon:             | Core GNUPG module                                                   |
 | vault         | :full_moon:             | Core vault and secrets management module                            |
 | remote        | :last_quarter_moon:     | The site remote access/execution module (ssh, ssh/sudo, tmux, etc.) |
-| ng            | :last_quarter_moon:     | Core Netgroup module                                                |
 | git           | :full_moon:             | Auxiliary Git helper module                                         |
 | dns           | :last_quarter_moon:     | Core DNS module                                                     |
+| tunnel        | :full_moon:             | Secure shell tunnelling wrapper                                     |
+| tutorial      | :waning_crescent_moon:  | The site module aims to serve as a tutorial for new site users      |
+
+The following set of modules are generally only useful under special-circumstances, and so are disabled by default:
+
+| Alpha Modules | Code-Complete           | Description                                                         |
+| ------------- | ----------------------- | ------------------------------------------------------------------- |
+| ng            | :last_quarter_moon:     | Core Netgroup module                                                |
 | ldap          | :last_quarter_moon:     | The site LDAP module                                                |
-| mongo         | :last_quarter_moon:     | MongoDB helper module                                               |
-| softlayer     | :last_quarter_moon:     | Core Softlayer API module                                           |
+| mongo         | :new_moon:              | MongoDB helper module                                               |
+| softlayer     | :new_moon:              | Softlayer CLI interface                                             |
+| pagerduty     | :new_moon:              | PagerDuty CLI interface                                             |
 
 ---
 
