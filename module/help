@@ -10,7 +10,7 @@ function help:all() {
         local profile
         for profile in USER_MODULES CORE_MODULES; do
             #. Initialize the ${profile} variable
-            eval $(::core:eval:dereference profile)
+            eval $(::core:dereference.eval profile)
             local module
             for module in ${!profile[@]}; do
                 :core:usage ${module}
