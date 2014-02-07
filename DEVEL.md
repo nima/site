@@ -80,6 +80,20 @@ it better; these functions should be thought of as the `third leg'.
 These functions must take a non-variable `$#` as described in the public
 function documentation above.
 
+### Function Types
+Where (non-public) functions produce a specific output, it is denoted by
+appending the type descriptor to the function name, for example a function
+called `::directory:users.json()` would communicate to the user that it
+produces json output.
+
+Here is a complete list of function types used in site at the time of this
+writing:
+
+| Function Suffix | Description                                                     |
+|-----------------|-----------------------------------------------------------------|
+| `.eval()`       | Produces code that is to be evaluated by another shell instance |
+| `.json()`       | Produces json                                                   |
+
 ---
 
 The decision of segregating this code between private and internal is this: Is
