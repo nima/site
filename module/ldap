@@ -424,11 +424,8 @@ function ldap:checksum() {
 }
 #. }=-
 #. Search -={
-function :ldap:eval:search() {
+function :ldap:search.eval() {
     #. This function searches for a single object
-    #.
-    #. As all :eval: functions, this function produces code that is to be evaluated by
-    #. another bash instance.
     local -i e=${CODE_FAILURE}
 
     if [ $# -ge 2 ]; then
