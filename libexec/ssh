@@ -12,7 +12,7 @@ from threading import Thread, Lock
 from time import sleep
 from random import random
 
-from libsite.secret import secret
+from libsite.secret import vault
 
 import signal
 g_interrupted = False

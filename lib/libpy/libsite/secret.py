@@ -1,11 +1,11 @@
 import os, gpgme
 
-def secret(secret):
-    secrets = '%s/.secrets' % os.environ['HOME']
-    if os.path.exists(secrets):
+def vault(sid):
+    vault = os.path.join(os.environ['SITE_USER_ETC'], 'site.vault')
+    if os.path.exists(vault):
         from io import BytesIO
         o = BytesIO()
-        with open(secrets, 'r') as ifH:
+        with open(vault, 'r') as ifH:
             from gpgme import Context
             ctx = Context()
             ctx.armor = True
