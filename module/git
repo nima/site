@@ -222,11 +222,21 @@ function git:split() {
 function git:commitall() {
     local -i e=${CODE_DEFAULT?}
 
-    for file in $(git status --porcelain|awk '{print$2}'); do
-        git add ${file}
-        git commit ${file} -m "... ${file}"
-    done
-    e=${CODE_SUCCESS}
+    if [ $# -eq 0 -o $# -eq 1 ]; then
+        local repo=${1:-${PWD}}
+        read gitbasedir gitrelpath <<< $(:git:basedir ${repo})
+        if [ $? -eq ${CODE_SUCCESS?} ]; then
+            cd ${gitbasedir}
+            local file
+            for file in $(git status --porcelain ${gitrelpath}|awk '{print$2}'); do
+                git add ${file}
+                git commit ${file} -m "... ${file}"
+            done
+            e=${CODE_SUCCESS?}
+        else
+            e=${CODE_FAILURE?}
+        fi
+    fi
 
     return $e
 }
