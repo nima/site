@@ -7,9 +7,11 @@ The site remote access/execution module (ssh, ssh/sudo, tmux, etc.)
 core:import dns
 core:import hgd
 core:import util
-core:import ldap
 
-#. -={
+core:requires ssh
+core:requires netstat
+
+#. Remote Execution/Monitoring -={
 #. remote:connect() -={
 function :remote:connect() {
     local -i e=${CODE_FAILURE?}
@@ -178,7 +180,7 @@ function remote:copy() {
 }
 #. }=-
 #. remote:sudo() -={
-function :remote:pipewrap() {
+function ::remote:pipewrap() {
     # This function reads in the input from a terminal and output the same.
     # The only purpose is to insert PASSWORD for "sudo -S" command.
     # After initially insert the password, it simply copy input from terminal
@@ -216,7 +218,7 @@ function :remote:sudo() {
             if [ $? -eq ${CODE_SUCCESS} ]; then
                 local fqdn=$2
                 shift 2
-                :remote:pipewrap "${passwd}" "${lckfile}" | (
+                ::remote:pipewrap "${passwd}" "${lckfile}" | (
                     :remote:connect ${tldid} ${fqdn} sudo -p "${prompt}" -S ${*}
                     e=$?
                     rm -f ${lckfile}
@@ -226,7 +228,7 @@ function :remote:sudo() {
                 tldid=$1
                 hnh=$2
                 shift 2
-                :remote:pipewrap "${passwd}" "${lckfile}" | (
+                ::remote:pipewrap "${passwd}" "${lckfile}" | (
                     :remote:connect ${tldid} ${hnh} sudo -p "${prompt}" -S ${*}
                     e=$?
                     rm -f ${lckfile}
@@ -311,7 +313,7 @@ function remote:cluster() {
     return $e
 }
 
-function ::remote:eval:tmux() {
+function ::remote:tmux.eval() {
     if [ $# -eq 3 ]; then
         local session=$1
         echo "#. session ${session}"
@@ -688,7 +690,7 @@ function remote:mon() {
     return $e
 }
 #. }=-
-#. remote:cf -={
+#. remote:cfrun -={
 function remote:cfrun:usage() { echo "[<hgd>]"; }
 function remote:cfrun() {
     local -i e=${CODE_DEFAULT?}
