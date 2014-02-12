@@ -164,3 +164,35 @@ function test_2_4_CoreGitBasedirInternal() {
     :git:basedir /tmp >${stdoutF?} 2>${stderrF?}
     assertFalse 0x0 $?
 }
+
+function test_3_1_CoreGitSizePublic() {
+    core:import git
+
+    cd /
+    core:wrapper git size ${SITE_SCM?} >${stdoutF?} 2>${stderrF?}
+    assertTrue 0x0 $?
+
+    cd ${SITE_SCM?}
+    core:wrapper git size >${stdoutF?} 2>${stderrF?}
+    assertTrue 0x1 $?
+
+    cd ${SITE_SCM?}/modules
+    core:wrapper git size >${stdoutF?} 2>${stderrF?}
+    assertTrue 0x2 $?
+}
+
+function test_3_1_CoreGitUsagePublic() {
+    core:import git
+
+    cd /
+    core:wrapper git usage ${SITE_SCM?} >${stdoutF?} 2>${stderrF?}
+    assertTrue 0x0 $?
+
+    cd ${SITE_SCM?}
+    core:wrapper git usage >${stdoutF?} 2>${stderrF?}
+    assertTrue 0x1 $?
+
+    cd ${SITE_SCM?}/modules
+    core:wrapper git usage >${stdoutF?} 2>${stderrF?}
+    assertTrue 0x2 $?
+}

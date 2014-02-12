@@ -1,0 +1,13 @@
+#. format: profile|module|function|context|stdin|arguments|stdout|stderr|exitcode
+#. Git -={
+#core|git|size|public|||||0
+#core|git|size|public||${SITE_SCM?}|||0
+#core|git|size|public||${SITE_SCM?}/module|||0
+#core|git|usage|public|||||0
+#core|git|usage|public||${SITE_SCM?}|||0
+#core|git|usage|public||${SITE_SCM?}/module|||0
+#core|git|gource|public
+#core|git|serve|public
+#core|git|mkci|private
+#core|git|rebasesearchstr|public
+#. }=-

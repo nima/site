@@ -26,8 +26,9 @@ export SITE_CORE_EXTERN_LIBSH=${SITE_CORE_EXTERN}/lib/libsh
 export SITE_CORE_EXTERN_LIBPY=${SITE_CORE_EXTERN}/lib/libpy
 export SITE_CORE_EXTERN_LIBRB=${SITE_CORE_EXTERN}/lib/librb
 export SITE_CORE_EXTERN_LIBEXEC=${SITE_CORE_EXTERN}/libexec
-export SITE_UNIT_STATIC=${SITE_CORE_LIBSH}/libsite/unit/static.sh
-export SITE_UNIT_DYNAMIC=${SITE_CORE_LIBSH}/libsite/unit/dynamic.csv
+export SITE_UNIT=${SITE_CORE}/share/unit
+export SITE_UNIT_TESTS=${SITE_CORE}/share/unit/tests
+export SITE_UNIT_FILES=${SITE_CORE}/share/unit/tests
 
 export SITE_USER=${HOME}/.site
 export SITE_USER_VAR=${SITE_USER}/var

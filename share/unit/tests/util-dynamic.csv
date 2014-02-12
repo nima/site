@@ -1,0 +1,16 @@
+#. format: profile|module|function|context|stdin|arguments|stdout|stderr|exitcode
+#. Utility Module -={
+core|util|date:i2s|internal||1369369079|20130524041759||0
+core|util|date:s2i|internal||20131230235959|1388447999||0
+core|util|listify|internal||b,a,d,b,e,e,f|b a d b e e f||0
+core|util|uniq|internal||b a d b e e f|a b d e f||0
+core|util|is_int|internal||-1|||0
+core|util|is_int|internal||0|||0
+core|util|is_int|internal||1|||0
+core|util|is_int|internal||a2|||1
+core|util|is_int|internal||2a|||1
+core|util|dups|internal|$(printf "uidNumber %d\\\\n" 1 2 3 4 8 5 6 7 8 9)||8||0
+core|util|markdown|internal|$(cat /etc/hosts)|h1 Header|||0
+#core|util|timeout|public
+core|util|json|internal|{a:a,b:b}||||0
+# }=-

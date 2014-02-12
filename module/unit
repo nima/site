@@ -107,9 +107,15 @@ function testCoverage() {
     if [ -d ${cwd} ]; then
         cd ${cwd}
         local context
-        local blacklisted
-        blacklisted="$(awk -F\| "NF==2&&\$1~/^#${profile}$/&&\$2~/^${module}$/{print\"BLACKLISTED\"}" ${SITE_UNIT_DYNAMIC?})"
-        if [ "${blacklisted}" != "BLACKLISTED" ]; then
+        local -i blacklisted=0
+        local dynamic="${SITE_UNIT_TESTS?}/${module}-dynamic.csv"
+        if [ -e ${dynamic} ]; then
+            blacklisted=$(
+                awk -F\| "BEGIN{b=0};NF==2&&\$1~/^#${profile}$/&&\$2~/^${module}$/{b=1};END{print(b)}" ${dynamic}
+            )
+        fi
+
+        if [ ${blacklisted} -eq 0 ]; then
             cpf "%{@profile:${profile}}: %{!module:${module}} %{r:-=[}\n"
             for context in ${!fnregexes[@]}; do
                 local regex=$(printf "${fnregexes[${context}]}" ${module})
@@ -133,10 +139,12 @@ function testCoverage() {
                         fi
 
                         cpf "      %{@comment:|___} %{!function:${module}:${fn}} %{g:dynamic}; %{@fn:${utf}}..."
-                        blacklisted="$(awk -F\| "\$1~/^#${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\"BLACKLISTED\"}" ${SITE_UNIT_DYNAMIC?})"
-                        if [ "${blacklisted}" != "BLACKLISTED" ]; then
+                        blacklisted=$(
+                            awk -F\| "BEGIN{b=0};NF==4&&\$1~/^#${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{b=1};END{print(b)}" ${dynamic}
+                        )
+                        if [ ${blacklisted} -eq 0 ]; then
                             local input
-                            input="$(awk -F\| "\$1~/^${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\$0}" ${SITE_UNIT_DYNAMIC?})"
+                            input="$(awk -F\| "\$1~/^${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\$0}" ${dynamic})"
                             if [ -n "${input}" ]; then
                                 local -i i=0
                                 local line
@@ -341,7 +349,7 @@ function ::unit:test() {
 #. Module    : ${module}
 #. Generated : $(date)
 !SCRIPT
-                        script=${SITE_UNIT_STATIC/static/static-${module}}
+                        script=${SITE_UNIT_TESTS}/${module}-static.sh
                         if [ -r "${script}" ]; then
                             cat "${script}" > ${g_RUNTIME_SCRIPT}
                         fi
