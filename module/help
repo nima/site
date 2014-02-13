@@ -7,10 +7,10 @@ function help:all() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 0 ]; then
-        local profile
-        for profile in USER_MODULES CORE_MODULES; do
+        local _profile
+        for _profile in USER_MODULES CORE_MODULES; do
             #. Initialize the ${profile} variable
-            eval $(::core:dereference.eval profile)
+            eval $(::core:dereference.eval _profile)
             local module
             for module in ${!profile[@]}; do
                 :core:usage ${module}

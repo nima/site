@@ -21,7 +21,7 @@ Here are the currently developing site modules:
 | ------------- | ----------------------- | ------------------------------------------------------------------- |
 | unit          | :last_quarter_moon:     | Core Unit-Testing module                                            |
 | util          | :full_moon:             | Core utilities module                                               |
-| help          | :last_quarter_moon:     | Core help module                                                    |
+| help          | :full_moon:             | Core help module                                                    |
 | hgd           | :waning_gibbous_moon:   | Core HGD (Host-Group Directive) module                              |
 | net           | :full_moon:             | Core networking module                                              |
 | gpg           | :full_moon:             | Core GNUPG module                                                   |

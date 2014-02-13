@@ -17,9 +17,9 @@ env:
     - PATH="${PATH}:${HOME}/bin"
   matrix:
     # CONTEXT=execute MODULE=tutorial #. nima/site#15
-    # CONTEXT=execute MODULE=help     #. nima/site#19
     # CONTEXT=execute MODULE=remote   #. nima/site#13
     # CONTEXT=execute MODULE=dns      #. nima/site#10
+    - CONTEXT=execute MODULE=help     #. nima/site#19
     - CONTEXT=execute MODULE=tunnel   #. nima/site#18
     - CONTEXT=execute MODULE=git      #. nima/site#9
     - CONTEXT=execute MODULE=vault    #. nima/site#17

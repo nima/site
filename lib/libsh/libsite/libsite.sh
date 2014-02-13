@@ -817,7 +817,7 @@ function ::core:dereference.eval() {
     #. Input: _my_var=something; something=( A B C )
     #. Output: my_var=( A B C )
     if [ ! -t 1 ]; then
-        echo "unset ${1} && eval \$(declare -p ${!1}|sed -e 's/declare -\([a-qs-zA-Z]*\)r*\([a-qs-zA-Z]*\) ${!1}=\(.*\)/declare -\1\2 ${1}=\3/')";
+        echo "unset ${1} && eval \$(declare -p ${!1}|sed -e 's/declare -\([a-qs-zA-Z]*\)r*\([a-qs-zA-Z]*\) ${!1}=\(.*\)/declare -\1\2 ${1#_}=\3/')";
     else
         core:raise EXCEPTION_BAD_FN_CALL \
             "This function must be called in a subshell, and evaled afterwards!"
@@ -914,32 +914,39 @@ function :core:usage() {
             ); done
         done
     elif [ $# -eq 1 ]; then
-        core:import ${module}
-        cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${SITE_PROFILE}} %{!module:${module}}\n"
-        local -a fns=( $(:core:functions public ${module}) )
-        for fn in ${fns[@]}; do
-            local usage_fn="${module}:${fn}:usage"
-            local usagestr="{no-args}"
-            if [ "$(type -t ${usage_fn})" == "function" ]; then
-                usagestr="$(${usage_fn})"
-                cpf "    %{bl:${SITE_BASENAME}} %{!function:${module}:${fn}} %{c:%s}\n" "${usagestr}"
-            else
-                cpf "    %{bl:${SITE_BASENAME}} %{!function:${module}:${fn}} %{bl:%s}\n" "${usagestr}"
+        core:softimport ${module}
+        local -i ie=$?
+        if [ $ie -eq ${CODE_IMPORT_GOOOD?} ]; then
+            if [ ${g_ONCE_WHOAMI:-0} -eq 0 ]; then
+                cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${SITE_PROFILE}} %{!module:${module}}\n"
+                g_ONCE_WHOAMI=1
             fi
-        done
 
-        if [ ${g_VERBOSE?} -eq 1 -a ${#FUNCNAME[@]} -lt 4 ]; then
-            cpf "\n%{!module:${module}} %{g:changelog}\n"
-            local modfile=${SITE_USER_MOD}/${module}
-            [ -f ${modfile} ] || modfile=${SITE_CORE_MOD}/${module}
-            cd ${SITE_CORE}
-            :core:git --no-pager\
-                log --follow --all --format=format:'    |___%C(bold blue)%h%C(reset) %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(bold white)— %an%C(reset)%C(bold yellow)%d%C(reset)'\
-                --abbrev-commit --date=relative -- "${modfile}"
-            cd ${OLDPWD}
+            local -a fns=( $(:core:functions public ${module}) )
+            for fn in ${fns[@]}; do
+                local usage_fn="${module}:${fn}:usage"
+                local usagestr="{no-args}"
+                if [ "$(type -t ${usage_fn})" == "function" ]; then
+                    usagestr="$(${usage_fn})"
+                    cpf "    %{bl:${SITE_BASENAME}} %{!function:${module}:${fn}} %{c:%s}\n" "${usagestr}"
+                else
+                    cpf "    %{bl:${SITE_BASENAME}} %{!function:${module}:${fn}} %{bl:%s}\n" "${usagestr}"
+                fi
+            done
+
+            if [ ${g_VERBOSE?} -eq 1 -a ${#FUNCNAME[@]} -lt 4 ]; then
+                cpf "\n%{!module:${module}} %{g:changelog}\n"
+                local modfile=${SITE_USER_MOD}/${module}
+                [ -f ${modfile} ] || modfile=${SITE_CORE_MOD}/${module}
+                cd ${SITE_CORE}
+                :core:git --no-pager\
+                    log --follow --all --format=format:'    |___%C(bold blue)%h%C(reset) %C(bold green)(%ar)%C(reset) %C(white)%s%C(reset) %C(bold white)— %an%C(reset)%C(bold yellow)%d%C(reset)'\
+                    --abbrev-commit --date=relative -- "${modfile}"
+                cd ${OLDPWD}
+                echo
+            fi
             echo
         fi
-        echo
     elif [ $# -ge 2 ]; then
         cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${SITE_PROFILE}} %{!function:${module}:${fn}}\n"
         cpf "    %{bl:${SITE_BASENAME}} %{!function:${module}:${fn}} "
