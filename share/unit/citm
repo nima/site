@@ -14,6 +14,12 @@
 #.
 #. See the short code below to figure out how those are used.
 
+function run() {
+    echo "$ ${@}"
+    "${@}"
+    return $e
+}
+
 declare -g EXIT=9
 echo "#. travis[$1].${CONTEXT?}(${MODULE?}) -=["
 if [ $# -eq 1 ]; then
@@ -22,19 +28,16 @@ if [ $# -eq 1 ]; then
             case ${CONTEXT}:${MODULE} in
                 installer:-)
                     EXIT=0
-                    make install   ;((EXIT|=$?)) #. Test fresh install
-                    make uninstall ;((EXIT|=$?)) #. Test uninstall
-                    make install   ;((EXIT|=$?)) #. Test reinstall
-                    make purge     ;((EXIT|=$?)) #. Test purge
+                    run make install                               ;((EXIT|=$?)) #. Test fresh install
+                    run make uninstall                             ;((EXIT|=$?)) #. Test uninstall
+                    run make install                               ;((EXIT|=$?)) #. Test reinstall
+                    run make purge                                 ;((EXIT|=$?)) #. Test purge
                 ;;
                 execute:*)
                     EXIT=0
-                    echo '$ make install'
-                    make install             ;((EXIT|=$?))
-                    echo "$ site unit test ${MODULE}"
-                    site unit test ${MODULE} ;((EXIT|=$?))
-                    echo '$ make uninstall'
-                    make uninstall           ;((EXIT|=$?))
+                    run make install                               ;((EXIT|=$?))
+                    run site unit test ${MODULE}                   ;((EXIT|=$?))
+                    run make uninstall                             ;((EXIT|=$?))
                 ;;
                 *:*)
                     EXIT=1
@@ -44,37 +47,44 @@ if [ $# -eq 1 ]; then
 
         before_install)
             EXIT=0
-            sudo apt-get install -qq make                      ;((EXIT|=$?))
-            sudo apt-get install -qq coreutils bash sed gawk   ;((EXIT|=$?))
-            sudo apt-get install -qq git                       ;((EXIT|=$?))
-            sudo apt-get install -qq python python-virtualenv  ;((EXIT|=$?))
-            sudo install -d /var/tmp -m 1777                   ;((EXIT|=$?))
-            sudo install -m 0644\
+            run sudo apt-get install -qq make                      ;((EXIT|=$?))
+            run sudo apt-get install -qq coreutils bash sed gawk   ;((EXIT|=$?))
+            run sudo apt-get install -qq git                       ;((EXIT|=$?))
+            run sudo apt-get install -qq python python-virtualenv  ;((EXIT|=$?))
+            run sudo install -d /var/tmp -m 1777                   ;((EXIT|=$?))
+            run sudo install -m 0644\
                 share/unit/files/apt.conf\
-                /etc/apt/apt.conf.d/99SiteUnitTest             ;((EXIT|=$?))
+                /etc/apt/apt.conf.d/99SiteUnitTest                 ;((EXIT|=$?))
+
+            #. Speed up RNG by faking it... -={
+            run sudo rm -f /dev/random                             ;((EXIT|=$?))
+            run sudo mknod -m 0666 /dev/random c 1 9               ;((EXIT|=$?))  #. urandom
+            run sudo install -m 0644\
+                share/unit/files/rng-tools\
+                /etc/default/rng-tools                             ;((EXIT|=$?))
+            run sudo apt-get install -qq rng-tools                 ;((EXIT|=$?))
+            #. }=-
 
             case ${MODULE} in
-                gpg|vault|git)
-                    sudo rm -f /dev/random
-                    sudo mknod -m 0666 /dev/random c 1 9 #. urandom
-                    sudo install -m 0644\
-                        share/unit/files/rng-tools\
-                        /etc/default/rng-tools                 ;((EXIT|=$?))
-                    sudo apt-get install -qq rng-tools         ;((EXIT|=$?))
+                gpg|vault|remote)
+                    run sudo apt-get install -qq gnupg2            ;((EXIT|=$?))
+                    run sudo apt-get install -qq pwgen             ;((EXIT|=$?))
+                    run sudo apt-get install -qq xclip             ;((EXIT|=$?))
                 ;;
             esac
 
             case ${MODULE} in
-                gpg|vault)
-                    sudo apt-get install -qq gnupg2            ;((EXIT|=$?))
-                    sudo apt-get install -qq pwgen             ;((EXIT|=$?))
-                    sudo apt-get install -qq xclip             ;((EXIT|=$?))
-                ;;
                 net)
-                    sudo apt-get install -qq iproute           ;((EXIT|=$?))
-                    sudo apt-get install -qq net-tools         ;((EXIT|=$?))
-                    sudo apt-get install -qq netcat            ;((EXIT|=$?))
-                    sudo apt-get install -qq socat             ;((EXIT|=$?))
+                    run sudo apt-get install -qq iproute           ;((EXIT|=$?))
+                    run sudo apt-get install -qq net-tools         ;((EXIT|=$?))
+                    run sudo apt-get install -qq netcat            ;((EXIT|=$?))
+                    run sudo apt-get install -qq socat             ;((EXIT|=$?))
+                ;;
+            esac
+
+            case ${MODULE} in
+                dns|remote)
+                    run sudo apt-get install -qq dnsutils          ;((EXIT|=$?))
                 ;;
             esac
         ;;

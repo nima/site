@@ -15,19 +15,25 @@ env:
   global:
     - SITE_PROFILE="TRAVIS"
     - PATH="${PATH}:${HOME}/bin"
+    - CITM_HOST=1
   matrix:
-    # CONTEXT=execute MODULE=tutorial #. nima/site#15
-    # CONTEXT=execute MODULE=remote   #. nima/site#13
-    # CONTEXT=execute MODULE=dns      #. nima/site#10
-    - CONTEXT=execute MODULE=help     #. nima/site#19
-    - CONTEXT=execute MODULE=tunnel   #. nima/site#18
-    - CONTEXT=execute MODULE=git      #. nima/site#9
-    - CONTEXT=execute MODULE=vault    #. nima/site#17
     - CONTEXT=execute MODULE=util     #. nima/site#4
+    - CONTEXT=execute MODULE=dns      #. nima/site#10  util
+    - CONTEXT=execute MODULE=net      #. nima/site#7   dns
+    - CONTEXT=execute MODULE=git      #. nima/site#9   net
+    - CONTEXT=execute MODULE=hgd      #. nima/site#3   util net
+    - CONTEXT=execute MODULE=tunnel   #. nima/site#18  util net dns
+    - CONTEXT=execute MODULE=remote   #. nima/site#13  util hgd dns
+    - CONTEXT=execute MODULE=tutorial #. nima/site#15  util
     - CONTEXT=execute MODULE=gpg      #. nima/site#5
-    - CONTEXT=execute MODULE=hgd      #. nima/site#3
-    - CONTEXT=execute MODULE=net      #. nima/site#7
+    - CONTEXT=execute MODULE=vault    #. nima/site#17  gpg
+    - CONTEXT=execute MODULE=help     #. nima/site#19
     - CONTEXT=installer MODULE=-
+
+matrix:
+  allow_failures:
+    - env: CONTEXT=execute MODULE=remote
+    - env: CONTEXT=execute MODULE=tutorial
 
 script:
   - share/unit/citm script
