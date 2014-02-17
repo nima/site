@@ -134,8 +134,8 @@ CODE_USAGE_FN_SHORT=94
 CODE_USAGE_FN_LONG=95
 
 CODE_IMPORT_GOOOD=0 #. good module
-CODE_IMPORT_ADMIN=1 #. administratively disabled
-CODE_IMPORT_ERROR=2 #. invalid/bad module (can't source/parse)
+CODE_IMPORT_ERROR=1 #. invalid/bad module (can't source/parse)
+CODE_IMPORT_ADMIN=2 #. administratively disabled
 CODE_IMPORT_UNDEF=3 #. no such module
 CODE_IMPORT_UNSET=4 #. no module set
 
@@ -194,8 +194,8 @@ declare -A g_SITE_IMPORTED_EXIT
 
 function core:softimport() {
     #. 0: good module
-    #. 1: administratively disabled
-    #. 2: invalid/bad module (can't source/parse)
+    #. 1: invalid/bad module (can't source/parse)
+    #. 2: administratively disabled
     #. 3: no such module defined
     #. 4: no module set
     local -i e=9
@@ -229,7 +229,7 @@ function core:softimport() {
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 0 -o ${USER_MODULES[${module}]-9} -eq 0 ]; then
                 #. Implicitly disabled
-                e=1
+                e=${CODE_IMPORT_ADMIN?}
             elif [ "${module}" == "-" ]; then
                 e=${CODE_IMPORT_UNSET?}
             else
