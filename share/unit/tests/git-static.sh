@@ -176,7 +176,7 @@ function test_3_1_CoreGitSizePublic() {
     core:wrapper git size >${stdoutF?} 2>${stderrF?}
     assertTrue 0x1 $?
 
-    cd ${SITE_SCM?}/modules
+    cd ${SITE_SCM?}/module
     core:wrapper git size >${stdoutF?} 2>${stderrF?}
     assertTrue 0x2 $?
 }
@@ -192,7 +192,7 @@ function test_3_1_CoreGitUsagePublic() {
     core:wrapper git usage >${stdoutF?} 2>${stderrF?}
     assertTrue 0x1 $?
 
-    cd ${SITE_SCM?}/modules
+    cd ${SITE_SCM?}/module
     core:wrapper git usage >${stdoutF?} 2>${stderrF?}
     assertTrue 0x2 $?
 }
