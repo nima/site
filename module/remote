@@ -11,47 +11,50 @@ core:import util
 core:requires ssh
 core:requires netstat
 
+declare -g g_SSH_OPT
+g_SSH_OPTS="-q -o ConnectionAttempts=${USER_SSH_ATTEMPTS:-2} -o ConnectTimeout=${USER_SSH_TIMEOUT:-3} -o PasswordAuthentication=no"
+
 #. Remote Execution/Monitoring -={
 #. remote:connect() -={
 function :remote:connect() {
     local -i e=${CODE_FAILURE?}
 
     if [ $# -ge 2 ]; then
-        local tldid=$1
-        local hnh=$2
-        shift 2
+        local tldid="$1"
+        local qdn="$2"
 
-        if [ ${#USER_IFACE[${tldid}]} -gt 0 ]; then
-            local -a qdns=( $(:dns:qdn ${tldid} ${hnh}) )
-            if [ ${#qdns[@]} -gt 0 ]; then
-                local qdn=${qdns[0]}
+        local ssh_opts
+        if [ $# -eq 2 ]; then
+            #. User wants to ssh into a shell
+            ssh_opts="${g_SSH_OPTS} -ttt"
+        elif [ $# -ge 3 ]; then
+            #. User wants to ssh and execute a command
+            ssh_opts="${g_SSH_OPTS} -T"
+        else
+            #. User is confused, and so we will follow.
+            core:raise EXCEPTION_BAD_FN_CALL
+        fi
 
-                local ssh_opts
-                if [ $# -eq 0 ]; then
-                    #. User wants to ssh into a shell
-                    ssh_opts="${g_SSH_OPTS} -t"
-                elif [ $# -ge 1 ]; then
-                    #. User wants to ssh and execute a command
-                    ssh_opts="${g_SSH_OPTS} -T"
-                else
-                    #. User is confused, and so will we be.
-                    core:raise EXCEPTION_BAD_FN_CALL
-                fi
-
-                local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
-                if [ ${#ssh_proxy} -eq 0 ]; then
-                    ssh ${ssh_opts} ${USER_USERNAME}@${qdn} $*
-                    e=$?
-                else
-                    ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME}@${ssh_proxy}\
-                        nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME}@${qdn} $*
-                    e=$?
-                fi
+        local ssh_proxy
+        [ ${tldid} == '.' ] || ssh_proxy=${USER_SSH_PROXY[${tldid}]}
+        if [ ${#ssh_proxy} -eq 0 ]; then
+            if [ $# -gt 2 ]; then
+                ssh ${ssh_opts} ${USER_USERNAME}@${qdn} "${@:3}"
+                e=$?
             else
-                core:raise EXCEPTION_BAD_FN_CALL "No such host"
+                ssh ${ssh_opts} ${USER_USERNAME}@${qdn}
+                e=$?
             fi
         else
-            core:raise EXCEPTION_BAD_FN_CALL "Invalid TLDID"
+            if [ $# -gt 2 ]; then
+                ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME}@${ssh_proxy}\
+                    nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME}@${qdn} "${@:3}"
+                e=$?
+            else
+                ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME}@${ssh_proxy}\
+                    nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME}@${qdn}
+                e=$?
+            fi
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -60,60 +63,46 @@ function :remote:connect() {
     return $e
 }
 
-function remote:connect:usage() { echo "[-T|--tldid <tldid>] <hnh>"; }
+function remote:connect:usage() { echo "[-T|--tldid <tldid>] <hnh> [<cmd> [<args> [...]]]"; }
 function remote:connect() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -ge 1 ]; then
         local hnh=$1
-        local tldid
-        tldid=$(:dns:qualified ${hnh})
-        if [ $? -eq ${CODE_SUCCESS} ]; then
-            :remote:connect $*
-            e=$?
+        local tldid=${g_TLDID}
+
+        local -a data
+        [ ! -t 1 ] || cpf "Resolving %{@host:%s} in %{@tldid:%s}..." "${hnh}" "${tldid}"
+        data=( $(:dns:lookup.csv ${tldid} a ${hnh}) )
+
+        local qt hnh_ qual tldid_ usdn dn fqdn resolved qid
+        if [ ${#data[@]} -eq 1 ]; then
+            IFS=, read qt hnh_ qual tldid_ usdn dn fqdn resolved qid <<< "${data[0]}"
+            [ ! -t 1 ] || theme HAS_PASSED "${fqdn}/${resolved}"
+        elif [ ${#data[@]} -gt 1 ]; then
+            [ ! -t 1 ] || theme ERR "Too many matches to the <hnh> \`${hnh}'"
+            e=${CODE_FAILURE}
         else
-            tldid=${g_TLDID}
-            shift 1
+            [ ! -t 1 ] || theme ERR "Failed to resolve any host matching \`${hnh}'"
+            e=${CODE_FAILURE}
+        fi
 
-            local tld=${USER_TLDS[${tldid}]}
+        if [ ${#data[@]} -eq 1 ]; then
+            local qdn="${fqdn%.${dn}}"
+            [ ! -t 1 ] || cpf "Connecting as@to %{@user:%s}@%{@host:%s}.%{@tldid:%s}...\n"\
+                "${USER_USERNAME}" "${qdn}" "${tldid}"
 
-            if [ ${#tld} -gt 0 ]; then
-                local qdn
-                local -a qdns=( $(:dns:qdn ${tldid} ${hnh}) )
-                if [ ${#qdns[@]} -gt 0 ]; then
-                    #if [ -t 1 ]; then
-                    #    if [ ${#qdns[@]} -gt 1 ]; then
-                    #        theme HAS_WARNED "More than one match"
-                    #        for qdn in ${qdns[@]}; do
-                    #            cpf "    - %{@host:%s}\n" ${qdn}
-                    #        done
-                    #    fi
-                    #fi
-
-                    if [ $# -eq 0 ]; then
-                        theme INFO "Connecting to ${qdns[0]}.${tldid}..."
-                    fi
-
-                    :remote:connect ${tldid} ${hnh} $*
-                    e=$?
-                    if [ $e -eq 255 ]; then
-                        theme ERR "Failed to connect to \`${qdns[0]}'"
-                    elif [ $e -ne ${CODE_SUCCESS?} ]; then
-                        theme WARN "Connection to ${qdns[0]} terminated with error code \`$e'"
-                    fi
-                elif [ ${#qdns[@]} -gt 0 ]; then
-                    for qdn in ${qdns[@]}; do
-                        read record context query sdn ip <<< "$(:dns:lookup P a ${qdn})"
-                        printf "$(basename $0) ssh connect %-48s #. %s\n" "${qdn} $*" ${ip}
-                    done
-                    e=${CODE_SUCCESS}
-                else
-                    theme ERR "Failed to resolve any host matching \`${hnh}'"
-                    e=${CODE_FAILURE}
-                fi
+            if [ $# -eq 1 ]; then
+                :remote:connect ${tldid} ${qdn}
+                e=$?
             else
-                theme ERR "Invalid TLD identifier \'${tldid}'"
-                e=${CODE_FAILURE}
+                :remote:connect ${tldid} ${qdn} "${@:2}"
+                e=$?
+                if [ $e -eq 255 ]; then
+                    [ ! -t 1 ] || theme HAS_FAILED "Failed to connect to \`${qdn}'"
+                elif [ $e -ne ${CODE_SUCCESS?} ]; then
+                    [ ! -t 1 ] || theme HAS_WARNED "Connection terminated with error code \`$e'"
+                fi
             fi
         fi
     fi
@@ -122,57 +111,65 @@ function remote:connect() {
 }
 #. }=-
 #. remote:copy() -={
-declare -g g_SSH_OPT
-g_SSH_OPTS="-q -o ConnectionAttempts=${USER_SSH_ATTEMPTS:-2} -o ConnectTimeout=${USER_SSH_TIMEOUT:-3} -o PasswordAuthentication=no"
-
 # TODO - if fqdn is sent, work out tldid backwards?
 function :remote:copy:cached() { echo 3600; }
 function :remote:copy:cachefile() { echo $4; }
 function :remote:copy() {
   ${CACHE_OUT}; {
+    #. Usage: :remote:copy m <fqdn> /etc/security/access.conf ${SITE_USER_CACHE}/${fqdn}-access.conf
+
     local -i e=${CODE_FAILURE?}
 
-    #.Usage: :remote:copy m <fqdn> /etc/security/access.conf ${SITE_USER_CACHE}/${fqdn}-access.conf
     if [ $# -eq 4 ]; then
         local tldid=$1
         local qdn=$2
         local src=$3
         local dst=$4
 
-        local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
+        local ssh_proxy
+        [ ${tldid} == '.' ] || ssh_proxy=${USER_SSH_PROXY[${tldid}]}
+
         local scp_opts="${g_SSH_OPTS}"
         if [ ${#ssh_proxy} -eq 0 ]; then
             scp ${scp_opts} ${USER_USERNAME}@${qdn}:${src} ${dst}
+            e=$?
         else
             scp ${scp_opts} -o ProxyCommand="ssh ${USER_USERNAME}@${ssh_proxy}\
                 nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME}@${qdn}:${src} ${dst}
+            e=$?
         fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
   } | ${CACHE_IN}; ${CACHE_EXIT}
 }
 
-function remote:copy:usage() { echo "-T<tldid> <hnh>:<src-path> <dst-path>"; }
+function remote:copy:usage() { echo "-T<tldid> <hnh> <src-path> <dst-path>"; }
 function remote:copy() {
     local -i e=${CODE_DEFAULT?}
 
-    local tldid=${g_TLDID}
-    if [ $# -eq 2 -a ${#tldid} -gt 0 ]; then
-        local tld=${USER_TLDS[${tldid}]}
-        if [ ${#tld} -gt 0 ]; then
-            IFS=: read hnh src <<< "$1"
-            if [ ${#hnh} -gt 0 -a ${#src} -gt 0 ]; then
-                local dst="$2"
-                local -a qdns=( $(:dns:qdn ${tldid} ${hnh}) )
-                local qdn=${qdns[0]}
-                [ ! -t 1 ] || theme INFO "Copying shit from ${qdn}..."
-                :remote:copy "${tldid}" "${hnh}" "${src}" "${dst}"
-                e=$?
-            fi
+    local tldid=${g_TLDID?}
+    if [ $# -eq 3 ]; then
+        local -r hnh="$1"
+        local -r src="$2"
+        local -r dst="$3"
+
+        local -a data
+        [ ! -t 1 ] || cpf "Resolving %{@host:%s} in %{@tldid:%s}..." "${hnh}" "${tldid}"
+        data=( $(:dns:lookup.csv ${tldid} a ${hnh}) )
+
+        local qt hnh_ qual tldid_ usdn dn fqdn resolved qid
+        if [ ${#data[@]} -eq 1 ]; then
+            IFS=, read qt hnh_ qual tldid_ usdn dn fqdn resolved qid <<< "${data[0]}"
+
+            local qdn=${fqdn%.${dn}}
+            [ ! -t 1 ] || theme INFO "Copying from ${qdn}..."
+            :remote:copy "${tldid}" "${qdn}" "${src}" "${dst}"
+            e=$?
         else
-            theme ERR "Invalid TLD identifier \'${tldid}'"
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         fi
     fi
 
@@ -181,18 +178,23 @@ function remote:copy() {
 #. }=-
 #. remote:sudo() -={
 function ::remote:pipewrap() {
-    # This function reads in the input from a terminal and output the same.
-    # The only purpose is to insert PASSWORD for "sudo -S" command.
-    # After initially insert the password, it simply copy input from terminal
-    # and send it to ssh command directly
-    echo $1  # which is password
-    local lockFile=$2;
-    while true; do
-        # The function will exit when output pipe is closed,
-        if [ ! -e $lockFile ]; then
-            return 0
-        fi
-        # i.e., the ssh
+    #. This function acts mostly as a transparent pipe; data in -> data out.
+    #.
+    #. There is just once case where it intervenes, and that is when it is used
+    #. with `sudo -S', and at this point, it will insert a <password>.
+    #.
+    #. After initially inserting the password, it simply copies input from the
+    #. terminal and sends it to the ssh process directly.
+    #.
+    #. Credits: https://code.google.com/p/sshsudo/
+    local password="${1}"
+    local lockFile="${2}";
+
+    echo "${password}"
+
+    #. The function will exit when output pipe is closed,
+    while [ -e $lockFile ]; do
+        # i.e., the ssh process
         read -t 1 line
         if [ $? -eq 0 ]; then
             # successfully read
@@ -205,74 +207,58 @@ function ::remote:pipewrap() {
 function :remote:sudo() {
     local -i e=${CODE_FAILURE}
 
-    if [ $# -ge 2 ]; then
+    core:import vault
+
+    if [ $# -ge 3 ]; then
         local passwd
+        local tldid="$1"
+        local qdn="$2"
+
+        local sudo_opts=
+        local lckfile=$(mktemp)
+
         passwd="$(:vault:read SUDO)"
         if [ $? -eq ${CODE_SUCCESS} ]; then
-            local prompt="$(printf ".\r")"
-            local lckfile=$(mktemp)
-
-            local hnh=$2
-            local tldid
-            tldid=$(:dns:qualified ${hnh})
-            if [ $? -eq ${CODE_SUCCESS} ]; then
-                local fqdn=$2
-                shift 2
-                ::remote:pipewrap "${passwd}" "${lckfile}" | (
-                    :remote:connect ${tldid} ${fqdn} sudo -p "${prompt}" -S ${*}
-                    e=$?
-                    rm -f ${lckfile}
-                    exit $e
-                )
-            else
-                tldid=$1
-                hnh=$2
-                shift 2
-                ::remote:pipewrap "${passwd}" "${lckfile}" | (
-                    :remote:connect ${tldid} ${hnh} sudo -p "${prompt}" -S ${*}
-                    e=$?
-                    rm -f ${lckfile}
-                    exit $e
-                )
-            fi
-
+            ::remote:pipewrap "${passwd}" "${lckfile}" | (
+                local prompt="$(printf ".\r")"
+                :remote:connect ${tldid} ${qdn} sudo -p "${prompt}" -S "${@:3}"
+                e=$?
+                rm -f ${lckfile}
+                exit $e
+            )
+            e=$?
+        else
+            :remote:connect ${tldid} ${qdn} sudo -S "${@:3}"
             e=$?
         fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
 }
 
-function remote:sudo:usage() { echo "-T|--tldid <host-hint> <cmd>"; }
+function remote:sudo:usage() { echo "-T|--tldid <hnh> <cmd>"; }
 function remote:sudo() {
     local -i e=${CODE_DEFAULT}
 
-    local tldid=${g_TLDID}
-    if [ $# -ge 2 -a ${#tldid} -gt 0 ]; then
-        local hnh=$1
-        shift 1
+    if [ $# -ge 2 ]; then
+        local -r hnh="$1"
+        local -r tldid="${g_TLDID?}"
 
-        local tld=${USER_TLDS[${tldid}]}
-        if [ ${#tld} -gt 0 ]; then
-            local -a qdns=( $(:dns:qdn ${tldid} ${hnh}) )
-            #if [ -t 1 ]; then
-            #    if [ ${#qdns[@]} -gt 1 ]; then
-            #        theme HAS_WARNED "More than one match"
-            #        local qdn
-            #        for qdn in ${qdns[@]}; do
-            #            cpf "    - %{@host:%s}\n" ${qdn}
-            #        done
-            #    fi
-            #fi
-            local qdn=${qdns[0]}
+        local -a data
+        [ ! -t 1 ] || cpf "Resolving %{@host:%s} in %{@tldid:%s}..." "${hnh}" "${tldid}"
+        data=( $(:dns:lookup.csv ${tldid} a ${hnh}) )
 
-            [ ! -t 1 ] || theme INFO "Connecting to ${qdn}.${tldid}..."
-            :remote:sudo ${tldid} ${hnh} ${*}
-            e=$?
-        else
-            theme ERR "Invalid TLD identifier \'${tldid}'"
-            e=${CODE_FAILURE}
+        local qt hnh_ qual tldid_ usdn dn fqdn resolved qid
+        if [ ${#data[@]} -eq 1 ]; then
+            IFS=, read qt hnh_ qual tldid_ usdn dn fqdn resolved qid <<< "${data[0]}"
+
+            local qdn=${fqdn%.${dn}}
+            [ ! -t 1 ] || theme INFO "Sudoing at ${qdn}.${tldid}..."
+            :remote:sudo ${tldid} ${qdn} "${@:2}"
         fi
+        e=$?
     fi
 
     return $e
@@ -304,7 +290,7 @@ function remote:cluster() {
         local -a qdns
         local hnh
         for hnh in $@; do
-            qdns=( ${qdns[@]} $(:dns:qdn ${tldid} ${hnh}) )
+            qdns=( ${qdns[@]} $(:dns:get qdn ${tldid} ${hnh}) )
         done
         cssh ${qdns[@]}
         e=$?
@@ -685,55 +671,6 @@ function remote:mon() {
                 theme HAS_FAILED "NO_SUCH_HGD"
             fi
         fi
-    fi
-
-    return $e
-}
-#. }=-
-#. remote:cfrun -={
-function remote:cfrun:usage() { echo "[<hgd>]"; }
-function remote:cfrun() {
-    local -i e=${CODE_DEFAULT?}
-
-    local tldid=${g_TLDID?}
-    local -a fqdns
-    for hnh in ${USER_CFHOSTS[@]}; do
-        fqdns+=( $(:dns:fqdn ${tldid} ${hnh}) )
-    done
-
-    if [ $# -eq 1 ]; then
-        e=${CODE_SUCCESS}
-
-        local hgd=$1
-        local -a hosts
-        hosts=( $(hgd:resolve ${tldid} ${hgd}) )
-        e=$?
-
-        if [ $e -eq ${CODE_SUCCESS} ]; then
-            local -a fqdnhosts
-            for hnh in ${hosts[@]}; do
-                fqdnhosts+=( $(:dns:fqdn ${tldid} ${hnh}) )
-            done
-            local -i i
-            for (( i=0; i<${#hosts[@]}; i+=32)); do
-                printf "Queing hosts $i..$(($i+31)) of ${#hosts[@]} for cfrun...\n"
-                local -i sid=$((( ($i/32)%2 )))
-                for host in ${fqdnhosts[@]:$i:32}; do
-                    cpf " * Adding %{@host:%s}..." "${host}"
-                    theme HAS_PASSED
-                done
-                printf "Invoking cfrun from ${USER_CFHOSTS[${sid}]}..."
-                :remote:sudo ${tldid} ${USER_CFHOSTS[${sid}]} cfrun -S -T ${fqdnhosts[@]:$i:32} -- -qvK >/dev/null 2>&1
-                test $? -eq 0 && theme HAS_PASSED || theme HAS_FAILED
-            done
-        else
-            theme ERR "Invalid or zero-matching HGD equation"
-            e=${CODE_FAILURE?}
-        fi
-    elif [ $# -eq 0 ]; then
-        :remote:sudo ${tldid} ${USER_CFHOSTS[0]} cfrun ${fqdns[@]} -- -qvK
-        e=$?
-        [ $e -eq ${CODE_SUCCESS} ] || e=${CODE_FAILURE}
     fi
 
     return $e
