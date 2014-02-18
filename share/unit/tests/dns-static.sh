@@ -130,13 +130,13 @@ function testCoreDnsInspectInternal() {
     data=( $(:dns:inspect.csv 'host-ca.networks' a) )
     assertTrue   4.1 $?
     assertEquals 4.2 1 ${#data[@]}
-    assertEquals 4.3 "a,host-ca.networks,qdn,m,networks,mgmt.site,host-ca.networks.mgmt.site,127.1.12.10,4" "${data[0]}"
+    assertEquals 4.3 "a,host-ca.networks,qdn,m,networks,mgmt.site,host-ca.networks.mgmt.site,127.1.12.10,6" "${data[0]}"
 
     data=( $(:dns:inspect.csv 'host-ca' a) )
     assertTrue   5.1 $?
     assertEquals 5.2 2 ${#data[@]}
-    assertEquals 5.3 "a,host-ca,shn,m,networks,mgmt.site,host-ca.networks.mgmt.site,127.1.12.10,5" "${data[0]}"
-    assertEquals 5.4 "a,host-ca,shn,p,products,site.org,host-ca.products.site.org,127.2.12.10,5" "${data[1]}"
+    assertEquals 5.3 "a,host-ca,shn,m,networks,mgmt.site,host-ca.networks.mgmt.site,127.1.12.10,7" "${data[0]}"
+    assertEquals 5.4 "a,host-ca,shn,p,products,site.org,host-ca.products.site.org,127.2.12.10,7" "${data[1]}"
 }
 #. }=-
 #. testCoreDnsLookupInternalCsv -={
@@ -148,24 +148,24 @@ function testCoreDnsLookupInternal() {
     data=( $(:dns:lookup.csv p a 'host-8f') )
     assertTrue   1.1 $?
     assertEquals 1.2 1 ${#data[@]}
-    assertEquals 1.3 "a,host-8f,shn,p,api,site.org,host-8f.api.site.org,127.2.8.15,5" "${data[0]}"
+    assertEquals 1.3 "a,host-8f,shn,p,api,site.org,host-8f.api.site.org,127.2.8.15,7" "${data[0]}"
 
     data=( $(:dns:lookup.csv m a 'host-8f') )
     assertTrue   2.1 $?
     assertEquals 2.2 1 ${#data[@]}
-    assertEquals 2.3 "a,host-8f,shn,m,unit-tests,mgmt.site,host-8f.unit-tests.mgmt.site,127.1.8.15,5" "${data[0]}"
+    assertEquals 2.3 "a,host-8f,shn,m,unit-tests,mgmt.site,host-8f.unit-tests.mgmt.site,127.1.8.15,7" "${data[0]}"
 
     data=( $(:dns:lookup.csv pm ca 'host-8f') )
     assertTrue   3.1 $?
     assertEquals 3.2 2 ${#data[@]}
-    assertEquals 3.3 "a,host-8f,shn,m,unit-tests,mgmt.site,host-8f.unit-tests.mgmt.site,127.1.8.15,5" "${data[0]}"
-    assertEquals 3.4 "a,host-8f,shn,p,api,site.org,host-8f.api.site.org,127.2.8.15,5" "${data[1]}"
+    assertEquals 3.3 "a,host-8f,shn,m,unit-tests,mgmt.site,host-8f.unit-tests.mgmt.site,127.1.8.15,7" "${data[0]}"
+    assertEquals 3.4 "a,host-8f,shn,p,api,site.org,host-8f.api.site.org,127.2.8.15,7" "${data[1]}"
 
     data=( $(:dns:lookup.csv mp ac 'host-8f') )
     assertTrue   4.1 $?
     assertEquals 4.2 2 ${#data[@]}
-    assertEquals 3.3 "a,host-8f,shn,m,unit-tests,mgmt.site,host-8f.unit-tests.mgmt.site,127.1.8.15,5" "${data[0]}"
-    assertEquals 3.3 "a,host-8f,shn,p,api,site.org,host-8f.api.site.org,127.2.8.15,5" "${data[1]}"
+    assertEquals 4.3 "a,host-8f,shn,m,unit-tests,mgmt.site,host-8f.unit-tests.mgmt.site,127.1.8.15,7" "${data[0]}"
+    assertEquals 4.3 "a,host-8f,shn,p,api,site.org,host-8f.api.site.org,127.2.8.15,7" "${data[1]}"
 }
 #. }=-
 #. testCoreDnsLookupPublic -={
