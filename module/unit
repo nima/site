@@ -233,12 +233,16 @@ function testCoverage() {
                         fi
 
                         cpf "      %{@comment:|___} %{!function:${module}:${fn}} %{g:dynamic}; %{@fn:${utf}}..."
-                        blacklisted=$(
-                            awk -F\| "BEGIN{b=0};NF==4&&\$1~/^#${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{b=1};END{print(b)}" ${dynamic}
-                        )
+                        if [ -e ${dynamic} ]; then
+                            blacklisted=$(
+                                awk -F\| "BEGIN{b=0};NF==4&&\$1~/^#${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{b=1};END{print(b)}" ${dynamic}
+                            )
+                        fi
                         if [ ${blacklisted} -eq 0 ]; then
                             local input
-                            input="$(awk -F\| "\$1~/^${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\$0}" ${dynamic})"
+                            if [ -e ${dynamic} ]; then
+                                input="$(awk -F\| "\$1~/^${profile}$/&&\$2~/^${module}$/&&\$3~/^${fn}$/&&\$4~/^${context}$/{print\$0}" ${dynamic})"
+                            fi
                             if [ -n "${input}" ]; then
                                 local -i i=0
                                 local line
