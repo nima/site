@@ -13,9 +13,10 @@ before_install:
 
 env:
   global:
-    - SITE_PROFILE="TRAVIS"
-    - PATH="${PATH}:${HOME}/bin"
     - CITM_HOST="d41d8cd98f00b204e9800998ecf8427e"
+    - SITE_PROFILE="TRAVIS"
+    - USER_USERNAME="travis"
+    - PATH="${PATH}:${HOME}/bin"
   matrix:
     - CONTEXT=execute MODULE=util     #. nima/site#4
     - CONTEXT=execute MODULE=dns      #. nima/site#10  util
@@ -32,7 +33,6 @@ env:
 
 matrix:
   allow_failures:
-    - env: CONTEXT=execute MODULE=remote
     - env: CONTEXT=execute MODULE=tutorial
 
 script:
