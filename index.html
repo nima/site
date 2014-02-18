@@ -1,44 +1,34 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
-    <meta charset="utf-8">
+    <meta charset='utf-8'>
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
+
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
+
     <title>site by nima</title>
-    <link rel="stylesheet" href="stylesheets/styles.css">
-    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
-    <script src="javascripts/respond.js"></script>
-    <!--[if lt IE 9]>
-      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-    <!--[if lt IE 8]>
-    <link rel="stylesheet" href="stylesheets/ie.css">
-    <![endif]-->
-    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-
   </head>
+
   <body>
-      <div id="header">
-        <nav>
-          <li class="fork"><a href="https://github.com/nima/site">View On GitHub</a></li>
-          <li class="downloads"><a href="https://github.com/nima/site/zipball/master">ZIP</a></li>
-          <li class="downloads"><a href="https://github.com/nima/site/tarball/master">TAR</a></li>
-          <li class="title">DOWNLOADS</li>
-        </nav>
-      </div><!-- end header -->
 
-    <div class="wrapper">
+    <header>
+      <div class="container">
+        <h1>site</h1>
+        <h2>Modular shell-scripting framework - 99% native bash, 1% phat!</h2>
 
-      <section>
-        <div id="title">
-          <h1>site</h1>
-          <p>Modular shell-scripting framework - 99% native bash, 1% phat!</p>
-          <hr>
-          <span class="credits left">Project maintained by <a href="https://github.com/nima">nima</a></span>
-          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
-        </div>
+        <section id="downloads">
+          <a href="https://github.com/nima/site/zipball/master" class="btn">Download as .zip</a>
+          <a href="https://github.com/nima/site/tarball/master" class="btn">Download as .tar.gz</a>
+          <a href="https://github.com/nima/site" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+        </section>
+      </div>
+    </header>
 
-        <p><a href="https://travis-ci.org/nima/site"><img src="https://travis-ci.org/nima/site.png?branch=master" alt="Build Status"></a>
+    <div class="container">
+      <section id="main_content">
+        <p><a href="https://travis-ci.org/nima/site"><img src="https://travis-ci.org/nima/site.png?branch=stable" alt="Build Status"></a>
 <a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/counters/views.png" alt="views"></a>
 <a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/badges/authors.png" alt="authors"></a>
 <a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png" alt="status"></a></p>
@@ -86,7 +76,7 @@
 </li>
 <li>One just for <em>you</em>: <code>~/.siterc</code>
 </li>
-</ol><h1>
+</ol><hr><h1>
 <a name="requirements" class="anchor" href="#requirements"><span class="octicon octicon-link"></span></a>REQUIREMENTS</h1>
 
 <h2>
@@ -101,7 +91,7 @@
 
 <p>The site modules will themselves check for any python, ruby, or perl module you need for that particular module.</p>
 
-<h1>
+<hr><h1>
 <a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>INSTALLATION</h1>
 
 <ol>
@@ -172,7 +162,20 @@ cp share/examples/siterc.eg ~/.siterc
 
 <p>That means that you do not need to change your <code>PATH</code> to accomodate it, and the only environment variable that site cares (deeply) about, is <code>PROFILE</code>.</p>
 
-<h1>
+<hr><h1>
+<a name="help" class="anchor" href="#help"><span class="octicon octicon-link"></span></a>HELP</h1>
+
+<h2>
+<a name="asking-for-help-support" class="anchor" href="#asking-for-help-support"><span class="octicon octicon-link"></span></a>Asking for Help (Support)</h2>
+
+<p>If you need help, please feel free to contact support on <code>github at nima dot id dot au</code>.</p>
+
+<h2>
+<a name="offering-to-help-contribustion" class="anchor" href="#offering-to-help-contribustion"><span class="octicon octicon-link"></span></a>Offering to Help (Contribustion)</h2>
+
+<p>We're always looking for users and developers.  Simply telling us about your experience installing and using site is of great value to us.  If you want to get your hands dirty, well send us a pull request!  Remember site is modular, and there is no reason why you couldn't add your own modules to site.  If those modules are generic and could be of use to other users, we would love to hear from you!</p>
+
+<hr><h1>
 <a name="philosophy" class="anchor" href="#philosophy"><span class="octicon octicon-link"></span></a>PHILOSOPHY</h1>
 
 <p>Instead of hardcoding tediously long and complex commands over and over again in various scripts and various places, implement them once, and implement them well.  That is all you need to do (as far as scripting habits go), and you can start using site (almost) seamlessly.</p>
@@ -243,9 +246,8 @@ Hello World!
 <a name="tags-abstraction-automation-reporting-verifiability-standards-monitoring-unit-testing-bash-ssh-tmux-netgroup-hosts-users-ldap-mongo-softlayer-gnupg-remote-execution-sudo-tmux-shell-scripting-traceback-ldif" class="anchor" href="#tags-abstraction-automation-reporting-verifiability-standards-monitoring-unit-testing-bash-ssh-tmux-netgroup-hosts-users-ldap-mongo-softlayer-gnupg-remote-execution-sudo-tmux-shell-scripting-traceback-ldif"><span class="octicon octicon-link"></span></a>TAGS: <code>abstraction</code>, <code>automation</code>, <code>reporting</code>, <code>verifiability</code>, <code>standards</code>, <code>monitoring</code>, <code>unit-testing</code>, <code>bash</code>, <code>ssh</code>, <code>tmux</code>, <code>netgroup</code>, <code>hosts</code>, <code>users</code>, <code>ldap</code>, <code>mongo</code>, <code>softlayer</code>, <code>gnupg</code>, <code>remote-execution</code>, <code>sudo</code>, <code>tmux</code>, <code>shell-scripting</code>, <code>traceback</code>, <code>ldif</code>
 </h6>
       </section>
-
     </div>
-    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+
     
   </body>
 </html>
