@@ -47,6 +47,7 @@ The site modules will themselves check for any python, ruby, or perl module you 
     ```bash
     cd ~/
     git clone https://github.com/nima/site.git
+    git checkout stable
     cd site
     ```
 1. Install prerequisite software
