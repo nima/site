@@ -57,7 +57,7 @@ export USER_MODULES
 
 declare -g -A CORE_MODULES=(
     [help]=1
-    [tutorial]=1
+    [tutorial]=0
     [softlayer]=1
     [pagerduty]=1
     [hgd]=1

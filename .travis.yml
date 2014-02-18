@@ -18,6 +18,7 @@ env:
     - USER_USERNAME="travis"
     - PATH="${PATH}:${HOME}/bin"
   matrix:
+    # CONTEXT=execute MODULE=tutorial #. nima/site#15  util
     - CONTEXT=execute MODULE=util     #. nima/site#4
     - CONTEXT=execute MODULE=dns      #. nima/site#10  util
     - CONTEXT=execute MODULE=net      #. nima/site#7   dns
@@ -25,15 +26,14 @@ env:
     - CONTEXT=execute MODULE=hgd      #. nima/site#3   util net
     - CONTEXT=execute MODULE=tunnel   #. nima/site#18  util net dns
     - CONTEXT=execute MODULE=remote   #. nima/site#13  util hgd dns
-    - CONTEXT=execute MODULE=tutorial #. nima/site#15  util
     - CONTEXT=execute MODULE=gpg      #. nima/site#5
     - CONTEXT=execute MODULE=vault    #. nima/site#17  gpg
     - CONTEXT=execute MODULE=help     #. nima/site#19
     - CONTEXT=installer MODULE=-
 
-matrix:
-  allow_failures:
-    - env: CONTEXT=execute MODULE=tutorial
+#matrix:
+#  allow_failures:
+#    - env: CONTEXT=execute MODULE=tutorial
 
 script:
   - share/unit/citm script
