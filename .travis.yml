@@ -15,7 +15,7 @@ env:
   global:
     - SITE_PROFILE="TRAVIS"
     - PATH="${PATH}:${HOME}/bin"
-    - CITM_HOST=1
+    - CITM_HOST="d41d8cd98f00b204e9800998ecf8427e"
   matrix:
     - CONTEXT=execute MODULE=util     #. nima/site#4
     - CONTEXT=execute MODULE=dns      #. nima/site#10  util

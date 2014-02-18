@@ -482,36 +482,56 @@ function ::unit:test() {
 function unit:test:usage() { echo "[<module> [<module> [...]]]"; }
 function unit:test() {
     local -i e=${CODE_DEFAULT?}
-    local valid=1
 
-    local module
-    if [ $# -gt 0 ]; then
-        for module in ${@}; do
-            if core:softimport ${module}; then
-                g_MODULES[${module}]=1
+    if [ "${CITM_HOST:-false}" == "d41d8cd98f00b204e9800998ecf8427e" ]; then
+        local valid=1
+
+        local module
+        if [ $# -gt 0 ]; then
+            for module in ${@}; do
+                if core:softimport ${module}; then
+                    g_MODULES[${module}]=1
+                else
+                    g_MODULES[${module}]=0
+                    valid=0
+                fi
+            done
+        fi
+
+        if [ ${valid} -eq 1 ]; then
+            if [ -e "${SHUNIT2}" ]; then
+                cpf "%{@comment:#############################################################################}\n"
+                #. Only regenerate the script if it doesn't exist, or if it is
+                #. older than the input unittest csv file.
+                ::unit:test
+                local -i e=$?
+
+                cpf "Unit-testing overal result..."
+                [ $e -eq 0 ] && theme HAS_PASSED || theme HAS_FAILED
             else
-                g_MODULES[${module}]=0
-                valid=0
+                theme ERR_USAGE "${SHUNIT2} is missing"
+                e=${CODE_FAILURE}
             fi
-        done
-    fi
-
-    if [ ${valid} -eq 1 ]; then
-        if [ -e "${SHUNIT2}" ]; then
-            cpf "%{@comment:#############################################################################}\n"
-            #. Only regenerate the script if it doesn't exist, or if it is
-            #. older than the input unittest csv file.
-            ::unit:test
-            local -i e=$?
-
-            cpf "Unit-testing overal result..."
-            [ $e -eq 0 ] && theme HAS_PASSED || theme HAS_FAILED
         else
-            theme ERR_USAGE "${SHUNIT2} is missing"
             e=${CODE_FAILURE}
         fi
     else
-        e=${CODE_FAILURE}
+        cpf "Dear %{@user:%s}\n" "${USER_USERNAME}"
+        cat <<!
+
+Developers are encouraged to run unit-testing on a throw-away virtual machine.
+
+Please do not run unit testing on your own machine as it will make undesireable
+changes to your system.
+
+In order to bypass this lock and run the unit-tests on your thow-away test
+machines, simply export CITM_HOST to the output of \`printf|md5sum' first.
+
+Have a wonderful day!
+
+The Site Development Team
+!
+        e=${CODE_FAILURE?}
     fi
 
     return $e
