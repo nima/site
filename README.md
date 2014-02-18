@@ -19,7 +19,7 @@ Here are the currently developing site modules:
 
 | Core Module   | Code-Complete           | Description                                                         |
 | ------------- | ----------------------- | ------------------------------------------------------------------- |
-| unit          | :last_quarter_moon:     | Core Unit-Testing module                                            |
+| unit          | :waning_gibbous_moon:   | Core Unit-Testing module                                            |
 | util          | :full_moon:             | Core utilities module                                               |
 | help          | :full_moon:             | Core help module                                                    |
 | hgd           | :waning_gibbous_moon:   | Core HGD (Host-Group Directive) module                              |
@@ -28,9 +28,12 @@ Here are the currently developing site modules:
 | vault         | :full_moon:             | Core vault and secrets management module                            |
 | remote        | :last_quarter_moon:     | The site remote access/execution module (ssh, ssh/sudo, tmux, etc.) |
 | git           | :full_moon:             | Auxiliary Git helper module                                         |
-| dns           | :last_quarter_moon:     | Core DNS module                                                     |
+| dns           | :full_moon:             | Core DNS module                                                     |
 | tunnel        | :full_moon:             | Secure shell tunnelling wrapper                                     |
 | tutorial      | :waning_crescent_moon:  | The site module aims to serve as a tutorial for new site users      |
+
+And here is their relationship with one-another; i.e., the dependecy graph of the core primary site modules:
+![Module Dependencies](https://dl.dropboxusercontent.com/u/68796871/projects/Site/dependencies.png)
 
 The following set of modules are generally only useful under special-circumstances, and so are disabled by default:
 
