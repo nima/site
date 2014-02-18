@@ -1,33 +1,43 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
   <head>
-    <meta charset='utf-8'>
+    <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="chrome=1">
-
-    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen" />
-    <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen" />
-    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print" />
-
     <title>site by nima</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
   </head>
-
   <body>
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/nima/site">View On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/nima/site/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/nima/site/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
 
-    <header>
-      <div class="container">
-        <h1>site</h1>
-        <h2>Modular shell-scripting framework - 99% native bash, 1% phat!</h2>
+    <div class="wrapper">
 
-        <section id="downloads">
-          <a href="https://github.com/nima/site/zipball/master" class="btn">Download as .zip</a>
-          <a href="https://github.com/nima/site/tarball/master" class="btn">Download as .tar.gz</a>
-          <a href="https://github.com/nima/site" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
-        </section>
-      </div>
-    </header>
+      <section>
+        <div id="title">
+          <h1>site</h1>
+          <p>Modular shell-scripting framework - 99% native bash, 1% phat!</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/nima">nima</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="https://twitter.com/michigangraham">mattgraham</a></span>
+        </div>
 
-    <div class="container">
-      <section id="main_content">
         <p><a href="https://travis-ci.org/nima/site"><img src="https://travis-ci.org/nima/site.png?branch=stable" alt="Build Status"></a>
 <a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/counters/views.png" alt="views"></a>
 <a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/badges/authors.png" alt="authors"></a>
@@ -41,6 +51,11 @@
 <p><strong>TARGET AUDIENCE</strong>: <em>System Administrators, System Engineers, DevOps, System Reliability Engineers (SRE), Test Engineers</em></p>
 
 <p>Site is written for system administrators, system engineers, devOps, or automation engineers.  It is a superset of bash, and structured to scale with your scripting requirements.</p>
+
+<h2>
+<a name="news" class="anchor" href="#news"><span class="octicon octicon-link"></span></a>News</h2>
+
+<p><a href="https://twitter.com/SiteSysOpsUtil">Tweets by @SiteSysOpsUtil</a></p>
 
 <h2>
 <a name="the-code" class="anchor" href="#the-code"><span class="octicon octicon-link"></span></a>The Code</h2>
@@ -100,6 +115,7 @@
 
 <div class="highlight highlight-bash"><pre><span class="nb">cd</span> ~/
 git clone https://github.com/nima/site.git
+git checkout stable
 <span class="nb">cd </span>site
 </pre></div>
 </li>
@@ -246,8 +262,9 @@ Hello World!
 <a name="tags-abstraction-automation-reporting-verifiability-standards-monitoring-unit-testing-bash-ssh-tmux-netgroup-hosts-users-ldap-mongo-softlayer-gnupg-remote-execution-sudo-tmux-shell-scripting-traceback-ldif" class="anchor" href="#tags-abstraction-automation-reporting-verifiability-standards-monitoring-unit-testing-bash-ssh-tmux-netgroup-hosts-users-ldap-mongo-softlayer-gnupg-remote-execution-sudo-tmux-shell-scripting-traceback-ldif"><span class="octicon octicon-link"></span></a>TAGS: <code>abstraction</code>, <code>automation</code>, <code>reporting</code>, <code>verifiability</code>, <code>standards</code>, <code>monitoring</code>, <code>unit-testing</code>, <code>bash</code>, <code>ssh</code>, <code>tmux</code>, <code>netgroup</code>, <code>hosts</code>, <code>users</code>, <code>ldap</code>, <code>mongo</code>, <code>softlayer</code>, <code>gnupg</code>, <code>remote-execution</code>, <code>sudo</code>, <code>tmux</code>, <code>shell-scripting</code>, <code>traceback</code>, <code>ldif</code>
 </h6>
       </section>
-    </div>
 
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
     
   </body>
 </html>
