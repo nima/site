@@ -83,24 +83,27 @@ oneTimeSetUp() {
                             ${domain}
                         for ((k=8; k<16; k++)); do
                             ((index=k%${#subdomains[@]}))
-                            printf "127.%d.%d.%d		host-%x%x.%s.%s\n"\
-                                ${i} ${j} ${k} ${j} ${k}\
-                                ${subdomains[${index}]} ${domain}
+                            printf "127.%d.%d.%d		host-%x%x.%s.%s host-%x%x.%s\n"\
+                                ${i} ${j} ${k}\
+                                ${j} ${k} ${subdomains[${index}]} ${domain}\
+                                ${j} ${k} ${subdomains[${index}]}
                         done
                     done
                 done
-            ) | sudo tee -a /etc/hosts >/dev/null
+            ) | sudo tee -a /etc/hosts >/dev/null 2>&1
+            #. }=-
             #. Prime  `~/.ssh/known_hosts' -={
             touch ~/.ssh/known_hosts
-            (
-                local -i i=0
-                local -i j
-                local -i k
-                local -i index
+            local -i i=0
+            local -i j
+            local -i k
+            local -i index
 
-                local -a subdomains
-                local tldid
-                local domain subdomain
+            local -a subdomains
+            local tldid
+            local ip qdn fqdn
+            local domain subdomain
+            (
                 for tldid in "${!USER_TLDS[@]}"; do
                     ((i++))
                     subdomains=( $(eval echo "\${USER_SUBDOMAIN_${tldid}[@]}") )
@@ -108,23 +111,31 @@ oneTimeSetUp() {
                         domain=${USER_TLDS[${tldid}]}
 
                         local ip=$(printf "127.%d.%d.%d" ${i} ${j} 99)
-                        ssh-keyscan -t rsa ${ip} >> ~/.ssh/known_hosts 2>/dev/null
+                        ssh-keyscan -t rsa ${ip}
 
-                        local hn=$(printf "host-%x.%s" ${j} ${domain})
-                        ssh-keyscan -t rsa ${hn} >> ~/.ssh/known_hosts 2>/dev/null
+                        local fqdn=$(printf "host-%x.%s" ${j} ${domain})
+                        ssh-keyscan -t rsa ${fqdn}
+
                         for ((k=8; k<16; k++)); do
                             ip=$(printf "127.%d.%d.%d" ${i} ${j} ${k})
-                            ssh-keyscan -t rsa ${ip} >> ~/.ssh/known_hosts 2>/dev/null
+                            ssh-keyscan -t rsa ${ip}
 
                             ((index=k%${#subdomains[@]}))
-                            hn=$(printf "host-%x%x.%s.%s" ${j} ${k} ${subdomains[${index}]} ${domain})
-                            ssh-keyscan -t rsa ${hn} >> ~/.ssh/known_hosts 2>/dev/null
+                            qdn=$(
+                                printf "host-%x%x.%s"\
+                                    ${j} ${k} ${subdomains[${index}]}
+                            )
+                            ssh-keyscan -t rsa ${qdn}
+
+                            fqdn=$(
+                                printf "host-%x%x.%s.%s"\
+                                    ${j} ${k} ${subdomains[${index}]} ${domain}
+                            )
+                            ssh-keyscan -t rsa ${fqdn}
                         done
                     done
                 done
-            ) | sudo tee -a /etc/hosts >/dev/null
-
-            #. }=-
+            )  2>/dev/null | sudo tee -a ~/.ssh/known_hosts >/dev/null
             #. }=-
             #. Generate `~/.ssh/id_rsa*' -={
             [ -e ~/.ssh/id_rsa ] || ssh-keygen -q -t rsa -N "" -f ~/.ssh/id_rsa
