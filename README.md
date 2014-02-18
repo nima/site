@@ -10,6 +10,10 @@
 
 Site is written for system administrators, system engineers, devOps, or automation engineers.  It is a superset of bash, and structured to scale with your scripting requirements.
 
+## News
+<a class="twitter-timeline" href="https://twitter.com/SiteSysOpsUtil" data-widget-id="435631222664880128">Tweets by @SiteSysOpsUtil</a>
+<script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+"://platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
+
 ## The Code
 Site is broken up into two main chunks:
 
