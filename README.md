@@ -2,8 +2,17 @@
 [![authors](https://sourcegraph.com/api/repos/github.com/nima/site/badges/authors.png)](https://sourcegraph.com/github.com/nima/site)
 [![status](https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png)](https://sourcegraph.com/github.com/nima/site)
 
+# `gh-pages` README
+You are probably looking for this [README](https://github.com/nima/site/blob/gh-pages/README.md), or the corresponding [homepage](http://nima.github.io/site/).
+
+---
+# README
+Please note that this README doesn't cover what `site` is (that is covered in the [homepage](http://nima.github.io/site/)), but focuses instead on the current status of site development.
+
 ## Development Status
 <!--
+We use moons to illustrate code-complete status.
+
 :new_moon:
 :waxing_crescent_moon:
 :first_quarter_moon:
@@ -15,7 +24,7 @@
 :new_moon:
 -->
 
-Here are the currently developing site modules:
+Here are the currently developing/developed site modules:
 
 | Core Module   | Code-Complete           | Description                                                         |
 | ------------- | ----------------------- | ------------------------------------------------------------------- |
@@ -26,7 +35,7 @@ Here are the currently developing site modules:
 | net           | :full_moon:             | Core networking module                                              |
 | gpg           | :full_moon:             | Core GNUPG module                                                   |
 | vault         | :full_moon:             | Core vault and secrets management module                            |
-| remote        | :last_quarter_moon:     | The site remote access/execution module (ssh, ssh/sudo, tmux, etc.) |
+| remote        | :waning_gibbous_moon:   | The site remote access/execution module (ssh, ssh/sudo, tmux, etc.) |
 | git           | :full_moon:             | Auxiliary Git helper module                                         |
 | dns           | :full_moon:             | Core DNS module                                                     |
 | tunnel        | :full_moon:             | Secure shell tunnelling wrapper                                     |
@@ -55,12 +64,3 @@ Here are the current build statuses of the various GitHub branches of site:
 | `unstable` | [![Build Status](https://travis-ci.org/nima/site.png?branch=unstable)](https://travis-ci.org/nima/site/branches) |
 | `frozen`   | [![Build Status](https://travis-ci.org/nima/site.png?branch=frozen)](https://travis-ci.org/nima/site/branches) |
 | `stable`   | [![Build Status](https://travis-ci.org/nima/site.png?branch=stable)](https://travis-ci.org/nima/site/branches) |
-
----
-
-# `gh-pages` README
-The `gh-pages` release `README` can be found [here](https://github.com/nima/site/blob/gh-pages/README.md).
-
-If you're viewing this on the web, then please visit the [site homepage](http://nima.github.io/site/)
-
-If you're viewing this on a terminal, then see [`gh-pages/README.md`](https://github.com/nima/site/blob/gh-pages/README.md).
