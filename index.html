@@ -43,19 +43,21 @@
 <a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/badges/authors.png" alt="authors"></a>
 <a href="https://sourcegraph.com/github.com/nima/site"><img src="https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png" alt="status"></a></p>
 
+
+
 <h1>
 <a name="overview" class="anchor" href="#overview"><span class="octicon octicon-link"></span></a>OVERVIEW</h1>
 
 <p><strong>MISSION STATEMENT</strong>: <em>To simplify and standardize collaborative scripting, reporting and automation tasks</em></p>
 
-<p><strong>TARGET AUDIENCE</strong>: <em>System Administrators, System Engineers, DevOps, System Reliability Engineers (SRE), Test Engineers</em></p>
+<p><strong>TARGET AUDIENCE</strong>: <em>System Administrators, System Engineers, #TechOps, #DevOps, System Reliability Engineers #SREs, and Test Engineers</em></p>
 
-<p>Site is written for system administrators, system engineers, devOps, or automation engineers.  It is a superset of bash, and structured to scale with your scripting requirements.</p>
+<p>Site was written for its target audience, by its target audience; it is a superset of bash, and structured to scale with your scripting requirements.</p>
 
 <h2>
 <a name="news" class="anchor" href="#news"><span class="octicon octicon-link"></span></a>News</h2>
 
-<p><a href="https://twitter.com/SiteSysOpsUtil">Tweets by @SiteSysOpsUtil</a></p>
+<p><a href="https://twitter.com/SiteSysOpsUtil">Follow @SiteSysOpsUtil on Twitter!</a></p>
 
 <h2>
 <a name="the-code" class="anchor" href="#the-code"><span class="octicon octicon-link"></span></a>The Code</h2>
@@ -64,7 +66,7 @@
 
 <ol>
 <li>
-<p>The bits that we write:</p>
+<p>The bits that <em>we</em> write/maintain:</p>
 
 <ul>
 <li>the <em>site engine</em>: <code>libsite.sh</code>
@@ -74,14 +76,16 @@
 </ul>
 </li>
 <li>
-<p>The bits that you write:</p>
+<p>The bits that <em>you</em> write (and maintain):</p>
 
 <ul>
 <li>the <em>user modules</em>: <code>~/.site/module/*</code>
 </li>
 </ul>
 </li>
-</ol><h2>
+</ol><p><strong>Quick note to developers</strong>: If you ever write a user module that you'd like to share with us, simply hit us up with a <a href="https://help.github.com/articles/using-pull-requests">github pull request</a>.</p>
+
+<h2>
 <a name="the-config" class="anchor" href="#the-config"><span class="octicon octicon-link"></span></a>The Config</h2>
 
 <p>Site is configured in two places:</p>
@@ -91,7 +95,11 @@
 </li>
 <li>One just for <em>you</em>: <code>~/.siterc</code>
 </li>
-</ol><hr><h1>
+</ol><p>The prior contains things that are specific to your organization and should be in a private VCS/SCM accessible by your team.</p>
+
+<p>The latter contains configuration settings specific to you and your desktop (user details and command alias overrides mostly).  It should not be shared with anyone as it pertains only to you.</p>
+
+<hr><h1>
 <a name="requirements" class="anchor" href="#requirements"><span class="octicon octicon-link"></span></a>REQUIREMENTS</h1>
 
 <h2>
@@ -143,8 +151,18 @@ cp share/examples/siterc.eg ~/.siterc
 <div class="highlight highlight-bash"><pre>make install
 </pre></div>
 </li>
+<li>
+<p>Create organizational site git (or other VCS) repository</p>
+
+<div class="highlight highlight-bash"><pre><span class="nb">cd</span>
+mv ~/.site/profile/<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span> site-<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span>
+ln -s ~/.site/profile/<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span> <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span>/site-<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span>
+<span class="nb">cd </span>site-<span class="k">${</span><span class="nv">PROFILE</span><span class="k">}</span>
+git init .
+</pre></div>
+</li>
 </ol><h2>
-<a name="filesystem-layout" class="anchor" href="#filesystem-layout"><span class="octicon octicon-link"></span></a>Filesystem Layout</h2>
+<a name="files-and-filesystem-layout" class="anchor" href="#files-and-filesystem-layout"><span class="octicon octicon-link"></span></a>Files and Filesystem Layout</h2>
 
 <p>Site is designed to be run by your local user; it is designed to be installed on your desktop machine, and it will communicate with your hosts remotely.  You should never need to install site on a server.</p>
 
@@ -153,15 +171,24 @@ cp share/examples/siterc.eg ~/.siterc
 
 <p>Here are the only files that will exist outside of <code>${SITE_SCM}</code> (where you cloned site to):</p>
 
-<pre><code>* `~/bin/site`
-* `~/.site/`
-* `~/.siterc`
-* `~/.secrets`
-</code></pre>
+<ul>
+<li><code>~/bin/site -&gt; ${SITE_SCM}/bin/site</code></li>
+<li><code>~/.site/</code></li>
+<li><code>~/.siterc</code></li>
+</ul><p>The installer installs everything required monolithically under <code>~/.site/</code>, and even that is just a set of symbolic links pointing back to various folders within <code>${SITE_SCM}</code>.</p>
 
-<p>The installer installs everything required monolithically under <code>~/.site/</code>, and even that is just a set of symbolic links pointing back to various folders within <code>${SITE_SCM}</code>.</p>
+<p>The <code>~/.siterc</code> is where you can store configuration overrides for you particular user.</p>
 
-<p>The <code>~/.siterc</code> is where you can store configuration overrides for you particular user, and <code>~/.secrets</code> is a GPG-encrypted file where you cam store all your passwords.  Site will provide you with the necessary high-level tools to create, edit, and read to and from this file, so you don't have to invoke GPG commands directly.</p>
+<h3>
+<a name="secrets-passwords-and-api-keys" class="anchor" href="#secrets-passwords-and-api-keys"><span class="octicon octicon-link"></span></a>Secrets, Passwords, and API Keys</h3>
+
+<p>Do not store any passwords or sensitive data in this file; site ships with the <em>vault</em> module which was written to address this problem directly:  The file <code>~/.site/etc/site.vault</code> will be a GPG-encrypted file where you cam store all your secrets, passwords, and API keys.</p>
+
+<p>The unencrypted vault has a very simple format: <code>&lt;secret-id&gt;     &lt;secret-token&gt;</code>, one entry per line.  The <code>secret-token</code> can contain spaces of course, or any other character; the first token must be alphanumeric however without any spaces; quotes are taken as literal characters and there is no escaping in this file format.</p>
+
+<p>Site will provide you with the necessary high-level tools to create, edit, and read to and from this file, so you don't have to invoke GPG commands directly.</p>
+
+<p>Note that site also ships with a <em>gpg</em> module which you will want to use first to create your user-specific gpg key.</p>
 
 <h3>
 <a name="site-can-be-uninstalled-as-easily-as-it-can-be-installed" class="anchor" href="#site-can-be-uninstalled-as-easily-as-it-can-be-installed"><span class="octicon octicon-link"></span></a>Site can be uninstalled as easily as it can be installed</h3>
@@ -171,7 +198,7 @@ cp share/examples/siterc.eg ~/.siterc
 <h3>
 <a name="site-doesnt-expect-your-bash-profile-to-be-changed" class="anchor" href="#site-doesnt-expect-your-bash-profile-to-be-changed"><span class="octicon octicon-link"></span></a>Site doesn't expect your bash profile to be changed</h3>
 
-<p>Instead, you ever need to tell it to use a different executable, simply do so via <code>~/.siterc</code>; for example:</p>
+<p>Instead, if you ever need to tell it to use a different executable, simply do so via <code>~/.siterc</code>; for example:</p>
 
 <div class="highlight highlight-bash"><pre><span class="k">function </span>grep<span class="o">()</span> <span class="o">{</span> /usr/local/bin/grep <span class="s2">"$@"</span><span class="p">;</span> <span class="k">return</span> <span class="nv">$?</span><span class="p">;</span> <span class="o">}</span>
 </pre></div>
@@ -184,7 +211,9 @@ cp share/examples/siterc.eg ~/.siterc
 <h2>
 <a name="asking-for-help-support" class="anchor" href="#asking-for-help-support"><span class="octicon octicon-link"></span></a>Asking for Help (Support)</h2>
 
-<p>If you need help, please feel free to contact support on <code>github at nima dot id dot au</code>.</p>
+<p>If you want to keep up with the latest, follow us on <code>@SiteSysOpsUtil</code>.</p>
+
+<p>If you need help, tweet the hashtag <code>#SiteSupport</code>.</p>
 
 <h2>
 <a name="offering-to-help-contribustion" class="anchor" href="#offering-to-help-contribustion"><span class="octicon octicon-link"></span></a>Offering to Help (Contribustion)</h2>
@@ -194,42 +223,46 @@ cp share/examples/siterc.eg ~/.siterc
 <hr><h1>
 <a name="philosophy" class="anchor" href="#philosophy"><span class="octicon octicon-link"></span></a>PHILOSOPHY</h1>
 
+<p>Minimalism, simplicity, scalability, and code-reuse; these are some of the words that sang a tune in our ear while we were looking for a shell script framework.  We did find a couple of ideas floating around, but nothing that was actively developed or cam across as anything more than a hobby.</p>
+
+<p>Enter: <strong>site</strong>!</p>
+
 <p>Instead of hardcoding tediously long and complex commands over and over again in various scripts and various places, implement them once, and implement them well.  That is all you need to do (as far as scripting habits go), and you can start using site (almost) seamlessly.</p>
 
-<p>All you have to do is to break up your scripts into small, single-purpose <em>functions</em>, and then group them contextually into <em>modules</em>.  Of course you don't have to break your scripts up at all, but if you want to reuse any part of that script, the this is the best way forward.</p>
+<p>All you have to do is to break up your scripts into small, single-purpose <em>functions</em>, and then group them contextually into <em>modules</em>.  Of course you don't have to break your scripts up at all if you don't want, you can simply wrap it in site to make it have a common home with you other scripts - but if do want reuse any part of that script, the this is the best way forward.</p>
 
 <h2>
 <a name="simplicity" class="anchor" href="#simplicity"><span class="octicon octicon-link"></span></a>Simplicity</h2>
 
-<p>Site is simple to use; and most UI concerns are automatically accounted for, simply as a result of you writing your code within the framework.</p>
+<p>Site is simple to use; and most UI concerns are semi-automatically accounted for, simply as a result of you writing your code within the framework.</p>
 
-<p>For example, if you implement a function called <code>say:hello()</code> in <code>~/.site/profile/module/say</code>, you will get basic usage for free:</p>
+<p>For example, if you implement a function called <code>say:hello()</code> in <code>~/.site/profile/module/say</code>, and another function `say:hello:usage()' which does what it says on the can, and you will instantly get:</p>
 
-<pre><code>% site
-Using /bin/bash 4.2.37(1)-release (export SITE_SHELL to override)
+<div class="highlight highlight-bash"><pre><span class="nv">$ </span>site
+Using /bin/bash 4.2.37<span class="o">(</span>1<span class="o">)</span>-release <span class="o">(</span><span class="nb">export </span>SITE_SHELL to override<span class="o">)</span>
 
 usage4nima@SITE01
-    site say:1/0; A module that greets the world
+    site say:1/0<span class="p">;</span> A module that greets the world
     ...
-%
-</code></pre>
+<span class="err">$</span>
+</pre></div>
 
 <p>Now that we know of the <code>say</code> module:</p>
 
-<pre><code>% site say
-Using /bin/bash 4.2.37(1)-release (export SITE_SHELL to override)
+<div class="highlight highlight-bash"><pre><span class="nv">$ </span>site say
+Using /bin/bash 4.2.37<span class="o">(</span>1<span class="o">)</span>-release <span class="o">(</span><span class="nb">export </span>SITE_SHELL to override<span class="o">)</span>
 
 usage4nima@SITE01 say
-    site say hello {no-args}
-%
-</code></pre>
+    site say hello <span class="o">{</span>no-args<span class="o">}</span>
+<span class="err">$</span>
+</pre></div>
 
 <p>And now, that we know how to use it:</p>
 
-<pre><code>% site say hello
+<div class="highlight highlight-bash"><pre><span class="nv">$ </span>site say hello
 Hello World!
-%
-</code></pre>
+<span class="err">$</span>
+</pre></div>
 
 <h2>
 <a name="verifiability" class="anchor" href="#verifiability"><span class="octicon octicon-link"></span></a>Verifiability</h2>
@@ -239,24 +272,22 @@ Hello World!
 
 <p>Scripts change over time, and so unit-testing is as relevant to systems scripts as it is to any piece of software.  Site comes with a flexible unit-testing module. This module reads everything it needs to know about every function test from a unit-testing configuration file, and warns you for functions that are missing unit-test data.</p>
 
-<pre><code>% site unit test
-</code></pre>
+<div class="highlight highlight-bash"><pre><span class="nv">$ </span>site unit <span class="nb">test</span>
+</pre></div>
+
+<p><strong>Note</strong>: Please only run this on a throw-away development host, as it needs to make changes to <code>/etc/hosts</code>, ssh user and hosts keys, and possibly more user/system files in order to allow for thorough unit-testing.  A safeguard has been added to the unit module to prevent you from (or forces some acrobatic shell loop hoppery upon you for) running the unit tests, so no need to fear - site is safe :).</p>
 
 <h3>
 <a name="bash-traceback" class="anchor" href="#bash-traceback"><span class="octicon octicon-link"></span></a>Bash Traceback</h3>
 
-<p>That's right, we have a traceback so you can debug your scripts (site user modules).  Of course bash doesn't provide such functionality natively, so we had to be creative.</p>
+<p>That's right, we have a traceback so you can debug your scripts (site user modules).  Of course bash doesn't provide such functionality natively, so we had to get creative.</p>
 
 <h2>
 <a name="security-measures" class="anchor" href="#security-measures"><span class="octicon octicon-link"></span></a>Security Measures</h2>
 
 <p>Site doesn't expect to be run as root; in fact it should <em>never</em> be run as root.  It will never <em>require</em> root access on your desktop machine - which is the only place it needs to be installed.</p>
 
-<p>It could however need root access when communicating tasks to remote hosts, and in that event it will resort to your <code>~/.secrets</code> file.</p>
-
-<p>All your passwords should be stored in <code>~/.secrets</code>, which is gnugp-encrypted with your user's public key; site will ask <code>gpg-agent</code> (or you) whenever it needs access to it.</p>
-
-<p>You can store any password you like in there, even remote host sudo passwords.</p>
+<p>It could however need root access when communicating tasks to remote hosts, and in that event it will resort to your vault, as covered earlier.</p>
 
 <hr><h6>
 <a name="tags-abstraction-automation-reporting-verifiability-standards-monitoring-unit-testing-bash-ssh-tmux-netgroup-hosts-users-ldap-mongo-softlayer-gnupg-remote-execution-sudo-tmux-shell-scripting-traceback-ldif" class="anchor" href="#tags-abstraction-automation-reporting-verifiability-standards-monitoring-unit-testing-bash-ssh-tmux-netgroup-hosts-users-ldap-mongo-softlayer-gnupg-remote-execution-sudo-tmux-shell-scripting-traceback-ldif"><span class="octicon octicon-link"></span></a>TAGS: <code>abstraction</code>, <code>automation</code>, <code>reporting</code>, <code>verifiability</code>, <code>standards</code>, <code>monitoring</code>, <code>unit-testing</code>, <code>bash</code>, <code>ssh</code>, <code>tmux</code>, <code>netgroup</code>, <code>hosts</code>, <code>users</code>, <code>ldap</code>, <code>mongo</code>, <code>softlayer</code>, <code>gnupg</code>, <code>remote-execution</code>, <code>sudo</code>, <code>tmux</code>, <code>shell-scripting</code>, <code>traceback</code>, <code>ldif</code>
