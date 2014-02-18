@@ -15,7 +15,7 @@
 Site was written for its target audience, by its target audience; it is a superset of bash, and structured to scale with your scripting requirements.
 
 ## News
-<a class="twitter-timeline" href="https://twitter.com/SiteSysOpsUtil" data-widget-id="435631222664880128">Tweets by @SiteSysOpsUtil</a>
+<a class="twitter-timeline" href="https://twitter.com/SiteSysOpsUtil" data-widget-id="435631222664880128">Follow @SiteSysOpsUtil on Twitter!</a>
 <script>!function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0],p=/^http:/.test(d.location)?'http':'https';if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src=p+"://platform.twitter.com/widgets.js";fjs.parentNode.insertBefore(js,fjs);}}(document,"script","twitter-wjs");</script>
 
 ## The Code
