@@ -703,7 +703,7 @@ declare -g fn=${fn:-}
         g_LDAPHOST=${FLAGS_ldaphost?}; unset FLAGS_ldaphost
         g_TLDID=${FLAGS_tldid?}; unset FLAGS_tldid
 
-        if [ ${#g_TLDID} -eq 0 ] || [ ${#USER_IFACE[${g_TLDID}]} -gt 0 ]; then
+        if [[ ${#g_TLDID} -eq 0 || ${g_TLDID} == '.' || ${#USER_IFACE[${g_TLDID}]} -gt 0 ]]; then
             cat <<!
 #. GLOBAL_OPTS 4/4:
 declare g_HELP=${g_HELP?}
