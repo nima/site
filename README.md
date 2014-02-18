@@ -26,7 +26,7 @@ Site is configured in two places:
 1. One for *your organization*: `~/.site/etc/site.conf`
 2. One just for *you*: `~/.siterc`
 
-
+---
 # REQUIREMENTS
 
 ## Core Requirements
@@ -40,6 +40,7 @@ You also need a handful of utilities and interpreters such as gnu grep, gawk, gs
 The site modules will themselves check for any python, ruby, or perl module you need for that particular module.
 
 
+---
 # INSTALLATION
 0. Clone It
 
@@ -95,7 +96,16 @@ function grep() { /usr/local/bin/grep "$@"; return $?; }
 ```
 That means that you do not need to change your `PATH` to accomodate it, and the only environment variable that site cares (deeply) about, is `PROFILE`.
 
+---
+# HELP
 
+## Asking for Help (Support)
+If you need help, please feel free to contact support on `github at nima dot id dot au`.
+
+## Offering to Help (Contribustion)
+We're always looking for users and developers.  Simply telling us about your experience installing and using site is of great value to us.  If you want to get your hands dirty, well send us a pull request!  Remember site is modular, and there is no reason why you couldn't add your own modules to site.  If those modules are generic and could be of use to other users, we would love to hear from you!
+
+---
 # PHILOSOPHY
 Instead of hardcoding tediously long and complex commands over and over again in various scripts and various places, implement them once, and implement them well.  That is all you need to do (as far as scripting habits go), and you can start using site (almost) seamlessly.
 
