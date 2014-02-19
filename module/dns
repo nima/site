@@ -30,13 +30,13 @@ function :dns:resolve() {
         2:a)
             resolved=$(dig +short ${qdn%%.}. A|head -n1)
             if [ ${#resolved} -eq 0 ]; then
-                resolved=$(
+                resolved="$(
                     getent hosts |
                         grep -E "\<${qdn}\>" |
                         head -n1 |
                         awk '{print$1}';
-                    exit ${PIPESTATUS[1]}
-                )
+                    exit $((PIPESTATUS[0]|PIPESTATUS[1]))
+                )"
                 e=$?
             else
                 e=${CODE_SUCCESS?}
@@ -200,6 +200,7 @@ function :dns:inspect.csv() {
             if [ ${#results[@]} -eq 0 ]; then
                 #. 3. <hnh> = <ext> ?
                 if [ ${hit} -eq 0 ]; then
+                    fqdn=${hnh}
                     results+=(
                         "${qt},${hnh},ext,-,-,-,${fqdn},${resolved},3"
                     )
