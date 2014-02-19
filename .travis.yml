@@ -2,10 +2,12 @@ language: c    #. Not really, it's actually bash
 
 branches:
   only:
-    - stable   #. stable (public) release
-    - frozen   #. freeze point between stable and unstable
-    - volatile #. short-lived but promising branches worth testing
-    - unstable #. don't expect no history-rewrites here!
+    - master
+    - develop
+    - feature/*
+    - release/*
+    - support/*
+    - hotfix/*
 
 before_install:
   - sudo apt-get update -qq
