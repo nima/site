@@ -61,6 +61,5 @@ Here are the current build statuses of the various GitHub branches of site:
 
 | Branch     | Status |
 |------------|--------|
-| `unstable` | [![Build Status](https://travis-ci.org/nima/site.png?branch=unstable)](https://travis-ci.org/nima/site/branches) |
-| `frozen`   | [![Build Status](https://travis-ci.org/nima/site.png?branch=frozen)](https://travis-ci.org/nima/site/branches) |
-| `stable`   | [![Build Status](https://travis-ci.org/nima/site.png?branch=stable)](https://travis-ci.org/nima/site/branches) |
+| `master`   | [![Build Status](https://travis-ci.org/nima/site.png?branch=master)](https://travis-ci.org/nima/site/branches) |
+| `develop`  | [![Build Status](https://travis-ci.org/nima/site.png?branch=develop)](https://travis-ci.org/nima/site/branches) |
