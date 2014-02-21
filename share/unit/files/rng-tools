@@ -1,1 +1,19 @@
+#. This file is just here for historical reasons now.
+
+#. Speed up RNG... -={
+#. I used to have to do this on Trvis-CI hosts to speed things up...
+#. rng-tools -={
+#run sudo rm -f /dev/random                             ;((EXIT|=$?))
+#run sudo mknod -m 0666 /dev/random c 1 9               ;((EXIT|=$?))  #. urandom
+#run sudo install -m 0644\
+#    share/unit/files/rng-tools\
+#    /etc/default/rng-tools                             ;((EXIT|=$?))
+#run sudo apt-get install -qq rng-tools                 ;((EXIT|=$?))
+#. }=-
 RNGDOPTIONS="--random-device /dev/urandom --rng-device /dev/urandom"
+
+#. Now, I do this...
+#. haveged -={
+#run sudo apt-get install haveged                       ;((EXIT|=$?))
+#. }=-
+#. }=-

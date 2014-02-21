@@ -51,19 +51,11 @@ if [ $# -eq 1 ]; then
             run sudo apt-get install -qq coreutils bash sed gawk   ;((EXIT|=$?))
             run sudo apt-get install -qq git                       ;((EXIT|=$?))
             run sudo apt-get install -qq python python-virtualenv  ;((EXIT|=$?))
+            run sudo apt-get install -qq haveged                   ;((EXIT|=$?))
             run sudo install -d /var/tmp -m 1777                   ;((EXIT|=$?))
             run sudo install -m 0644\
                 share/unit/files/apt.conf\
                 /etc/apt/apt.conf.d/99SiteUnitTest                 ;((EXIT|=$?))
-
-            #. Speed up RNG by faking it... -={
-            run sudo rm -f /dev/random                             ;((EXIT|=$?))
-            run sudo mknod -m 0666 /dev/random c 1 9               ;((EXIT|=$?))  #. urandom
-            run sudo install -m 0644\
-                share/unit/files/rng-tools\
-                /etc/default/rng-tools                             ;((EXIT|=$?))
-            run sudo apt-get install -qq rng-tools                 ;((EXIT|=$?))
-            #. }=-
 
             case ${MODULE} in
                 gpg|vault|remote)
