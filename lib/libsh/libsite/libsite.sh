@@ -21,11 +21,6 @@ export SITE_CORE_LIB=${SITE_CORE}/lib
 export SITE_CORE_LIBPY=${SITE_CORE}/lib/libpy
 export SITE_CORE_LIBJS=${SITE_CORE}/lib/libjs
 export SITE_CORE_LIBSH=${SITE_CORE}/lib/libsh
-export SITE_CORE_EXTERN=${SITE_CORE}/extern
-export SITE_CORE_EXTERN_LIBSH=${SITE_CORE_EXTERN}/lib/libsh
-export SITE_CORE_EXTERN_LIBPY=${SITE_CORE_EXTERN}/lib/libpy
-export SITE_CORE_EXTERN_LIBRB=${SITE_CORE_EXTERN}/lib/librb
-export SITE_CORE_EXTERN_LIBEXEC=${SITE_CORE_EXTERN}/libexec
 export SITE_UNIT=${SITE_CORE}/share/unit
 export SITE_UNIT_TESTS=${SITE_CORE}/share/unit/tests
 export SITE_UNIT_FILES=${SITE_CORE}/share/unit/tests
@@ -38,18 +33,22 @@ export SITE_USER_ETC=${SITE_USER}/etc
 export SITE_USER_LOG=${SITE_USER}/var/log/site.log
 export SITE_USER_TMP=${SITE_USER}/var/tmp
 export SITE_USER_MOD=${SITE_USER}/module
-export SITE_USER_LIBEXEC=${SITE_USER}/libexec
-export SITE_USER_EXTERN=${SITE_USER}/extern
-export SITE_USER_EXTERN_LIBEXEC=:${SITE_USER_EXTERN}/libexec
+export SITE_USER_LIB=${SITE_USER}/var/lib
+export SITE_USER_LIBSH=${SITE_USER}/var/lib/libsh
+export SITE_USER_LIBPY=${SITE_USER}/var/lib/libpy
+export SITE_USER_LIBEXEC=${SITE_USER}/var/libexec
 
-export PATH+=:${SITE_CORE_LIBEXEC}
-export PATH+=:${SITE_USER_LIBEXEC}
-export PATH+=:${SITE_CORE_EXTERN_LIBEXEC}
-export PATH+=:${SITE_USER_EXTERN_LIBEXEC}
+PATH+=:${SITE_CORE_LIBEXEC}
+PATH+=:${SITE_USER_LIBEXEC}
+export PATH
 
-export PYTHONPATH+=:${SITE_CORE_LIBPY}
-export PYTHONPATH+=:${SITE_CORE_EXTERN_LIBPY}
-export PYTHONPATH+=:${SITE_CORE_EXTERN_LIBPY}/pyobjpath
+PYTHONPATH+=:${SITE_CORE_LIBPY}
+PYTHONPATH+=:${SITE_USER_LIBPY}
+export PYTHONPATH
+
+export SHUNIT2=${SITE_USER_LIBEXEC}/shunit2
+export SHFLAGS=${SITE_USER_LIBSH}/shflags
+source ${SHFLAGS?}
 #. }=-
 #. 1.3  User/Profile Configuration -={
 declare -A USER_MODULES
@@ -97,13 +96,6 @@ unset  CDPATH
 export SITE_DEADMAN=${SITE_USER_CACHE}/deadman
 export SITE_IN_COLOR=1
 source ${SITE_CORE_MOD?}/cpf
-#. }=-
-#. 1.5  ShUnit2 -={
-export SHUNIT2=$(which shunit2)
-#. }=-
-#. 1.6  ShFlags -={
-export SHFLAGS=${SITE_CORE_EXTERN_LIBSH}/shflags
-source ${SHFLAGS?}
 #. }=-
 #. 1.7  Error Code Constants -={
 true

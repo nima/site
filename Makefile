@@ -3,6 +3,7 @@ export MAKEFLAGS := --no-print-directory --warn-undefined-variables
 BIN_PY27 := python2.7
 BIN_VENV := virtualenv
 REQUIRED := ${BIN_PY27} ${BIN_VENV}
+EXTERN_D   := ~/.site/var
 export BIN_PY27 BIN_VENV
 
 .DEFAULT: help
@@ -41,9 +42,24 @@ install: require sanity .install
 	@echo "Installation complete!"
 
 .install:
+	@printf "Preparing ~/.site..."
 	@mkdir -p $(HOME)/.site
+	@echo "DONE"
 	@
-	@$(MAKE) -C extern install
+	@printf "Preparing ${EXTERN_D}..."
+	@mkdir -p /var/tmp/site/var
+	@mkdir -p /var/tmp/site/var/cache
+	@mkdir -p /var/tmp/site/var/run
+	@mkdir -p /var/tmp/site/var/log
+	@mkdir -p /var/tmp/site/var/tmp
+	@mkdir -p /var/tmp/site/var/lib
+	@ln -sf /var/tmp/site/var ${EXTERN_D}
+	@ln -sf $(PWD)/share/extern.makefile ${EXTERN_D}/Makefile
+	@echo "DONE"
+	@
+	@printf "Populating ${EXTERN_D}...\n"
+	@$(MAKE) -f $(PWD)/share/extern.makefile -C ${EXTERN_D} install
+	@
 	@printf "Installing symbolic links in $(HOME)/.site/..."
 	@ln -sf $(PWD) $(HOME)/.site/.scm
 	@ln -sf $(PWD)/lib $(HOME)/.site/lib
@@ -67,22 +83,13 @@ install: require sanity .install
 	@test ! -f .initialize || echo "DONE"
 	@rm -f .initialize
 	@
-	@printf "Preparing /var/tmp/site/..."
-	@mkdir -p /var/tmp/site/var
-	@mkdir -p /var/tmp/site/var/cache
-	@mkdir -p /var/tmp/site/var/run
-	@mkdir -p /var/tmp/site/var/log
-	@mkdir -p /var/tmp/site/var/tmp
-	@ln -sf /var/tmp/site/var $(HOME)/.site/var
-	@echo "DONE"
-	@
 	@touch .install
 #. }=-
 #. Uninstallation -={
 .PHONY: unsanity unsanity
 unsanity:; @test -f .install
 uninstall: unsanity
-	@$(MAKE) -C extern uninstall
+	@$(MAKE) -f $(PWD)/share/extern.makefile -C ${EXTERN_D} uninstall
 	@
 	find lib/libpy -name '*.pyc' -exec rm -f {} \;
 	find lib/libpy -name '*.pyo' -exec rm -f {} \;
@@ -103,7 +110,7 @@ uninstall: unsanity
 	@
 	@echo "Uninstallation complete!"
 purge:
-	@$(MAKE) -C extern purge
+	@$(MAKE) -f $(PWD)/share/extern.makefile -C ${EXTERN_D} purge
 	test ! -d ~/.site || find ~/.site -type l -exec rm -f {} \;
 	test ! -d ~/.site || find ~/.site -depth -type d -empty -exec rmdir {} \;
 	rm -rf /var/tmp/site/
