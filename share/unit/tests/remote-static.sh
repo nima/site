@@ -43,14 +43,16 @@ function testCoreRemoteCopyInternal() {
     [ -f ${SITE_USER_CACHE}/hosts ]
     assertTrue 1.2 $?
 
-    local same
-    same=$(
-        md5sum /etc/hosts ${SITE_USER_CACHE}/hosts |
-        awk '{print$1}' |
-        sort -u |
-        wc -l
-    )
-    assertEquals 1.3 1 ${same}
+    if [ -f ${SITE_USER_CACHE}/hosts ]; then
+        local same
+        same=$(
+            md5sum /etc/hosts ${SITE_USER_CACHE}/hosts |
+            awk '{print$1}' |
+            sort -u |
+            wc -l
+        )
+        assertEquals 1.3 1 ${same}
+    fi
 
     rm -f ${SITE_USER_CACHE}/hosts
 }
