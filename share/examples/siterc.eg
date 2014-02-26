@@ -1,7 +1,5 @@
 #. Copy this file to ~/.siterc, and set/uncomment variables as required.
 
-#. Set your SITE_PROFILE here:
-: ${SITE_PROFILE:=SITE01}
 : ${USER_USERNAME:=tyrion}
 : ${USER_FULLNAME:=Tyrion Lannister}
 : ${USER_EMAIL:=tyrion.lannister@lannister.casterlyrock.com}

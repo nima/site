@@ -13,7 +13,7 @@ export SITE_SITE_BASENAME=$(basename $0)
 
 export SITE_SCM=$(readlink ~/.site/.scm)
 
-export SITE_CORE=$(dirname $(dirname $(readlink ~/bin/site)))
+export SITE_CORE=$(readlink ~/.site/.scm)
 export SITE_CORE_MOD=${SITE_CORE}/module
 export SITE_CORE_LIBEXEC=${SITE_CORE}/libexec
 export SITE_CORE_BIN=${SITE_CORE}/bin
@@ -95,6 +95,7 @@ declare g_TLDID=${USER_TLDID_DEFAULT:-.}
 unset  CDPATH
 export SITE_DEADMAN=${SITE_USER_CACHE}/deadman
 export SITE_IN_COLOR=1
+export SITE_DATE_FORMAT="%x-%X"
 source ${SITE_CORE_MOD?}/cpf
 #. }=-
 #. 1.7  Error Code Constants -={
@@ -106,7 +107,20 @@ false
 FALSE=$?
 CODE_FAILURE=${FALSE?}
 
-CODE_E01=128               #. 128..255   Errors
+CODE_NOTIMPL=2
+
+#. 64..127 Internal
+CODE_USER_MAX=63
+CODE_DISABLED=64
+CODE_USAGE_SHORT=90
+CODE_USAGE_MODS=91
+CODE_USAGE_MOD=92
+CODE_USAGE_FN_GUESS=93
+CODE_USAGE_FN_SHORT=94
+CODE_USAGE_FN_LONG=95
+
+#. 128..255 General Error Codes
+CODE_E01=128
 CODE_E02=129
 CODE_E03=130
 CODE_E04=131
@@ -116,20 +130,11 @@ CODE_E07=134
 CODE_E08=135
 CODE_E09=136
 
-CODE_USER_MAX=63           #. 64..127 Internal
-CODE_DISABLED=64
-CODE_USAGE_SHORT=90
-CODE_USAGE_MODS=91
-CODE_USAGE_MOD=92
-CODE_USAGE_FN_GUESS=93
-CODE_USAGE_FN_SHORT=94
-CODE_USAGE_FN_LONG=95
-
-CODE_IMPORT_GOOOD=0 #. good module
-CODE_IMPORT_ERROR=1 #. invalid/bad module (can't source/parse)
-CODE_IMPORT_ADMIN=2 #. administratively disabled
-CODE_IMPORT_UNDEF=3 #. no such module
-CODE_IMPORT_UNSET=4 #. no module set
+CODE_IMPORT_GOOOD=${CODE_SUCCESS} #. good module
+CODE_IMPORT_ERROR=${CODE_E01}     #. invalid/bad module (can't source/parse)
+CODE_IMPORT_ADMIN=${CODE_E02}     #. administratively disabled
+CODE_IMPORT_UNDEF=${CODE_E03}     #. no such module
+CODE_IMPORT_UNSET=${CODE_E04}     #. no module set
 
 export SITE_DELIM=$(printf "\x07")
 
@@ -146,9 +151,13 @@ declare -A SITE_LOG_CODES=(
 )
 function core:log() {
     local code=${1}
-    local -i level=0
+    local -i level
     case ${code} in
         EMERG|ALERT|CRIT|ERR|WARNING|NOTICE|INFO|DEBUG)
+            level=${SITE_LOG_NAMES[${code}]}
+        ;;
+        *)
+            code=EMERG
             level=${SITE_LOG_NAMES[${code}]}
         ;;
     esac
@@ -197,25 +206,25 @@ function core:softimport() {
         if [ -z "${g_SITE_IMPORTED_EXIT[${module}]}" ]; then
             if [ ${USER_MODULES[${module}]-9} -eq 1 ]; then
                 if [ -f ${SITE_USER_MOD}/${module} ]; then
-                    if ( source ${SITE_USER_MOD}/${module} >/tmp/site.ouch 2>&1 ); then
+                    if ( source ${SITE_USER_MOD}/${module} >/tmp/site.${module}.ouch 2>&1 ); then
                         source ${SITE_USER_MOD}/${module}
-                        rm -f /tmp/site.ouch
                         e=${CODE_IMPORT_GOOOD?}
                     else
                         e=${CODE_IMPORT_ERROR?}
                     fi
+                    rm -f /tmp/site.${module}.ouch
                 else
                     e=${CODE_IMPORT_UNDEF?}
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
                 if [ -f ${SITE_CORE_MOD}/${module} ]; then
-                    if ( source ${SITE_CORE_MOD}/${module} >/tmp/site.ouch 2>&1 ); then
+                    if ( source ${SITE_CORE_MOD}/${module} >/tmp/site.${module}.ouch 2>&1 ); then
                         source ${SITE_CORE_MOD}/${module}
-                        rm -f /tmp/site.ouch
                         e=${CODE_IMPORT_GOOOD?}
                     else
                         e=${CODE_IMPORT_ERROR?}
                     fi
+                    rm -f /tmp/site.${module}.ouch
                 else
                     e=${CODE_IMPORT_UNDEF?}
                 fi
@@ -232,6 +241,8 @@ function core:softimport() {
             #. Import already attempted, reuse that result
             e=${g_SITE_IMPORTED_EXIT[${module}]}
         fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
@@ -240,7 +251,7 @@ function core:softimport() {
 function core:import() {
     core:softimport $@
     local -i e=$?
-    #. Don't raise an exception; that will break softimport too
+    #. Don't raise an exception; that will break softimport too, just exit
     [ $e -eq ${CODE_SUCCESS} ] || exit 99 #core:raise EXCEPTION_BAD_MODULE
 
     return $e
@@ -609,28 +620,22 @@ function :core:cached() {
 function ::core:execute:internal() {
     local module=$1
     local fn=$2
-    shift 2
-    #set -x
-    :${module}:${fn} "${@}"
-    #set +x
+    :${module}:${fn} "${@:3}"
     return $?
 }
 
 function ::core:execute:private() {
     local module=$1
     local fn=$2
-    shift 2
-    #set -x
-    ::${module}:${fn} "${@}"
-    #set +x
+    ::${module}:${fn} "${@:3}"
     return $?
 }
 
-function ::core:shflags.eval() {
+function ::core:flags.eval() {
     local -i e=${CODE_FAILURE}
 
     #. Extract the first 2 non-flag tokens as module and function
-    #. All remaining tokens are addred to the new argv array
+    #. All remaining tokens are added to the new argv array
     local -a argv
     local -i argc=0
     local module=-
@@ -730,19 +735,20 @@ function :core:execute() {
         e=${CODE_USAGE_MOD}
 
         if [ $# -ge 2 ]; then
+            #. FIXME: Why do these need to be global?  I did try to change them
+            #. FIXME: to locals, however all unit-tests (other than util) broke.
             declare -g module=$1
             declare -g fn=$2
-            shift 2
 
             if [ "$(type -t ${module}:${fn})" == "function" ]; then
                 case ${g_FORMAT} in
-                    dot|text|png)    SITE_IN_COLOR=0 ${module}:${fn} "${@}";;
-                    html|email)      SITE_IN_COLOR=1 ${module}:${fn} "${@}";;
+                    dot|text|png)    SITE_IN_COLOR=0 ${module}:${fn} "${@:3}";;
+                    html|email)      SITE_IN_COLOR=1 ${module}:${fn} "${@:3}";;
                     ansi)
                         if [ -t 1 ]; then
-                            SITE_IN_COLOR=1 ${module}:${fn} "${@}"
+                            SITE_IN_COLOR=1 ${module}:${fn} "${@:3}"
                         else
-                            SITE_IN_COLOR=0 ${module}:${fn} "${@}"
+                            SITE_IN_COLOR=0 ${module}:${fn} "${@:3}"
                         fi
                     ;;
                     *) core:raise EXCEPTION_SHOULD_NOT_GET_HERE "Format checks should have already taken place!";;
@@ -998,13 +1004,18 @@ function core:wrapper() {
     local -i e=${CODE_USAGE_MODS}
 
     local setdata
-    local -i e_shflags
-    setdata="$(::core:shflags.eval "${@}")"
-    e_shflags=$?
-    eval "${setdata}" #. sets module, fn, etc.
+    setdata=$(::core:flags.eval "${@}")
+    local -i e_flags=$?
+    core:log DEBUG "core:flags.eval() returned ${e_flags}"
+
+    eval "${setdata}" #. NOTE: This sets module, fn, $@, etc.
+    : ${module?}
+    : ${fn?}
+    core:log DEBUG "core:wrapper(module=${module}, fn=${fn}, argv=( $@ ))"
 
     local regex=':+[a-z0-9]+(:[a-z0-9]+) |*'
-    core:softimport "${module?}"
+
+    core:softimport "${module}"
     case $?/${module?}/${fn?} in
         ${CODE_IMPORT_UNSET?}/-/-)                                                                                       e=${CODE_USAGE_MODS} ;;
         ${CODE_IMPORT_GOOOD?}/*/-)    :core:execute          ${module}                2>&1 | grep --color -E "${regex}"; e=${PIPESTATUS[0]}   ;;
@@ -1022,7 +1033,7 @@ function core:wrapper() {
 
             if [ ${#completed[@]} -eq 1 ]; then
                 fn=${completed}
-                if [ ${e_shflags} -eq ${CODE_SUCCESS} ]; then
+                if [ ${e_flags} -eq ${CODE_SUCCESS} ]; then
                     if [ ${g_FORMAT?} == "email" ]; then
                         :core:execute ${module} ${completed} "${@}" 2>&1 |
                             grep --color -E "${regex}" |
@@ -1054,7 +1065,8 @@ function core:wrapper() {
                 done
                 e=${CODE_USAGE_FN_GUESS}
             else
-                theme ERR_USAGE "${fn} not defined"
+                core:log ERR "${module}:${fn} not defined"
+                theme ERR_USAGE "${module}:${fn} not defined"
                 e=${CODE_USAGE_MOD}
             fi
         ;;

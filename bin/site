@@ -17,14 +17,20 @@ fi
 if [ $e -eq 0 ]; then
     maj=${BASH_VERSINFO[0]}
     min=${BASH_VERSINFO[1]}
-    : ${SITE_PROFILE?}
 
     if [ ${maj} -ge 4 -a ${min} -ge 0 ]; then
-        source ~/.site/lib/libsh/libsite/libsite.sh
-        rm -f ${SITE_DEADMAN?}
-
-        core:wrapper "$@"
+        SITE_PROFILE=$(${HOME}/.site/bin/activate)
         e=$?
+        if [ $e -eq 0 ]; then
+            export SITE_PROFILE
+            source ~/.site/.scm/lib/libsh/libsite/libsite.sh
+            rm -f ${SITE_DEADMAN?}
+
+            core:wrapper "$@"
+            e=$?
+        else
+            echo "No site profiles active, either create a new one, or activate an existing one."
+        fi
     else
         e=1
         echo "Your version of BASH is too old; export SITE_SHELL to override system bash."
