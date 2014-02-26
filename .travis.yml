@@ -4,14 +4,11 @@ branches:
   only:
     - master
     - develop
-    - feature/*
-    - release/*
-    - support/*
-    - hotfix/*
-
-before_install:
-  - sudo apt-get update -qq
-  - share/unit/citm before_install
+    - volatile
+    - /^feature\/.*$/
+    - /^release\/.*$/
+    - /^support\/.*$/
+    - /^hotfix\/.*$/
 
 env:
   global:
@@ -37,5 +34,24 @@ env:
 #  allow_failures:
 #    - env: CONTEXT=execute MODULE=tutorial
 
+before_install:
+  - sudo apt-get update -qq
+  - share/unit/citm before_install
+
+install:
+  - share/unit/citm install
+
+before_script:
+  - share/unit/citm before_script
+
 script:
   - share/unit/citm script
+
+after_success:
+  - share/unit/citm after_success
+
+after_failure:
+  - share/unit/citm after_failure
+
+after_script:
+  - share/unit/citm after_script

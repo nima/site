@@ -24,27 +24,6 @@ declare -g EXIT=9
 echo "#. travis[$1].${CONTEXT?}(${MODULE?}) -=["
 if [ $# -eq 1 ]; then
     case $1 in
-        script)
-            case ${CONTEXT}:${MODULE} in
-                installer:-)
-                    EXIT=0
-                    run make install                               ;((EXIT|=$?)) #. Test fresh install
-                    run make uninstall                             ;((EXIT|=$?)) #. Test uninstall
-                    run make install                               ;((EXIT|=$?)) #. Test reinstall
-                    run make purge                                 ;((EXIT|=$?)) #. Test purge
-                ;;
-                execute:*)
-                    EXIT=0
-                    run make install                               ;((EXIT|=$?))
-                    run site unit test ${MODULE}                   ;((EXIT|=$?))
-                    run make uninstall                             ;((EXIT|=$?))
-                ;;
-                *:*)
-                    EXIT=1
-                ;;
-            esac
-        ;;
-
         before_install)
             EXIT=0
             run sudo apt-get install -qq make                      ;((EXIT|=$?))
@@ -79,6 +58,47 @@ if [ $# -eq 1 ]; then
                     run sudo apt-get install -qq dnsutils          ;((EXIT|=$?))
                 ;;
             esac
+        ;;
+
+        install)
+            EXIT=0
+            run make install                                       ;((EXIT|=$?))
+        ;;
+
+        before_script)
+            EXIT=0
+        ;;
+
+        script)
+            EXIT=0
+            case ${CONTEXT}:${MODULE} in
+                installer:-)
+                    run make uninstall                             ;((EXIT|=$?)) #. Test uninstall
+                    run make install                               ;((EXIT|=$?)) #. Test reinstall
+                    run make purge                                 ;((EXIT|=$?)) #. Test purge
+                    run make install                               ;((EXIT|=$?)) #. Test reinstall
+                ;;
+                execute:*)
+                    run site unit test ${MODULE}                   ;((EXIT|=$?))
+                ;;
+                *:*)
+                    EXIT=1
+                ;;
+            esac
+        ;;
+
+        after_success)
+            EXIT=0
+        ;;
+
+        after_failure)
+            EXIT=0
+            run cat ~/.site/var/log/site.log
+        ;;
+
+        after_script)
+            EXIT=0
+            run make uninstall                                     ;((EXIT|=$?))
         ;;
     esac
 fi
