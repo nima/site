@@ -97,18 +97,32 @@ function vault:create() {
 function :vault:list() {
     local -i e=${CODE_FAILURE}
 
-    if [ $# -eq 1 ]; then
+    if [ $# -eq 1 -o $# -eq 2 ]; then
         local vault="$1"
-        local -a secrets
+        local sid="$2"
         if [ -r ${vault} ]; then
-            secrets=(
-                $(
-                    :gpg:decrypt ${vault} - | awk '$1!~/^[\t ]*#/{print$1}';
+            if [ ${#sid} -eq 0 ]; then
+                local -a secrets
+                secrets=(
+                    $(
+                        :gpg:decrypt ${vault} - | awk '$1!~/^[\t ]*#/{print$1}';
+                        exit ${PIPESTATUS[0]}
+                    )
+                )
+                if [ $? -eq 0 ]; then
+                    echo "${secrets[@]}"
+                    e=${CODE_SUCCESS?}
+                fi
+            else
+                local secret=$(
+                    :gpg:decrypt ${vault} - | awk '$1~/\<'${sid}'\>/{print$1}';
                     exit ${PIPESTATUS[0]}
                 )
-            )
-            e=$?
-            [ $e -ne 0 ] || echo "${secrets[@]}"
+
+                if [ $? -eq 0 -a ${#secret} -gt 0 ]; then
+                    e=${CODE_SUCCESS?}
+                fi
+            fi
         else
             e=9
         fi
@@ -119,27 +133,40 @@ function :vault:list() {
     return $e
 }
 
-function vault:list:usage() { echo "<mandatory> [<optional:default>]"; }
+function vault:list:usage() { echo "[<sid>]"; }
 function vault:list() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -le 1 ]; then
         cpf "Inspecting vault..."
-        local vault=${1:-${g_VAULT}}
+        local vault=${g_VAULT}
+        local sid="${1}"
         local -a secrets
         secrets=( $(:vault:list ${vault}) )
-        e=$?
-        if [ $e -eq ${CODE_SUCCESS} ]; then
+        if [ $? -eq ${CODE_SUCCESS} ]; then
             theme HAS_PASSED ${vault}
 
-            local secret
-            for secret in ${secrets[@]}; do
-                cpf " * %{r:%s}\n" ${secret}
-            done
+            if [ ${#sid} -gt 0 ]; then
+                cpf "Checking for SID %{r:%s}..." ${sid}
+                if :vault:list ${vault} ${sid}; then
+                    theme HAS_PASSED
+                    e=${CODE_SUCCESS?}
+                else
+                    theme HAS_FAILED
+                    e=${CODE_FAILURE?}
+                fi
+            else
+                for sid in ${secrets[@]}; do
+                    cpf " * %{r:%s}\n" ${sid}
+                done
+                e=${CODE_SUCCESS?}
+            fi
         elif [ $e -eq 9 ]; then
-            theme HAS_FAILED "MISSING:${vault}"
+            theme HAS_FAILED "MISSING_VAULT:${vault}"
+            e=${CODE_FAILURE?}
         else
             theme HAS_FAILED "CANNOT_DECRYPT:${vault}"
+            e=${CODE_FAILURE?}
         fi
     fi
 
