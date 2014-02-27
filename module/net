@@ -1,9 +1,9 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
-core:import dns
-
 :<<[core:docstring]
 Core networking module
 [core:docstring]
+
+core:import dns
 
 #. Network Utilities -={
 #. IP Functions -={
@@ -275,7 +275,7 @@ function net:portping() {
             tldid=$(:dns:qualified ${hnh})
             if [ $? -ne ${CODE_SUCCESS} ]; then
                 tldid=${g_TLDID}
-                fqdn=$(:dns:fqdn ${tldid} ${hnh})
+                fqdn=$(:dns:get ${tldid} fqdn ${hnh})
                 if [ $? -ne ${CODE_SUCCESS} ]; then
                     theme HAS_FAILED "INVALID_FQDN"
                     e=${CODE_FAILURE}
