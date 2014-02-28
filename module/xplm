@@ -1,0 +1,353 @@
+# vim: tw=0:ts=4:sw=4:et:ft=bash
+
+core:import util
+
+:<<[core:docstring]
+The eXternal Programming (scripting) Language Module manager.
+
+This modules handles Python, Ruby, and Perl modules in site's sandboxed virtual
+environment.
+[core:docstring]
+
+#. -={
+#. xplm:init -={
+function :xplm:init() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local plid="${1}"
+        case ${plid} in
+            py)
+                source ${VENV_ROOT?}/bin/activate
+                e=$?
+            ;;
+            rb)
+                if [ -x ${RBENV_RUBY?} ]; then
+                    eval "$(rbenv init -)"
+                    e=$?
+                else
+                    rbenv install ${RBENV_VERSION}
+                    rbenv shell ${RBENV_VERSION}
+                    [ $? -ne 0 ] || eval "$(rbenv init -)"
+                    e=$?
+                fi
+            ;;
+        esac
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+#. }=-
+#. xplm:repl -={
+function :xplm:repl() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local plid="${1}"
+        case ${plid} in
+            py)
+                :xplm:init ${plid} && python
+                python
+                e=$?
+            ;;
+            rb)
+                :xplm:init ${plid} && irb
+                e=$?
+            ;;
+            pl)
+                e=${CODE_NOTIMPL?}
+            ;;
+        esac
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+function xplm:repl:usage() { echo "<plid>"; }
+function xplm:repl() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        local plid="$1"
+        case "${plid}" in
+            py|pl|rb)
+                :xplm:repl ${plid} "${@:2}"
+                e=$?
+            ;;
+            *)
+                theme HAS_FAILED "Unknown/unsupported language ${plid}"
+                e=${CODE_FAILURE?}
+            ;;
+        esac
+    fi
+
+    return $e
+}
+#. }=-
+#. xplm:play -={
+function :xplm:play() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local plid="${1}"
+        case ${plid} in
+            py)
+                echo "Ctrl-D to exit environment"
+                if :xplm:init ${plid}; then
+                    bash --rcfile <(
+                        cat <<!VENV
+                        cd ${VENV_ROOT?}
+                        unset PROMPT_COMMAND
+!VENV
+                    ) -i
+                    e=$?
+                fi
+            ;;
+            rb)
+                if :xplm:init ${plid}; then
+                    echo "Ctrl-D to exit environment"
+                    bash --rcfile <(
+                        cat <<!RBENV
+                        cd ${RBENV_ROOT?}
+                        unset PROMPT_COMMAND
+!RBENV
+                    ) -i
+                    e=$?
+                fi
+            ;;
+            pl)
+                e=${CODE_NOTIMPL?}
+            ;;
+        esac
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+function xplm:play:usage() { echo "<plid>"; }
+function xplm:play() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 1 ]; then
+        local plid="$1"
+        case "${plid}" in
+            py|pl|rb)
+                :xplm:play ${plid} "${@:2}"
+                e=$?
+            ;;
+            *)
+                theme HAS_FAILED "Unknown/unsupported language ${plid}"
+                e=${CODE_FAILURE?}
+            ;;
+        esac
+    fi
+
+    return $e
+}
+#. }=-
+#. xplm:requires -={
+function :xplm:requires() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 2 ]; then
+        local plid="${1}"
+        local required="${2}"
+        case ${plid} in
+            py)
+                if :xplm:init ${plid}; then
+                    python -c "import ${required}" 2>/dev/null
+                    [ $? -ne 0 ] || e=${CODE_SUCCESS?}
+                fi
+            ;;
+            rb)
+                if :xplm:init ${plid}; then
+                    ruby -e "require '${required}'" 2>/dev/null
+                    [ $? -ne 0 ] || e=${CODE_SUCCESS?}
+                fi
+            ;;
+            pl)
+                if :xplm:init ${plid}; then
+                    perl -M${required} -e ';' 2>/dev/null
+                    [ $? -ne 0 ] || e=${CODE_SUCCESS?}
+                fi
+            ;;
+        esac
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+#. }=-
+#. xplm:install -={
+function :xplm:install() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -gt 1 ]; then
+        local plid="${1}"
+        case ${plid} in
+            py)
+                if :xplm:init ${plid}; then
+                    pip install --upgrade -q "${@:2}"
+                    e=$?
+                fi
+            ;;
+            rb)
+                if :xplm:init ${plid}; then
+                    gem install "${@:2}"
+                    e=$?
+                fi
+            ;;
+            pl)
+                if :xplm:init ${plid}; then
+                    e=${CODE_NOTIMPL?}
+                fi
+            ;;
+        esac
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+function xplm:install:usage() { echo "<plid> <pkg> [<pkg> [...]]"; }
+function xplm:install() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -gt 1 ]; then
+        local plid="$1"
+        case "${plid}" in
+            py|pl|rb)
+                :xplm:install ${plid} "${@:2}"
+                e=$?
+            ;;
+            *)
+                theme HAS_FAILED "Unknown/unsupported language ${plid}"
+                e=${CODE_FAILURE?}
+            ;;
+        esac
+    fi
+
+    return $e
+}
+#. }=-
+#. xplm:search -={
+function :xplm:search() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -gt 1 ]; then
+        local plid="${1}"
+        case ${plid} in
+            py)
+                if :xplm:init ${plid}; then
+                    pip search "${@:2}" | cat
+                    e=${PIPESTATUS[0]}
+                fi
+            ;;
+            rb)
+                if :xplm:init ${plid}; then
+                    gem search "${@:2}" | cat
+                    e=${PIPESTATUS[0]}
+                fi
+            ;;
+            pl)
+                if :xplm:init ${plid}; then
+                    e=${CODE_NOTIMPL?}
+                fi
+            ;;
+        esac
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function xplm:search:usage() { echo "<plid> <search-str>"; }
+function xplm:search() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -gt 1 ]; then
+        local plid="$1"
+        case "${plid}" in
+            py|pl|rb)
+                :xplm:search ${plid} "${@:2}"
+                e=$?
+            ;;
+            *)
+                theme HAS_FAILED "Unknown/unsupported language ${plid}"
+                e=${CODE_FAILURE?}
+            ;;
+        esac
+    fi
+
+    return $e
+}
+#. }=-
+#. xplm:list -={
+function :xplm:list() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local plid="${1}"
+        case ${plid} in
+            py)
+                if :xplm:init ${plid}; then
+                    pip list | sed 's/^/py /'
+                    e=${PIPESTATUS[0]}
+                fi
+            ;;
+            rb)
+                if :xplm:init ${plid}; then
+                    gem list --local | sed 's/^/rb /'
+                    e=${PIPESTATUS[0]}
+                fi
+            ;;
+            pl)
+                if :xplm:init ${plid}; then
+                    e=${CODE_NOTIMPL?}
+                fi
+            ;;
+        esac
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
+function xplm:list:usage() { echo "[<plid>]"; }
+function xplm:list() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -le 1 ]; then
+        local -A prolangs=( [py]=0 [pl]=0 [rb]=0 )
+        for plid in "${@}"; do
+            case "${plid}" in
+                py) prolangs[${plid}]=1;;
+                pl) prolangs[${plid}]=1;;
+                rb) prolangs[${plid}]=1;;
+                *) e=${CODE_FAILURE?};;
+            esac
+        done
+
+        if [ $e -ne ${CODE_FAILURE?} ]; then
+            for plid in ${!prolangs[@]}; do
+                if [[ $# -eq 0 || ${prolangs[${plid}]} -eq 1 ]]; then
+                    :xplm:list ${plid}
+                    e=$?
+                fi
+            done
+        else
+            theme HAS_FAILED "Unknown/unsupported language ${plid}"
+        fi
+    fi
+
+    return $e
+}
+#. }=-
+#. }=-

@@ -1,15 +1,28 @@
 export MAKEFLAGS := --no-print-directory --warn-undefined-variables
 
-BIN_PY27 := python2.7
-BIN_VENV := virtualenv
-REQUIRED := ${BIN_PY27} ${BIN_VENV}
-EXTERN_D := ~/.site/var
-export BIN_PY27 BIN_VENV
+BIN_PY27  := python2.7
+BIN_VENV  := virtualenv
+BIN_RBENV := rbenv
+REQUIRED  := ${BIN_PY27} ${BIN_VENV} ${BIN_RBENV}
+EXTERN_D  := ${HOME}/.site/var
+export BIN_PY27 BIN_VENV BIN_RBENV
+export EXTERN_D
 
 .DEFAULT: help
 
 #. Site Bootstrap -={
 #. Installation Status Check -={
+#. Additional python modules that you want installed - this should be kept as
+#. small as possible, and each site module should have it's own set of modules
+#. defined via xplm.
+VENV_PKGS :=
+export VENV_PKGS
+
+RBENV_ROOT=${EXTERN_D}/rbenv
+RBENV_VERSION := 2.1.1
+RBENV_GEMSETS="${RBENV_ROOT}/gemset global"
+export RBENV_ROOT RBENV_VERSION RBENV_GEMSETS
+
 ifeq ($(wildcard .install),)
 STATUS := "UNINSTALLED"
 else

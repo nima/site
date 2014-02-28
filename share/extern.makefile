@@ -13,13 +13,12 @@ ifneq (${DLA},)
 flycatcher:
 	@echo "Do not run make here unless you know what you're doing."
 
-EXTERN := shflags shunit2 vimpager pyobjpath jsontool
-VENV_PKGS := softlayer paramiko ipaddress
+EXTERN := shflags shunit2 vimpager jsontool
 
 #. Installation -={
 .PHONY: prepare install $(EXTERN:%=%.install)
 install: .install; @echo "Installation (extern) complete!"
-.install: prepare venv.install $(EXTERN:%=%.install); @touch .install
+.install: prepare venv.install rbenv.install $(EXTERN:%=%.install); @touch .install
 
 LIBEXEC := libexec
 LIBSH   := lib/libsh
@@ -33,7 +32,7 @@ prepare:
 	@echo "DONE"
 #. }=-
 #. Uninstallation -={
-.PHONY: unprepare venv.uninstall uninstall $(EXTERN:%=%.uninstall)
+.PHONY: unprepare uninstall $(EXTERN:%=%.uninstall)
 unprepare:
 	@printf "Unpreparing extern build..."
 	@find ${LIBPY} -name '*.pyc' -exec rm -f {} \;
@@ -46,7 +45,7 @@ uninstall: $(EXTERN:%=%.uninstall) unprepare
 	@rm -f .install
 	@echo "Uninstallation (extern) complete!"
 
-purge: venv.purge
+purge: venv.purge rbenv.purge
 	rm -rf lib
 	rm -rf src
 	rm -rf scm
@@ -57,24 +56,37 @@ purge: venv.purge
 #. Python VirtualEnv -={
 venv:; ${BIN_VENV} -q --clear -p ${BIN_PY27} $@
 
-.PHONY: venv.purge venv.play
-.PHONY: venv.install
-#$(VENV_PKGS:%=%.venv.install)
-.PHONY: venv.uninstall
-#$(VENV_PKGS:%=%.venv.uninstall)
-
+.PHONY: venv.install $(VENV_PKGS:%=%.venv.install)
 #. venv/bin/activate && pip install hg+http://hg.secdev.org/scapy
 venv.install: venv $(VENV_PKGS:%=%.venv.install)
 %.venv.install:; . venv/bin/activate && pip install -q $(@:.venv.install=)
 
+.PHONY: venv.uninstall $(VENV_PKGS:%=%.venv.uninstall)
 venv.uninstall: $(VENV_PKGS:%=%.venv.uninstall)
 %.venv.uninstall:; . venv/bin/activate && pip uninstall -q -y $(@:.venv.uninstall=)
 
+.PHONY: venv.purge
 venv.purge:; @rm -rf venv
+#. }=-
+#. Ruby RBEnv -={
+rbenv:
+	@mkdir -p ${RBENV_ROOT}
+	@echo .gems > ${RBENV_ROOT}/.rbenv-gemsets
 
-venv.play:
-	@echo "Ctrl-D to exit environment"
-	@bash --rcfile venv/bin/activate -i
+.PHONY: rbenv.install
+rbenv.install: rbenv
+	@#ln -sf $(CURDIR)/$</bin/rbenv ${LIBEXEC}/rbenv
+
+.PHONY: rbenv.uninstall
+rbenv.uninstall:
+	@#-rm ${LIBEXEC}/rbenv
+
+.PHONY: rbenv.purge
+rbenv.purge:; @rm -rf rbenv
+
+scm/rbenv.git:
+	@echo "Cloning $(@F)..."
+	@git clone https://github.com/sstephenson/rbenv.git $@
 #. }=-
 
 #. shflags -={

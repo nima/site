@@ -38,14 +38,26 @@ export SITE_USER_LIBSH=${SITE_USER}/var/lib/libsh
 export SITE_USER_LIBPY=${SITE_USER}/var/lib/libpy
 export SITE_USER_LIBEXEC=${SITE_USER}/var/libexec
 
+#. Site's PATH
 PATH+=:${SITE_CORE_LIBEXEC}
 PATH+=:${SITE_USER_LIBEXEC}
 export PATH
 
+#. Python
+VENV_ROOT=${SITE_USER_VAR?}/venv
 PYTHONPATH+=:${SITE_CORE_LIBPY}
 PYTHONPATH+=:${SITE_USER_LIBPY}
 export PYTHONPATH
 
+#. Ruby
+RBENV_ROOT=${SITE_USER_VAR}/rbenv
+RBENV_VERSION=2.1.1
+RBENV_GEMSET_FILE="${RBENV_ROOT}/.rbenv-gemsets"
+export RBENV_ROOT RBENV_VERSION RBENV_GEMSET_FILE
+#export RBENV_GEMSETS="${RBENV_ROOT}/gemset global"
+RBENV_RUBY=${RBENV_ROOT}/shims/ruby
+
+#. shunit2 and shflags
 export SHUNIT2=${SITE_USER_LIBEXEC}/shunit2
 export SHFLAGS=${SITE_USER_LIBSH}/shflags
 source ${SHFLAGS?}
@@ -72,6 +84,7 @@ declare -g -A CORE_MODULES=(
     [gpg]=1
     [vault]=1
     [tunnel]=1
+    [xplm]=1
 )
 
 source ${SITE_USER_ETC}/site.conf
@@ -330,49 +343,18 @@ function core:requires() {
     local required;
     case $#:${1} in
         1:*)
-            if ! :core:requires $1; then
-                e=${CODE_FAILURE}
+            required="$1"
+            if ! :core:requires ${required}; then
+                core:log NOTICE "${caller} missing required executable ${required}"
+                e=${CODE_FAILURE?}
             fi
-        ;;
-        *:PERL)
-            for required in ${@:2}; do
-                if ! perl -M${required} -e ';' 2>/dev/null; then
-                    core:log NOTICE "${caller} missing required perl module ${required}"
-                    e=${CODE_FAILURE}
-                fi
-            done
-        ;;
-        *:PYTHON)
-            for required in ${@:2}; do
-                if ! python -c "import ${required}" 2>/dev/null; then
-                    core:log NOTICE "${caller} missing required python module ${required}"
-                    e=${CODE_FAILURE}
-                fi
-            done
-        ;;
-        *:ENV)
-            for required in ${@:2}; do
-                if [ -z "${!required}" ]; then
-                    core:log NOTICE "${caller} missing required environment variable ${required}"
-                    e=${CODE_FAILURE}
-                    break
-                fi
-            done
-        ;;
-        *:VAULT)
-            for required in ${@:2}; do
-                if [ ${g_SIDS[${required}]:-0} -ne 1 ]; then
-                    core:log NOTICE "${caller} missing required secret ${required}"
-                    e=${CODE_FAILURE}
-                fi
-            done
         ;;
         *:ALL)
             e=${CODE_SUCCESS}
             for required in ${@:2}; do
                 if ! :core:requires "${required}"; then
                     e=${CODE_FAILURE}
-                    #core:raise EXCEPTION_MISSING_EXEC ${required}
+                    core:log NOTICE "${caller} missing required executable ${required}"
                     break
                 fi
             done
@@ -385,9 +367,74 @@ function core:requires() {
                     break
                 fi
             done
-            #if [ $e -ne ${CODE_SUCCESS} ]; then
-            #    core:raise EXCEPTION_MISSING_EXEC "${@:2}"
-            #fi
+            if [ $e -ne ${CODE_SUCCESS} ]; then
+                core:log NOTICE "${caller} missing ANY of required executable ${@:2}"
+            fi
+        ;;
+        *:PERL)
+            local plid=pl
+            core:softimport xplm
+            if [ $? -eq ${CODE_IMPORT_GOOOD?} ]; then
+                for required in ${@:2}; do
+                    if ! :xplm:requires ${plid} ${required}; then
+                        core:log NOTICE "${caller} missing required perl module ${required}"
+                        e=${CODE_FAILURE?}
+                    fi
+                done
+            else
+                e=${CODE_FAILURE?}
+            fi
+        ;;
+        *:PYTHON)
+            local plid=py
+            core:softimport xplm
+            if [ $? -eq ${CODE_IMPORT_GOOOD?} ]; then
+                for required in ${@:2}; do
+                    if ! :xplm:requires ${plid} ${required}; then
+                        core:log NOTICE "${caller} installing required python module ${required}"
+                        if ! :xplm:install ${plid} ${required}; then
+                            core:log ERR "${caller} installation of python module ${required} FAILED"
+                        fi
+                        e=${CODE_FAILURE?}
+                    fi
+                done
+            else
+                e=${CODE_FAILURE?}
+            fi
+        ;;
+        *:RUBY)
+            local plid=rb
+            core:softimport xplm
+            if [ $? -eq ${CODE_IMPORT_GOOOD?} ]; then
+                for required in ${@:2}; do
+                    if ! :xplm:requires ${plid} ${required}; then
+                        core:log NOTICE "${caller} missing required ruby module ${required}"
+                        e=${CODE_FAILURE?}
+                    fi
+                done
+            else
+                e=${CODE_FAILURE?}
+            fi
+        ;;
+        *:VAULT)
+            core:softimport vault
+            if [ $? -eq ${CODE_IMPORT_GOOOD?} ]; then
+                for required in ${@:2}; do
+                    if ! :vault:read ${SITE_USER_ETC}/site.vault ${required}; then
+                        core:log NOTICE "${caller} missing required secret ${required}"
+                        e=${CODE_FAILURE}
+                    fi
+                done
+            fi
+        ;;
+        *:ENV)
+            for required in ${@:2}; do
+                if [ -z "${!required}" ]; then
+                    core:log NOTICE "${caller} missing required environment variable ${required}"
+                    e=${CODE_FAILURE}
+                    break
+                fi
+            done
         ;;
         *) core:raise EXCEPTION_BAD_FN_CALL "${@}";;
     esac
@@ -395,14 +442,6 @@ function core:requires() {
     test $e -eq 0 && return $e || exit $e
     return $e
 }
-
-declare -gA g_SIDS
-core:softimport vault
-if [ $? -eq ${CODE_IMPORT_GOOOD?} ]; then
-    for sid in $(:vault:list ${SITE_USER_ETC}/site.vault); do
-        g_SIDS[$sid]=1
-    done
-fi
 #. }=-
 #. 1.10 Caching -={
 #. 0 means cache forever (default)
@@ -1076,7 +1115,7 @@ function core:wrapper() {
             e=${CODE_FAILURE}
         ;;
         ${CODE_IMPORT_ERROR?}/*/*)
-            theme HAS_FAILED "Module ${module} has errors"
+            theme HAS_FAILED "Module ${module} has errors; see ${SITE_USER_LOG}"
             e=${CODE_FAILURE}
         ;;
         ${CODE_IMPORT_ADMIN?}/*/*)
