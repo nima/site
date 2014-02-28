@@ -7,6 +7,7 @@ Softlayer API
 core:import util
 core:import dns
 core:requires PYTHON pytz
+core:requires PYTHON SoftLayer
 core:requires VAULT  SOFTLAYER_API_KEY
 
 function :softlayer:hostlist() {
@@ -404,5 +405,3 @@ function softlayer:subnets() {
 
     return $e
 }
-
-
