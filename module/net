@@ -3,10 +3,10 @@
 Core networking module
 [core:docstring]
 
+#. Network Utilities -={
 core:import dns
 
-#. Network Utilities -={
-#. IP Functions -={
+#. net:b2nm -={
 #. IPv4: Bits to Netmask
 function :net:b2nm() {
     #. input  24
@@ -25,7 +25,8 @@ function :net:b2nm() {
 
     return $e
 }
-
+#. }=-
+#. net:b2hm -={
 #. IPv4: Bits to Hostmask
 function :net:b2hm() {
     #. input  24
@@ -44,7 +45,8 @@ function :net:b2hm() {
 
     return $e
 }
-
+#. }=-
+#. net:h2s -={
 #. IPv4: Hex to String
 function :net:h2s() {
     #. input  0xff00ff00
@@ -69,7 +71,8 @@ function :net:h2s() {
 
     return $e
 }
-
+#. }=-
+#. net:s2h -={
 #. IPv4: String to Hex
 function :net:s2h() {
     #. input  255.0.255.0
@@ -89,7 +92,8 @@ function :net:s2h() {
 
     return $e
 }
-
+#. }=-
+#. net:i2s -={
 #. IPv4: Interface to String
 function :net:i2s() {
     #. input  lo
@@ -112,7 +116,8 @@ function :net:i2s() {
 
     return $e
 }
-
+#. }=-
+#. net:hosts -={
 function :net:hosts() {
     #. input  123.123.123.123/12
     #. output (a list of all hosts in the subnet)
@@ -120,7 +125,7 @@ function :net:hosts() {
 
     [ "${1//[^.]/}" == '...' ] || e=${CODE_FAILURE?}
     [ "${1//[^\/]/}" == '/' ] || [ "${1//[^\/]/}" == '' ] || e=${CODE_FAILURE?}
-    if [ $# -eq 1 -a $e -eq ${CODE_SUCCESS} ]; then
+    if [ $# -eq 1 -a $e -eq ${CODE_SUCCESS?} ]; then
         IFS=/ read -r ips nmb <<< "$1"
         local -r ipx=$(:net:s2h ${ips})
         local -r nm=$(:net:b2nm ${nmb})
@@ -138,7 +143,8 @@ function :net:hosts() {
 
     return $e
 }
-
+#. }=-
+#. net:firsthost -={
 function :net:firsthost() {
     #. input  123.123.123.0/24
     #. ouput  123.123.123.1
@@ -147,7 +153,7 @@ function :net:firsthost() {
     [ "${1//[^.]/}" == '...' ] || e=${CODE_FAILURE?}
     [ "${1//[^\/]/}" == '/' ] || [ "${1//[^\/]/}" == '' ] || e=${CODE_FAILURE?}
 
-    if [ $# -eq 1 -a $e -eq ${CODE_SUCCESS} ]; then
+    if [ $# -eq 1 -a $e -eq ${CODE_SUCCESS?} ]; then
         IFS=/ read -r ips nmb <<< "$1"
         local -r ipx=$(:net:s2h ${ips})
         local -r nm=$(:net:b2nm ${nmb})
@@ -162,11 +168,11 @@ function :net:firsthost() {
     return $e
 }
 #. }=-
-#. PortPersist -={
+#. net:portpersist -={
 function :net:portpersist() {
     core:requires socat
 
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 4 ]; then
         local tldid=$1
@@ -174,7 +180,7 @@ function :net:portpersist() {
         local port=$3
         local -i attempts=$4
         local -i i=0
-        while ((i < attempts)) && ((e == ${CODE_FAILURE})); do
+        while ((i < attempts)) && ((e == ${CODE_FAILURE?})); do
             :net:portping ${tldid} ${qdn} ${port}
             e=$?
             ((i++))
@@ -186,9 +192,9 @@ function :net:portpersist() {
     return $e
 }
 #. }=-
-#. PortPing -={
+#. net:localportping -={
 function :net:localportping() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
         local -i lport=$1
@@ -199,15 +205,16 @@ function :net:localportping() {
 
     return $e
 }
-
+#. }=-
+#. net:freelocalport -={
 function :net:freelocalport() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     freeport=0
     for port in $@; do
         if ! :net:localportping ${port}; then
             freeport=$port
-            e=${CODE_SUCCESS}
+            e=${CODE_SUCCESS?}
             break
         fi
     done
@@ -216,7 +223,7 @@ function :net:freelocalport() {
         ((port=1024+RANDOM))
         if ! :net:localportping ${lport}; then
             freeport=${port}
-            e=${CODE_SUCCESS}
+            e=${CODE_SUCCESS?}
             break
         fi
     done
@@ -225,12 +232,13 @@ function :net:freelocalport() {
 
     return $e
 }
-
+#. }=-
+#. net:portping -={
 function :net:portping() {
     core:requires nc
     core:requires socat
 
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
     if [ $# -eq 3 ]; then
         local tldid=$1
         local qdn=$2
@@ -241,7 +249,7 @@ function :net:portping() {
             local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
             local tld=${USER_TLDS[${tldid}]}
             if [ ${#ssh_proxy} -gt 0 ]; then
-                ssh ${USER_USERNAME}@${ssh_proxy} ${cmd} >/dev/null 2>&1
+                ssh ${USER_USERNAME?}@${ssh_proxy} ${cmd} >/dev/null 2>&1
                 e=$?
             else
                 eval ${cmd} >/dev/null 2>&1
@@ -258,10 +266,9 @@ function :net:portping() {
 
     return $e
 }
-
 function net:portping:usage() { echo "<hnh> <port>"; }
 function net:portping() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 2 ]; then
         local hnh=$1
@@ -273,12 +280,12 @@ function net:portping() {
         local tldid
         if [ "${hnh:$((${#hnh}-1))}" != '.' ]; then
             tldid=$(:dns:qualified ${hnh})
-            if [ $? -ne ${CODE_SUCCESS} ]; then
-                tldid=${g_TLDID}
+            if [ $? -ne ${CODE_SUCCESS?} ]; then
+                tldid=${g_TLDID?}
                 fqdn=$(:dns:get ${tldid} fqdn ${hnh})
-                if [ $? -ne ${CODE_SUCCESS} ]; then
+                if [ $? -ne ${CODE_SUCCESS?} ]; then
                     theme HAS_FAILED "INVALID_FQDN"
-                    e=${CODE_FAILURE}
+                    e=${CODE_FAILURE?}
                 fi
             else
                 tldid='.'
@@ -289,13 +296,13 @@ function net:portping() {
             fqdn=${hnh}
         fi
 
-        if [ $e -ne ${CODE_FAILURE} ]; then
+        if [ $e -ne ${CODE_FAILURE?} ]; then
             if :net:portping ${tldid} ${fqdn} ${port}; then
                 theme HAS_PASSED "CONNECTED"
-                e=${CODE_SUCCESS}
+                e=${CODE_SUCCESS?}
             else
                 theme HAS_WARNED "NO_CONN"
-                e=${CODE_FAILURE}
+                e=${CODE_FAILURE?}
             fi
         fi
     fi

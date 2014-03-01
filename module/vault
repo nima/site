@@ -5,21 +5,20 @@ Core vault and secrets module
 [core:docstring]
 
 #. The Vault -={
-
 core:import gpg
 
 core:requires pwgen
 core:requires shred
 core:requires xclip
 
-g_VAULT=${SITE_USER_ETC}/site.vault
-g_VAULT_TMP=${SITE_USER_TMP}/vault.killme
-g_VAULT_TS=${SITE_USER_TMP}/vault.timestamp
-g_VAULT_BU=${SITE_USER_TMP}/vault.$(date +'%Y%m%d')
+g_VAULT=${SITE_USER_ETC?}/site.vault
+g_VAULT_TMP=${SITE_USER_TMP?}/vault.killme
+g_VAULT_TS=${SITE_USER_TMP?}/vault.timestamp
+g_VAULT_BU=${SITE_USER_TMP?}/vault.$(date +'%Y%m%d')
 
-#. private -={
+#. vault:clean -={
 #function ::vault:draw() {
-#    ${HOME}/bin/gpg2png $1
+#    ${HOME?}/bin/gpg2png $1
 #    cp $1.png ~/vault.png
 #    cp $1-qr.png ~/g_VAULT-QR.PNG
 #    img2txt ~/vault.png ~/g_VAULT-QR.PNG
@@ -27,18 +26,18 @@ g_VAULT_BU=${SITE_USER_TMP}/vault.$(date +'%Y%m%d')
 
 function ::vault:clean() {
     local -i e=${CODE_SUCCESS?}
-    test ! -f ${g_VAULT}     || chmod 600 ${g_VAULT}
-    test ! -f ${g_VAULT_BU}  || chmod 400 ${g_VAULT_BU}
-    test ! -f ${g_VAULT_TMP} || shred -fuz ${g_VAULT_TMP}
-    test ! -f ${g_VAULT_TS}  || shred -fuz ${g_VAULT_TS}
+    test ! -f ${g_VAULT?}     || chmod 600 ${g_VAULT?}
+    test ! -f ${g_VAULT_BU?}  || chmod 400 ${g_VAULT_BU?}
+    test ! -f ${g_VAULT_TMP?} || shred -fuz ${g_VAULT_TMP?}
+    test ! -f ${g_VAULT_TS?}  || shred -fuz ${g_VAULT_TS?}
     return $e
 }
 #. DEPRECATED
 #function ::vault:secrets() {
-#    local -i e=${CODE_FAILURE}
+#    local -i e=${CODE_FAILURE?}
 #
 #    if [ $# -eq 1 ]; then
-#        ${SITE_CORE_LIBEXEC}/secret $1
+#        ${SITE_CORE_LIBEXEC?}/secret $1
 #        e=$?
 #    else
 #        core:raise EXCEPTION_BAD_FN_CALL
@@ -48,9 +47,9 @@ function ::vault:clean() {
 #}
 #. }=-
 
-#. create -={
+#. vault:create -={
 function :vault:create() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
         local vault=$1
@@ -71,21 +70,21 @@ function :vault:create() {
 
 function vault:create:usage() { echo "[<vault-path:~/.secrets>]"; }
 function vault:create() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -le 1 ]; then
         cpf "Generating blank secrets file..."
-        local vault=${1:-${g_VAULT}}
+        local vault=${1:-${g_VAULT?}}
         if [ ! -f ${vault} ]; then
             :vault:create ${vault}
             e=$?
-            if [ $e -eq ${CODE_SUCCESS} ]; then
+            if [ $e -eq ${CODE_SUCCESS?} ]; then
                 theme HAS_PASSED ${vault}
             else
                 theme HAS_FAILED ${vault}
             fi
         else
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
             theme HAS_FAILED "${vault} exists"
         fi
     fi
@@ -93,9 +92,9 @@ function vault:create() {
     return $e
 }
 #. }=-
-#. list -={
+#. vault:list -={
 function :vault:list() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 -o $# -eq 2 ]; then
         local vault="$1"
@@ -139,11 +138,11 @@ function vault:list() {
 
     if [ $# -le 1 ]; then
         cpf "Inspecting vault..."
-        local vault=${g_VAULT}
+        local vault=${g_VAULT?}
         local sid="${1}"
         local -a secrets
         secrets=( $(:vault:list ${vault}) )
-        if [ $? -eq ${CODE_SUCCESS} ]; then
+        if [ $? -eq ${CODE_SUCCESS?} ]; then
             theme HAS_PASSED ${vault}
 
             if [ ${#sid} -gt 0 ]; then
@@ -173,28 +172,28 @@ function vault:list() {
     return $e
 }
 #. }=-
-#. edit -={
+#. vault:edit -={
 function vault:edit:usage() { echo "[<vault>]"; }
 function vault:edit() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 0 -o $# -eq 1 ]; then
-        local vault="${1:-${g_VAULT}}"
-        mkdir -p $(dirname ${g_VAULT_TMP})
+        local vault="${1:-${g_VAULT?}}"
+        mkdir -p $(dirname ${g_VAULT_TMP?})
 
         cpf "Decrypting secrets..."
-        :gpg:decrypt ${g_VAULT} ${g_VAULT_TMP}
+        :gpg:decrypt ${g_VAULT?} ${g_VAULT_TMP?}
         e=$?
         theme HAS_AUTOED $e
 
         if [ $e -eq 0 ]; then
-            touch ${g_VAULT_TS}
-            ${EDITOR:-vim} -n ${g_VAULT_TMP}
-            if [ ${g_VAULT_TMP} -nt ${g_VAULT_TS} ]; then
+            touch ${g_VAULT_TS?}
+            ${EDITOR:-vim} -n ${g_VAULT_TMP?}
+            if [ ${g_VAULT_TMP?} -nt ${g_VAULT_TS?} ]; then
                 cpf "Encrypting secrets..."
-                #::vault:draw ${g_VAULT_TMP}
-                mv --force ${g_VAULT} ${g_VAULT_BU}
-                :gpg:encrypt ${g_VAULT_TMP} ${g_VAULT}
+                #::vault:draw ${g_VAULT_TMP?}
+                mv --force ${g_VAULT?} ${g_VAULT_BU?}
+                :gpg:encrypt ${g_VAULT_TMP?} ${g_VAULT?}
                 e=$?
                 theme HAS_AUTOED $e
             fi
@@ -209,11 +208,11 @@ function vault:edit() {
 }
 
 #. }=-
-#. read -={
+#. vault:read -={
 function :vault:read() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
-    local vault="${g_VAULT}"
+    local vault="${g_VAULT?}"
     local sid
     if [ $# -eq 1 ]; then
         sid="$1"
@@ -233,11 +232,11 @@ function :vault:read() {
 
 function vault:read:usage() { echo "<secret-id> [<vault>]"; }
 function vault:read() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 -o $# -eq 2 ]; then
         local secret="${1}"
-        local vault="${2:-${g_VAULT}}"
+        local vault="${2:-${g_VAULT?}}"
 
         [ ! -t 1 ] || cpf "Checking for secret id %{r:%s}..." "${secret}"
 

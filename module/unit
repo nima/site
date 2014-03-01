@@ -13,7 +13,7 @@ moduleScaffold() {
     local module=$2
     cpf "%{@comment:${module}${cl}...}"
 
-    if [ -f ${g_RUNTIME_SCRIPT} ]; then
+    if [ -f ${g_RUNTIME_SCRIPT?} ]; then
         if [ $? -eq 0 ]; then
             if [ "$(type -t ${module}${cl} 2>/dev/null)" == "function" ]; then
                 ${module}${cl}
@@ -28,7 +28,7 @@ moduleScaffold() {
             fi
         else
             theme HAS_FAILED
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         fi
     else
         theme HAS_PASSED "DYNAMIC_ONLY"
@@ -41,11 +41,11 @@ oneTimeSetUp() {
     : ${module?}
 
     cpf "%{@comment:unitSetUp...}"
-    local -i e=${CODE_SUCCESS}
+    local -i e=${CODE_SUCCESS?}
 
     declare -gi tid=0
 
-    declare -g oD="${SHUNIT_TMPDIR}"
+    declare -g oD="${SHUNIT_TMPDIR?}"
     mkdir -p "${oD}"
 
     declare -g stdoutF="${oD}/stdout"
@@ -155,7 +155,7 @@ oneTimeSetUp() {
 }
 
 oneTimeTearDown() {
-    local -i e=${CODE_SUCCESS}
+    local -i e=${CODE_SUCCESS?}
 
     moduleScaffold tearDown ${module?}
     e=$?
@@ -184,7 +184,7 @@ function testCoverage() {
     local profile=${g_RUNTIME_PROFILE?}
     local module=${g_RUNTIME_MODULE?}
     local script=${g_RUNTIME_SCRIPT?}
-    local cwd=${g_RUNTIME_CWD}
+    local cwd=${g_RUNTIME_CWD?}
     local -i e=0
     local -i t=0
     local -i p=0
@@ -264,13 +264,13 @@ function ${utf}Dyn${i}NoArgs() {
     #. TODO: so this either/or approach will have to do.
     core:softimport ${module}
     cpf " %{@comment ___site} %{!function:${module}:${fn}} {no-args} "
-    if assertEquals "import ${module}" ${CODE_SUCCESS} \$?; then
+    if assertEquals "import ${module}" ${CODE_SUCCESS?} \$?; then
         ${ffn} >/dev/null 2>&1
-        ((e=\$? % ${CODE_DEFAULT})) #. See why above
-        if assertEquals "exit code" ${CODE_SUCCESS} \${e}; then
+        ((e=\$? % ${CODE_DEFAULT?})) #. See why above
+        if assertEquals "exit code" ${CODE_SUCCESS?} \${e}; then
             theme HAS_PASSED
         else
-            theme HAS_FAILED "Expected return code ${CODE_DEFAULT} or ${CODE_SUCCESS}, but not \${e}"
+            theme HAS_FAILED "Expected return code ${CODE_DEFAULT?} or ${CODE_SUCCESS?}, but not \${e}"
         fi
     fi
 }
@@ -303,10 +303,10 @@ function ${utf}Dyn${i}() {
         [ ${auto_exitcode} -eq 0 ] && cpf "%{g:0}" || cpf "%{r:${auto_exitcode}}"
     cpf " %{r:]=-}"
 
-    if [ -z "${auto_site}" -o "${auto_site}" == "${SITE_PROFILE}" ]; then
+    if [ -z "${auto_site}" -o "${auto_site}" == "${SITE_PROFILE?}" ]; then
         cpf
         core:softimport ${auto_module}
-        if assertEquals "import ${auto_module}" ${CODE_SUCCESS} \$?; then
+        if assertEquals "import ${auto_module}" ${CODE_SUCCESS?} \$?; then
             if assertEquals "function" \$(type -t "${ffn}"); then
                 local -i e
                 local argv='${auto_arguments}'
@@ -409,7 +409,7 @@ function ${utf}Dyn${i}() {
         else
             cpf "%{@profile:${profile}}: %{!module:${module}} %{r:-=[} %{@warn:BLACKLISTED} %{r:]=-} %{@profile:${profile}}: %{!module:${module}}\n"
         fi
-        cd ${OLDPWD}
+        cd ${OLDPWD?}
     fi
 
     assertEquals "of the $t unit-tests, $p passed, $s skipped, and $e missing; i.e.," $((t-s)) $p
@@ -422,8 +422,8 @@ function ::unit:test() {
     local -i e=0
 
     local -A profiles=(
-        [core]=${SITE_CORE_MOD}
-        [${SITE_PROFILE}]=${SITE_USER_MOD}
+        [core]=${SITE_CORE_MOD?}
+        [${SITE_PROFILE?}]=${SITE_USER_MOD?}
     )
     for profile in ${!profiles[@]}; do
         if [ -d ${profiles[${profile}]} ]; then
@@ -432,30 +432,30 @@ function ::unit:test() {
             for module in *; do
                 if [ ${#g_MODULES[@]} -eq 0 -o ${g_MODULES[${module}]--1} -eq 1 ]; then
                     g_MODE="prime"
-                    cpf "%{@comment:${profile}.${module}}.%{r:${g_MODE} -=[}\n";
+                    cpf "%{@comment:${profile}.${module}}.%{r:${g_MODE?} -=[}\n";
                     (
                         export g_RUNTIME_CWD=${profiles[${profile}]}
                         export g_RUNTIME_PROFILE=${profile}
                         export g_RUNTIME_MODULE=${module}
                         export g_RUNTIME_SCRIPT=${SITE_USER_CACHE?}/unittest-${module}.sh
 
-                        cat <<!SCRIPT > ${g_RUNTIME_SCRIPT}
+                        cat <<!SCRIPT > ${g_RUNTIME_SCRIPT?}
 #!/bin/bash
 #. Script    : ${script}
 #. Profile   : ${profile}
 #. Module    : ${module}
 #. Generated : $(date)
 !SCRIPT
-                        script=${SITE_UNIT_TESTS}/${module}-static.sh
+                        script=${SITE_UNIT_TESTS?}/${module}-static.sh
                         if [ -r "${script}" ]; then
-                            cat "${script}" > ${g_RUNTIME_SCRIPT}
+                            cat "${script}" > ${g_RUNTIME_SCRIPT?}
                         fi
-                        source ${g_RUNTIME_SCRIPT}
-                        SHUNIT_PARENT="${SITE_CORE_MOD}/unit" source ${SHUNIT2}
+                        source ${g_RUNTIME_SCRIPT?}
+                        SHUNIT_PARENT="${SITE_CORE_MOD?}/unit" source ${SHUNIT2?}
                     )
                     local -i ep=$?
 
-                    cpf "%{r:]=-} %{@comment:${profile}.${module}}.%{r:${g_MODE}}...";
+                    cpf "%{r:]=-} %{@comment:${profile}.${module}}.%{r:${g_MODE?}}...";
                     if [ ${ep} -eq 0 ]; then
                         theme HAS_PASSED
                     else
@@ -465,18 +465,18 @@ function ::unit:test() {
                     cpf "%{@comment:#############################################################################}\n"
 
                     g_MODE="execute"
-                    cpf "%{@comment:${profile}.${module}}.%{r:${g_MODE} -=[}\n";
+                    cpf "%{@comment:${profile}.${module}}.%{r:${g_MODE?} -=[}\n";
                     script=${SITE_USER_CACHE?}/unittest-${module}.sh
                     local -i ee=-1
                     if [ -r "${script}" ]; then
                         (
                             export g_RUNTIME_SCRIPT="${script}"
                             source "${script}"
-                            SHUNIT_PARENT="${script}" source "${SHUNIT2}"
+                            SHUNIT_PARENT="${script}" source "${SHUNIT2?}"
                         )
                         ee=$?
                     fi
-                    cpf "%{r:]=-} %{@comment:${profile}.${module}}.%{r:${g_MODE}}...";
+                    cpf "%{r:]=-} %{@comment:${profile}.${module}}.%{r:${g_MODE?}}...";
                     if [ ${ee} -eq 0 ]; then
                         theme HAS_PASSED
                     elif [ ${ee} -eq -1 ]; then
@@ -514,7 +514,7 @@ function unit:test() {
         fi
 
         if [ ${valid} -eq 1 ]; then
-            if [ -e "${SHUNIT2}" ]; then
+            if [ -e "${SHUNIT2?}" ]; then
                 cpf "%{@comment:#############################################################################}\n"
                 #. Only regenerate the script if it doesn't exist, or if it is
                 #. older than the input unittest csv file.
@@ -524,14 +524,14 @@ function unit:test() {
                 cpf "Unit-testing overal result..."
                 [ $e -eq 0 ] && theme HAS_PASSED || theme HAS_FAILED
             else
-                theme ERR_USAGE "${SHUNIT2} is missing"
-                e=${CODE_FAILURE}
+                theme ERR_USAGE "${SHUNIT2?} is missing"
+                e=${CODE_FAILURE?}
             fi
         else
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         fi
     else
-        cpf "Dear %{@user:%s}\n" "${USER_USERNAME}"
+        cpf "Dear %{@user:%s}\n" "${USER_USERNAME?}"
         cat <<!
 
 Developers are encouraged to run unit-testing on a throw-away virtual machine.

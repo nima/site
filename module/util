@@ -43,9 +43,9 @@ function util:timeout:shflags() {
     local -i DEFAULT_DELAY=1
 
     cat <<!
-integer timeout ${DEFAULT_TIMEOUT} <timeout> t
-integer interval ${DEFAULT_INTERVAL} <interval> i
-integer delay ${DEFAULT_DELAY} <delay> d
+integer timeout ${DEFAULT_TIMEOUT?} <timeout> t
+integer interval ${DEFAULT_INTERVAL?} <interval> i
+integer delay ${DEFAULT_DELAY?} <delay> d
 !
 }
 
@@ -53,7 +53,7 @@ function util:timeout() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -ge 1 ]; then
-        e=${CODE_FAILURE}
+        e=${CODE_FAILURE?}
         local -i delay=${FLAGS_delay?}; unset FLAGS_delay
         local -i timeout=${FLAGS_timeout?}; unset FLAGS_timeout
         local -i interval=${FLAGS_interval?}; unset FLAGS_interval
@@ -101,7 +101,7 @@ function :util:date:s2i() {
         local SS=${1:12:2}
 
         #. Convert datestamp to seconds
-        date --utc --date "${YYYY}-${mm}-${dd} ${HH}:${MM}:${SS}" "+%s"
+        date --utc --date "${YYYY?}-${mm}-${dd} ${HH?}:${MM?}:${SS?}" "+%s"
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -109,7 +109,7 @@ function :util:date:s2i() {
 #. }=-
 #. Stat -={
 function :util:stat:mode() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     local filepath="${1}"
     if [ $# -eq 1 -a -e "${filepath}" ]; then
@@ -122,7 +122,7 @@ function :util:stat:mode() {
 #. }=-
 #. Misc -={
 function :util:json() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ -t 1 ]; then
         jsontool -o inspect $@
@@ -136,13 +136,13 @@ function :util:json() {
 }
 
 function :util:listify() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -gt 0 ]; then
         #. Method 1
         IFS=, read -a s <<< "$*"
         echo ${s[@]}
-        e=${CODE_SUCCESS}
+        e=${CODE_SUCCESS?}
 
         #. Method 2
         #IFS=, read -a s <<< $*
@@ -155,7 +155,7 @@ function :util:listify() {
 }
 
 function :util:uniq() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -gt 0 ]; then
         tr ' ' '\n' <<< "${@}" | sort -u | tr '\n' ' '
@@ -168,13 +168,13 @@ function :util:uniq() {
 }
 
 function :util:dups() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 0 ]; then
         while read line; do
             echo ${line}
         done | sort -n | awk 'BEGIN{last=0};$1~/uidNumber/{if(last==$2){print$2};last=$2}' | sort -u
-        e=${CODE_SUCCESS}
+        e=${CODE_SUCCESS?}
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -208,18 +208,18 @@ function :util:is_int() {
 #}
 #
 #function :util:locald() {
-#    local -pA|awk 'BEGIN{e='${CODE_FAILURE}'};$0~/local .*'$1'=/{e='${CODE_SUCCESS}'};END{exit(e)}'
+#    local -pA|awk 'BEGIN{e='${CODE_FAILURE?}'};$0~/local .*'$1'=/{e='${CODE_SUCCESS?}'};END{exit(e)}'
 #    return $?
 #}
 #. }=-
 #. ANSI2HTML -={
 function :util:ansi2html() {
-    ${SITE_CORE_LIBEXEC}/ansi2html
+    ${SITE_CORE_LIBEXEC?}/ansi2html
 }
 #. }=-
 #. Markdown Scaffolding -={
 function :util:markdown() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -gt 0 ]; then
         if read -t 0 -N 0; then
@@ -269,5 +269,6 @@ function :util:markdown() {
 #    sd=( $(comm -3 <(explode $1) <(explode $2)) )
 #    explode sd
 #}
+#. }=-
 #. }=-
 #. }=-

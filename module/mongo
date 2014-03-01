@@ -4,9 +4,11 @@
 The module interfaces mongodb
 [core:docstring]
 
+#. Mongo -={
 core:import util
 core:requires mongo
 
+#. mongo:query -={
 #site mongo :query BC 'qdn=/server/' qdn
 function :mongo:query() {
     local -i e=${CODE_FAILURE?}
@@ -26,7 +28,7 @@ function :mongo:query() {
         done
 
         if [ ${#display[@]} -gt 0 ]; then
-            #"load(\"${SITE_CORE_LIBJS}/mongo/helper.js\")"
+            #"load(\"${SITE_CORE_LIBJS?}/mongo/helper.js\")"
             local -a jseval=(
                 "var filters = { $(:util:join ', ' filters) }"
                 "var data = db.nodes.find(filters, { _id: 0 }).toArray()"
@@ -34,12 +36,12 @@ function :mongo:query() {
             )
 
             #mongo --quiet --eval "$(:util:join ';' jseval)"\
-            #    ${db} ${SITE_CORE_LIBJS}/mongo/host.js |
+            #    ${db} ${SITE_CORE_LIBJS?}/mongo/host.js |
             #    jsontool -a ${display[@]}
             mongo --quiet --eval "$(:util:join ';' jseval)" ${db} |
                 jsontool -a ${display[@]}
 
-            e=${CODE_SUCCESS}
+            e=${CODE_SUCCESS?}
 
         else
             core:raise EXCEPTION_BAD_FN_CALL "At least one display field to be supplied"
@@ -50,3 +52,5 @@ function :mongo:query() {
 
     return $e
 }
+#. }=-
+#. }=-

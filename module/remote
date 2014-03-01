@@ -4,6 +4,7 @@
 The site remote access/execution module (ssh, ssh/sudo, tmux, etc.)
 [core:docstring]
 
+#. Remote Execution/Monitoring -={
 core:import dns
 core:import hgd
 core:import util
@@ -14,7 +15,6 @@ core:requires netstat
 declare -g g_SSH_OPT
 g_SSH_OPTS="-q -o ConnectionAttempts=${USER_SSH_ATTEMPTS:-2} -o ConnectTimeout=${USER_SSH_TIMEOUT:-3} -o PasswordAuthentication=no"
 
-#. Remote Execution/Monitoring -={
 #. remote:connect() -={
 function :remote:connect() {
     local -i e=${CODE_FAILURE?}
@@ -26,10 +26,10 @@ function :remote:connect() {
         local ssh_opts
         if [ $# -eq 2 ]; then
             #. User wants to ssh into a shell
-            ssh_opts="${g_SSH_OPTS} -ttt"
+            ssh_opts="${g_SSH_OPTS?} -ttt"
         elif [ $# -ge 3 ]; then
             #. User wants to ssh and execute a command
-            ssh_opts="${g_SSH_OPTS} -T"
+            ssh_opts="${g_SSH_OPTS?} -T"
         else
             #. User is confused, and so we will follow.
             core:raise EXCEPTION_BAD_FN_CALL
@@ -39,20 +39,20 @@ function :remote:connect() {
         [ ${tldid} == '.' ] || ssh_proxy=${USER_SSH_PROXY[${tldid}]}
         if [ ${#ssh_proxy} -eq 0 ]; then
             if [ $# -gt 2 ]; then
-                ssh ${ssh_opts} ${USER_USERNAME}@${qdn} "${@:3}"
+                ssh ${ssh_opts} ${USER_USERNAME?}@${qdn} "${@:3}"
                 e=$?
             else
-                ssh ${ssh_opts} ${USER_USERNAME}@${qdn}
+                ssh ${ssh_opts} ${USER_USERNAME?}@${qdn}
                 e=$?
             fi
         else
             if [ $# -gt 2 ]; then
-                ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME}@${ssh_proxy}\
-                    nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME}@${qdn} "${@:3}"
+                ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME?}@${ssh_proxy}\
+                    nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME?}@${qdn} "${@:3}"
                 e=$?
             else
-                ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME}@${ssh_proxy}\
-                    nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME}@${qdn}
+                ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME?}@${ssh_proxy}\
+                    nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME?}@${qdn}
                 e=$?
             fi
         fi
@@ -69,7 +69,7 @@ function remote:connect() {
 
     if [ $# -ge 1 ]; then
         local hnh=$1
-        local tldid=${g_TLDID}
+        local tldid=${g_TLDID?}
 
         local -a data
         [ ! -t 1 ] || cpf "Resolving %{@host:%s} in %{@tldid:%s}..." "${hnh}" "${tldid}"
@@ -81,16 +81,16 @@ function remote:connect() {
             [ ! -t 1 ] || theme HAS_PASSED "${fqdn}/${resolved}"
         elif [ ${#data[@]} -gt 1 ]; then
             [ ! -t 1 ] || theme ERR "Too many matches to the <hnh> \`${hnh}'"
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         else
             [ ! -t 1 ] || theme ERR "Failed to resolve any host matching \`${hnh}'"
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         fi
 
         if [ ${#data[@]} -eq 1 ]; then
             local qdn="${fqdn%.${dn}}"
             [ ! -t 1 ] || cpf "Connecting as@to %{@user:%s}@%{@host:%s}.%{@tldid:%s}...\n"\
-                "${USER_USERNAME}" "${qdn}" "${tldid}"
+                "${USER_USERNAME?}" "${qdn}" "${tldid}"
 
             if [ $# -eq 1 ]; then
                 :remote:connect ${tldid} ${qdn}
@@ -115,8 +115,8 @@ function remote:connect() {
 function :remote:copy:cached() { echo 3600; }
 function :remote:copy:cachefile() { echo $4; }
 function :remote:copy() {
-  ${CACHE_OUT}; {
-    #. Usage: :remote:copy m <fqdn> /etc/security/access.conf ${SITE_USER_CACHE}/${fqdn}-access.conf
+  ${CACHE_OUT?}; {
+    #. Usage: :remote:copy m <fqdn> /etc/security/access.conf ${SITE_USER_CACHE?}/${fqdn}-access.conf
 
     local -i e=${CODE_FAILURE?}
 
@@ -129,13 +129,13 @@ function :remote:copy() {
         local ssh_proxy
         [ ${tldid} == '.' ] || ssh_proxy=${USER_SSH_PROXY[${tldid}]}
 
-        local scp_opts="${g_SSH_OPTS}"
+        local scp_opts="${g_SSH_OPTS?}"
         if [ ${#ssh_proxy} -eq 0 ]; then
-            scp ${scp_opts} ${USER_USERNAME}@${qdn}:${src} ${dst}
+            scp ${scp_opts} ${USER_USERNAME?}@${qdn}:${src} ${dst}
             e=$?
         else
-            scp ${scp_opts} -o ProxyCommand="ssh ${USER_USERNAME}@${ssh_proxy}\
-                nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME}@${qdn}:${src} ${dst}
+            scp ${scp_opts} -o ProxyCommand="ssh ${USER_USERNAME?}@${ssh_proxy}\
+                nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME?}@${qdn}:${src} ${dst}
             e=$?
         fi
     else
@@ -143,7 +143,7 @@ function :remote:copy() {
     fi
 
     return $e
-  } | ${CACHE_IN}; ${CACHE_EXIT}
+  } | ${CACHE_IN?}; ${CACHE_EXIT?}
 }
 
 function remote:copy:usage() { echo "-T<tldid> <hnh> <src-path> <dst-path>"; }
@@ -205,7 +205,7 @@ function ::remote:pipewrap() {
 }
 
 function :remote:sudo() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     core:import vault
 
@@ -218,7 +218,7 @@ function :remote:sudo() {
         local lckfile=$(mktemp)
 
         passwd="$(:vault:read SUDO)"
-        if [ $? -eq ${CODE_SUCCESS} ]; then
+        if [ $? -eq ${CODE_SUCCESS?} ]; then
             ::remote:pipewrap "${passwd}" "${lckfile}" | (
                 local prompt="$(printf ".\r")"
                 :remote:connect ${tldid} ${qdn} sudo -p "${prompt}" -S "${@:3}"
@@ -240,7 +240,7 @@ function :remote:sudo() {
 
 function remote:sudo:usage() { echo "-T|--tldid <hnh> <cmd>"; }
 function remote:sudo() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -ge 2 ]; then
         local -r hnh="$1"
@@ -284,7 +284,7 @@ function remote:cluster() {
             cssh ${hosts[@]}
         else
             theme ERR_USAGE "That <hgd> did not resolve to any hosts."
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         fi
     elif [ $# -gt 1 ]; then
         local -a qdns
@@ -334,7 +334,7 @@ function ::remote:tmux.eval() {
         wid=0
         wname=${session}:w${wid}
         echo tmux rename-window -t ${session} ${session}:w0
-        for ((wid=1; wid<${WINDOWS}; wid++)); do
+        for ((wid=1; wid<${WINDOWS?}; wid++)); do
             wname=${session}:w${wid}
             echo tmux new-window -t ${session} -d -a -n ${wname}
         done
@@ -410,7 +410,7 @@ function ::remote:tmux() {
 
                     [ ${lpid} -eq 0 ] || tmux split-window -h
                     cpf "Connection %{g:${tab}}:%{@int:${pid}} to %{@host:${hosts[${pid}]}}..."
-                    tmux send-keys -t "${lpid}" "${SITE_CORE_BIN}/ssh ${hosts[${pid}]}" C-m
+                    tmux send-keys -t "${lpid}" "${SITE_CORE_BIN?}/ssh ${hosts[${pid}]}" C-m
                     #XXX tmux send-keys -t "${lpid}" "ss${tldid} ${hosts[${pid}]}" C-m
                     tmux select-layout -t "${session}:${tab}" tiled >/dev/null
                     theme HAS_PASSED "${tab}:${pid}"
@@ -488,7 +488,7 @@ function remote:tmux() {
             e=$?
         else
             theme ERR_USAGE "That session already exists."
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         fi
     fi
 
@@ -509,8 +509,8 @@ function ::remote:serialmon() {
             local qdn info postcmd
             for qdn in ${qdns[@]}; do
                 info="$(:remote:connect ${tldid} ${qdn} ${rcmd}|tr -d '\r\n'; exit ${PIPESTATUS[0]})"
-                if [ $? -eq ${CODE_SUCCESS} ]; then
-                    e=${CODE_SUCCESS}
+                if [ $? -eq ${CODE_SUCCESS?} ]; then
+                    e=${CODE_SUCCESS?}
                     echo "${info}"
                 fi
             done
@@ -554,7 +554,7 @@ function remote:mon() {
         fi
 
         if [ ${#rcmd} -gt 0 ]; then
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
 
             cpf "Processing..."
             local -a qdns
@@ -575,9 +575,9 @@ function remote:mon() {
                     local script=
 
                     if [ ${sudo} -eq 1 ]; then
-                        script="${SITE_CORE_LIBEXEC}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME}:SUDO@${csv_hosts} ${rcmd}"
+                        script="${SITE_CORE_LIBEXEC?}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME?}:SUDO@${csv_hosts} ${rcmd}"
                     else
-                        script="${SITE_CORE_LIBEXEC}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME}@${csv_hosts} ${rcmd}"
+                        script="${SITE_CORE_LIBEXEC?}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME?}@${csv_hosts} ${rcmd}"
                     fi
                     #echo "#. DEBUG: ${script}" >&2
 
@@ -632,7 +632,7 @@ function remote:mon() {
                     fi
 
                     if [ ${#rcmd} -gt 0 ]; then
-                        e=${CODE_SUCCESS}
+                        e=${CODE_SUCCESS?}
                         cpf "(%{@int:${#qdns[@]}} hosts"
                         for qdn in ${qdns[@]}; do
                             cpf "%{@host:%-32s}" ${qdn}
@@ -651,17 +651,17 @@ function remote:mon() {
                                             e=$?
                                         fi
                                         theme HAS_PASSED "${info}"
-                                        e=${CODE_SUCCESS}
+                                        e=${CODE_SUCCESS?}
                                     else
-                                        e=${CODE_FAILURE}
+                                        e=${CODE_FAILURE?}
                                         theme HAS_FAILED "EXIT CODE:$e"
                                     fi
                                 else
-                                    e=${CODE_FAILURE}
+                                    e=${CODE_FAILURE?}
                                     theme HAS_FAILED "SSH_DOWN"
                                 fi
                             else
-                                e=${CODE_FAILURE}
+                                e=${CODE_FAILURE?}
                                 theme HAS_FAILED "NO_A_RECORD"
                             fi
                         done

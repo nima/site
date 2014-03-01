@@ -3,6 +3,9 @@
 Core help module
 [core:docstring]
 
+#. Help -={
+
+#. help:all -={
 function help:all() {
     local -i e=${CODE_DEFAULT?}
 
@@ -17,12 +20,13 @@ function help:all() {
             done
             echo
         done
-        e=${CODE_SUCCESS}
+        e=${CODE_SUCCESS?}
     fi
 
     return $e
 }
-
+#. }=-
+#. help:module -={
 function help:module:usage() { echo "<module> [<function>]"; }
 function help:module() {
     local -i e=${CODE_DEFAULT?}
@@ -35,9 +39,11 @@ function help:module() {
             :core:usage ${1} ${2} --long
             e=$?
         else
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         fi
     fi
 
     return $e
 }
+#. }=-
+#. }=-

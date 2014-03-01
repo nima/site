@@ -12,14 +12,14 @@ core:import util
 core:requires ssh
 core:requires netstat
 
-declare -rg g_CP_PREFIX="${SITE_USER_RUN}/ssh-sm"
+declare -rg g_CP_PREFIX="${SITE_USER_RUN?}/ssh-sm"
 
 #. tunnel:status -={
 function :tunnel:pid() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     local -r qdn="${1}"
-    local -r controlpath=${g_CP_PREFIX}@${qdn}
+    local -r controlpath=${g_CP_PREFIX?}@${qdn}
     if [ -e "${controlpath}" ]; then
         local raw
         raw=$(
@@ -64,7 +64,7 @@ function tunnel:status() {
         pid=$(:tunnel:pid ${qdn})
         e=$?
 
-        if [ $e -eq ${CODE_SUCCESS} ]; then
+        if [ $e -eq ${CODE_SUCCESS?} ]; then
             local -a ports
             ports=( $(:tunnel:list ${pid} ) )
             portstr=$(:util:join , ports)
@@ -138,7 +138,7 @@ function :tunnel:stop() {
     if [ $# -eq 1 ]; then
         local -i pid=0
         local -r qdn="${1}"
-        local -r controlpath=${g_CP_PREFIX}@${qdn}
+        local -r controlpath=${g_CP_PREFIX?}@${qdn}
         if [ -e "${controlpath}" ]; then
             pid=$(:tunnel:pid ${qdn})
             if [ $? -eq ${CODE_SUCCESS?} ]; then
@@ -165,7 +165,7 @@ function tunnel:stop() {
         local -r qdn="${1}"
         cpf "Stopping ssh control master to %{@host:${qdn}}..."
 
-        local -r controlpath=${g_CP_PREFIX}@${qdn}
+        local -r controlpath=${g_CP_PREFIX?}@${qdn}
         if [ -e "${controlpath}" ]; then
             local -i pid
             pid=$(:tunnel:stop "${qdn}")
@@ -190,7 +190,7 @@ function :tunnel:create() {
         local lport="${3}"
         local raddr="${4}"
         local rport="${5}"
-        local -r controlpath=${g_CP_PREFIX}@${qdn}
+        local -r controlpath=${g_CP_PREFIX?}@${qdn}
         if [ -S ${controlpath} ]; then
             if ! :net:localportping ${lport}; then
                 ssh -qo 'ControlMaster=no' -O forward -S "${controlpath}"\

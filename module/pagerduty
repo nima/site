@@ -1,12 +1,12 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
-core:import util
-
 :<<[core:docstring]
 PagerDuty module
 [core:docstring]
 
 #. See http://developer.pagerduty.com/documentation/rest to extend functionality
+#. PagerDuty -={
+core:import util
 
 core:import util
 core:import vault
@@ -15,8 +15,9 @@ core:requires curl
 core:requires ENV USER_PAGERDUTY_HOST
 core:requires VAULT PAGERDUTY_API_KEY
 
+#. pagerduty:query -={
 function :pagerduty:query() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     local secret
     case $#:$1 in
@@ -28,7 +29,7 @@ function :pagerduty:query() {
                     -H "Authorization: Token token=${secret}"\
                     -X GET -G \
                     --data-urlencode "status=triggered,acknowledged" \
-                    "https://${USER_PAGERDUTY_HOST}/api/v1/${1}"
+                    "https://${USER_PAGERDUTY_HOST?}/api/v1/${1}"
                 e=$?
             fi
         ;;
@@ -39,7 +40,7 @@ function :pagerduty:query() {
                     -H "Content-type: application/json"\
                     -H "Authorization: Token token=${secret}"\
                     -X GET -G \
-                    "https://${USER_PAGERDUTY_HOST}/api/v1/${1}"
+                    "https://${USER_PAGERDUTY_HOST?}/api/v1/${1}"
                 e=$?
             fi
         ;;
@@ -52,7 +53,7 @@ function :pagerduty:query() {
                     --data-urlencode "since=$(date --iso-8601=minutes -d "0 hour")"\
                     --data-urlencode "until=$(date --iso-8601=minutes -d "12 hour")"\
                     -X GET -G \
-                    "https://${USER_PAGERDUTY_HOST}/api/v1/${1}/${2}"
+                    "https://${USER_PAGERDUTY_HOST?}/api/v1/${1}/${2}"
                 e=$?
             fi
         ;;
@@ -89,3 +90,5 @@ function pagerduty:query() {
 
     return $e
 }
+#. }=-
+#. }=-

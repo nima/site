@@ -26,8 +26,8 @@ function :xplm:init() {
                     eval "$(rbenv init -)"
                     e=$?
                 else
-                    rbenv install ${RBENV_VERSION}
-                    rbenv shell ${RBENV_VERSION}
+                    rbenv install ${RBENV_VERSION?}
+                    rbenv shell ${RBENV_VERSION?}
                     [ $? -ne 0 ] || eval "$(rbenv init -)"
                     e=$?
                 fi

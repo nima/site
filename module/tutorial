@@ -6,6 +6,8 @@ The site module aims to serve as a tutorial for new site users.  Once you are
 comfortable with site, you can simply disable this module.
 [core:docstring]
 
+#. Tutorial -={
+#. tutorial:p01 -={
 function tutorial:p01() {
     cat <<!
 # Part 1 - Simple Start
@@ -24,7 +26,7 @@ function declaration is thus:
     }
 \`\`\`
 
-Peek inside ${SITE_CORE}/module/tutorial to see the implementation of this
+Peek inside ${SITE_CORE?}/module/tutorial to see the implementation of this
 function before continuing.
 
 Let's get to that in the next tutorial, where we will demonstrate how to use
@@ -34,7 +36,8 @@ function with a call to \`:util:markdown()\`.
     % site tutorial p02
 !
 }
-
+#. }=-
+#. tutorial:p02 -={
 core:import util
 function tutorial:p02() {
     :util:markdown h1 "Part 2 - Using Modules" <<!
@@ -56,7 +59,8 @@ move onto p03 where we discuss the three types of functions in site:
     % site tutorial p03
 !
 }
-
+#. }=-
+#. tutorial:p03 -={
 function tutorial:p03() {
     :util:markdown h1 "Part 3.0 - The Three Function Types" <<!
 Earlier we mentioned that the function \`:util:markdown\` was an internal
@@ -143,7 +147,8 @@ you don't care much to expose to anything but one or two functions within the
 same module.
 !
 }
-
+#. }=-
+#. tutorial:hello -={
 #. Optional alerts
 function tutorial:hello:alert() {
     cat <<!
@@ -266,14 +271,15 @@ function tutorial:hello() {
             sleep ${snooze}
         done
 
-        e=${CODE_SUCCESS}
+        e=${CODE_SUCCESS?}
     fi
 
     return $e
 }
 
-#  #${CACHE_OUT}; {
+#  #${CACHE_OUT?}; {
 #        cpf "%{B:Time now is} %{y:%s}\n" "$(date)"
 #        cpf "%{B:Signing off at} %{y:%s}\n" "$(date)"
-#  #} | ${CACHE_IN}; ${CACHE_EXIT}
-
+#  #} | ${CACHE_IN?}; ${CACHE_EXIT?}
+#. }=-
+#. }=-

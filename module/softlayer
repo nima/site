@@ -4,59 +4,21 @@
 Softlayer API
 [core:docstring]
 
+#. SoftLayer -={
 core:import util
 core:import dns
 core:requires PYTHON pytz
 core:requires PYTHON SoftLayer
 core:requires VAULT  SOFTLAYER_API_KEY
 
-function :softlayer:hostlist() {
-    local -i e=${CODE_FAILURE}
-
-    local mask='networkComponents.primarySubnet'
-
-    #print y['primarySubnet']['gateway'], x['id']
-    if [ $# -eq 0 ]; then
-        echo "FQDN" "IPMIAddr" "IPBackend" "Gw" "IPPrimary"
-        softlayer 'Account::getHardware' mask=${mask} |
-            :util:json -a \
-                fullyQualifiedDomainName \
-                networkManagementIpAddress \
-                primaryBackendIpAddress \
-                'networkComponents[0]["primarySubnet"]["gateway"]' \
-                primaryIpAddress
-        e=$?
-    else
-        core:raise EXCEPTION_BAD_FN_CALL
-    fi
-
-    return $e
-}
-
-function :softlayer:hostdump.json() {
-    local -i e=${CODE_FAILURE}
-
-    if [ $# -eq 1 ]; then
-        local fqdn="$1"
-        local mask="remoteManagementAccounts,remoteManagementAccounts"
-        softlayer 'Account::getHardware' mask=${mask} |
-            :util:json -a -c 'this.fullyQualifiedDomainName == "'${fqdn}'"' 2>/dev/null
-        e=$?
-        echo "${data}"
-    else
-        core:raise EXCEPTION_BAD_FN_CALL
-    fi
-
-    return $e
-}
-
+#. softlayer:ipmicreds -={
 function :softlayer:ipmicreds() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
         local data
         data=$(:softlayer:hostdump.json ${fqdn})
-        if [ ${#data} -gt 0 -a $? -eq ${CODE_SUCCESS} ]; then
+        if [ ${#data} -gt 0 -a $? -eq ${CODE_SUCCESS?} ]; then
             local username=$(
                 echo -ne "${data}" | :util:json -a 'remoteManagementAccounts[0]["username"]'
             )
@@ -65,71 +27,15 @@ function :softlayer:ipmicreds() {
             )
             local ipmiaddr=$(echo -ne "${data}" | :util:json -a 'networkManagementIpAddress')
 
-            echo "${username}${SITE_DELIM}${password}${SITE_DELIM}${ipmiaddr}"
-            e=${CODE_SUCCESS}
+            echo "${username}${SITE_DELIM?}${password}${SITE_DELIM?}${ipmiaddr}"
+            e=${CODE_SUCCESS?}
         fi
     fi
 
     return $e
 }
-
-function :softlayer:hostid() {
-    local -i e=${CODE_FAILURE}
-
-    if [ $# -eq 1 ]; then
-        softlayer 'Account::getHardware' |
-            :util:json -a -c 'this.fullyQualifiedDomainName == "'${fqdn}'"' 2>/dev/null |
-            :util:json -a 'id' 2>/dev/null
-        e=$?
-    else
-        core:raise EXCEPTION_BAD_FN_CALL
-    fi
-
-    return $e
-}
-
-function :softlayer:hostpower() {
-    local -i e=${CODE_FAILURE}
-
-    if [ $# -eq 1 ]; then
-        local fqdn=$1
-        local id
-        id=$(:softlayer:hostid ${fqdn})
-        if [ $? -eq ${CODE_SUCCESS} ]; then
-            softlayer 'Hardware_Server::getServerPowerState' id=${id} |
-                :util:json -a 2>/dev/null
-            e=$?
-        fi
-    elif [ $# -eq 2 ]; then
-        local fqdn=$1
-        local cmd=$2
-        local success
-        id=$(:softlayer:hostid ${fqdn})
-        if [ $? -eq ${CODE_SUCCESS} ]; then
-            case ${cmd} in
-                reset)
-                    success=$(softlayer 'Hardware_Server::powerCycle' id=${id})
-                ;;
-                on)
-                    success=$(softlayer 'Hardware_Server::powerOn' id=${id})
-                ;;
-                off)
-                    success=$(softlayer 'Hardware_Server::powerOff' id=${id})
-                ;;
-                *)
-                    core:raise EXCEPTION_BAD_FN_CALL
-                ;;
-            esac
-            e=${CODE_FAILURE}
-            [ "${success}" != "true" ] || e=${CODE_SUCCESS}
-        fi
-    else
-        core:raise EXCEPTION_BAD_FN_CALL
-    fi
-
-    return $e
-}
-
+#. }=-
+#. softlayer:ipmi -={
 function softlayer:ipmi:usage() { echo "sol|health|dump <fqdn>"; }
 function softlayer:ipmi() {
     local -i e=${CODE_DEFAULT?}
@@ -139,8 +45,8 @@ function softlayer:ipmi() {
         local fqdn=$2
         local creds
         creds="$(:softlayer:ipmicreds ${fqdn})"
-        if [ $? -eq ${CODE_SUCCESS} ]; then
-            IFS=${SITE_DELIM} read username password ipmiaddr <<< "${creds}"
+        if [ $? -eq ${CODE_SUCCESS?} ]; then
+            IFS=${SITE_DELIM?} read username password ipmiaddr <<< "${creds}"
 
             case ${cmd} in
                 sol)
@@ -161,22 +67,171 @@ function softlayer:ipmi() {
                 ;;
             esac
         else
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         fi
     fi
 
     return $e
 }
+#. }=-
+#. softlayer:subnets -={
+function softlayer:subnets:usage() { echo "[private] [public]"; }
+function softlayer:subnets() {
+    local -i e=${CODE_DEFAULT?}
 
+    local -a subnets
+    if [ $# -gt 0 ]; then
+        e=${CODE_SUCCESS?}
+        local subnet
+        for subnet in $@; do
+            case ${subnet} in
+                private) subnets+=( ${subnet} ) ;;
+                public)  subnets+=( ${subnet} ) ;;
+                *) e=${CODE_USAGE?};;
+            esac
+        done
+    else
+        e=${CODE_SUCCESS?}
+        subnets+=( private public )
+    fi
+
+    if [ $e -eq ${CODE_SUCCESS?} ]; then
+        local nw cidr gw
+        local -i count total vlan
+        for subnet in ${subnets[@]}; do
+            case ${subnet} in
+                private|public)
+                    while read line; do
+                        read gw nw cidr count vlan <<< "${line}"
+                        ((total+=count))
+                        cpf "%15s/%s @ vlan:%-6s -> %-15s (%s, %s hosts)\n" \
+                            "${nw}" "${cidr}" "${vlan}" "${gw}" "${subnet}" "${count}"
+                    done < <(
+                        softlayer "Account::get${subnet^}Subnets" |
+                            :util:json -a gateway networkIdentifier cidr usableIpAddressCount networkVlanId
+                    )
+                ;;
+            esac
+        done
+        if [ -t 1 ]; then
+            cpf "\nTotal addressable IPv4 addresses in the %{y:%s} space: %{@int:%s}\n" "$(:util:join / subnets)" "${total}"
+        fi
+    fi
+
+    return $e
+}
+#. }=-
+#. softlayer:hostlist -={
+function :softlayer:hostlist() {
+    local -i e=${CODE_FAILURE?}
+
+    local mask='networkComponents.primarySubnet'
+
+    #print y['primarySubnet']['gateway'], x['id']
+    if [ $# -eq 0 ]; then
+        echo "FQDN" "IPMIAddr" "IPBackend" "Gw" "IPPrimary"
+        softlayer 'Account::getHardware' mask=${mask} |
+            :util:json -a \
+                fullyQualifiedDomainName \
+                networkManagementIpAddress \
+                primaryBackendIpAddress \
+                'networkComponents[0]["primarySubnet"]["gateway"]' \
+                primaryIpAddress
+        e=$?
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+#. }=-
+#. softlayer:hostdump -={
+function :softlayer:hostdump.json() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local fqdn="$1"
+        local mask="remoteManagementAccounts,remoteManagementAccounts"
+        softlayer 'Account::getHardware' mask=${mask} |
+            :util:json -a -c 'this.fullyQualifiedDomainName == "'${fqdn}'"' 2>/dev/null
+        e=$?
+        echo "${data}"
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+#. }=-
+#. softlayer:hostid -={
+function :softlayer:hostid() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        softlayer 'Account::getHardware' |
+            :util:json -a -c 'this.fullyQualifiedDomainName == "'${fqdn}'"' 2>/dev/null |
+            :util:json -a 'id' 2>/dev/null
+        e=$?
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+#. }=-
+#. softlayer:hostpower -={
+function :softlayer:hostpower() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local fqdn=$1
+        local id
+        id=$(:softlayer:hostid ${fqdn})
+        if [ $? -eq ${CODE_SUCCESS?} ]; then
+            softlayer 'Hardware_Server::getServerPowerState' id=${id} |
+                :util:json -a 2>/dev/null
+            e=$?
+        fi
+    elif [ $# -eq 2 ]; then
+        local fqdn=$1
+        local cmd=$2
+        local success
+        id=$(:softlayer:hostid ${fqdn})
+        if [ $? -eq ${CODE_SUCCESS?} ]; then
+            case ${cmd} in
+                reset)
+                    success=$(softlayer 'Hardware_Server::powerCycle' id=${id})
+                ;;
+                on)
+                    success=$(softlayer 'Hardware_Server::powerOn' id=${id})
+                ;;
+                off)
+                    success=$(softlayer 'Hardware_Server::powerOff' id=${id})
+                ;;
+                *)
+                    core:raise EXCEPTION_BAD_FN_CALL
+                ;;
+            esac
+            e=${CODE_FAILURE?}
+            [ "${success}" != "true" ] || e=${CODE_SUCCESS?}
+        fi
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+#. }=-
+#. softlayer:host -={
 function softlayer:host:usage() { echo "list | dump <fqdn> | power <fqdn> status|on|off|reset"; }
 function softlayer:host() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -ge 1 ]; then
         local cmd=$1
         local hnh=$2
         local fqdn=${hnh} #. FIXME
-        local tldid=${g_TLDID}
+        local tldid=${g_TLDID?}
         local -a fqdns
 
         local tld=${USER_TLDS[${tldid}]}
@@ -190,14 +245,14 @@ function softlayer:host() {
                     local -a fqdns
                     fqdns=( $(:dns:fqdn ${tldid} ${hnh}) )
                     if [ ${#fqdns[@]} -gt 0 ]; then
-                        e=${CODE_SUCCESS}
+                        e=${CODE_SUCCESS?}
                         for fqdn in ${fqdns[@]}; do
                             :softlayer:hostdump.json ${fqdn}
                             e=$?
                         done
                     else
                         theme HAS_FAILED "CANNOT_RESOLVE_HNH"
-                        e=${CODE_FAILURE}
+                        e=${CODE_FAILURE?}
                     fi
                 ;;
                 3:power)
@@ -206,10 +261,10 @@ function softlayer:host() {
                         fqdn=${fqdns[0]}
                     else
                         theme HAS_FAILED "CANNOT_RESOLVE_HNH"
-                        e=${CODE_FAILURE}
+                        e=${CODE_FAILURE?}
                     fi
 
-                    if [ $e -ne ${CODE_FAILURE} ]; then
+                    if [ $e -ne ${CODE_FAILURE?} ]; then
                         cpf "Host %{@host:${fqdn}} is .."
 
                         local request=$3
@@ -218,18 +273,18 @@ function softlayer:host() {
                         e=$?
                         cpf '.'
 
-                        if [ $e -eq ${CODE_SUCCESS} ]; then
+                        if [ $e -eq ${CODE_SUCCESS?} ]; then
                             case ${power}:${request} in
-                                on:status)  cpf "%{g:ON}\n" ; e=${CODE_SUCCESS} ;;
-                                off:status) cpf "%{r:OFF}\n"; e=${CODE_SUCCESS} ;;
-                                on:on)      cpf "already %{g:ON}\n" ; e=${CODE_SUCCESS} ;;
-                                off:off)    cpf "already %{r:OFF}\n"; e=${CODE_SUCCESS} ;;
+                                on:status)  cpf "%{g:ON}\n" ; e=${CODE_SUCCESS?} ;;
+                                off:status) cpf "%{r:OFF}\n"; e=${CODE_SUCCESS?} ;;
+                                on:on)      cpf "already %{g:ON}\n" ; e=${CODE_SUCCESS?} ;;
+                                off:off)    cpf "already %{r:OFF}\n"; e=${CODE_SUCCESS?} ;;
                                 on:reset)
                                     cpf "%{g:ON}\n"
                                     cpf "Powercycling server..."
                                     :softlayer:hostpower reset
                                     e=$?
-                                    if [ $e -eq ${CODE_SUCCESS} ]; then
+                                    if [ $e -eq ${CODE_SUCCESS?} ]; then
                                         theme HAS_PASSED
                                     else
                                         theme HAS_FAILED
@@ -259,45 +314,17 @@ function softlayer:host() {
             esac
         else
             theme ERR "Invalid TLD identifier \'${tldid}'"
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         fi
     fi
 
     return $e
 }
-
-function :softlayer:query() {
-    softlayer "${@}"
-    return $?
-}
-
-function softlayer:query:usage() { echo "<query>"; }
-function softlayer:query() {
-    local -i e=${CODE_USAGE}
-
-    #site nexpose test getHardware '$.privateIpAddress'
-    #site nexpose test getHardware '$.*[152]'
-
-    #. https://control.softlayer.com/network/vlans
-    #site softlayer query Network_Vlan::getObject
-
-    #. https://control.softlayer.com/network/vlans/114973
-    #site softlayer query Network_Vlan::getSubnets id=114973 path='$..networkIdentifier'
-
-    if [ $# -gt 1 ]; then
-        {
-            echo "/* vim:syntax=json */"
-            :softlayer:query "${@}" | :util:json
-        } | vimcat
-        e=${CODE_SUCCESS}
-    fi
-
-    return $e
-}
-
+#. }=-
+#. softlayer:ticket -={
 function softlayer:ticket:usage() { echo "[<ticket-id>]"; }
 function softlayer:ticket() {
-    local e=${CODE_DEFAULT}
+    local e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 ]; then
         local data=$(:softlayer:query Ticket::getLastUpdate id=$1)
@@ -327,10 +354,11 @@ function softlayer:ticket() {
 
     return $e
 }
-
+#. }=-
+#. softlayer:dc -={
 function softlayer:dc:usage() { echo "<shn> [<shn> [...]]"; }
 function softlayer:dc() {
-    local e=${CODE_DEFAULT}
+    local e=${CODE_DEFAULT?}
 
     if [ $# -gt 0 ]; then
         local shn
@@ -354,54 +382,40 @@ function softlayer:dc() {
             )
         done
 
-        e=${CODE_SUCCESS}
+        e=${CODE_SUCCESS?}
     fi
 
     return $e
 }
+#. }=-
+#. softlayer:query -={
+function :softlayer:query() {
+    softlayer "${@}"
+    return $?
+}
 
-function softlayer:subnets:usage() { echo "[private] [public]"; }
-function softlayer:subnets() {
-    local -i e=${CODE_DEFAULT}
+function softlayer:query:usage() { echo "<query>"; }
+function softlayer:query() {
+    local -i e=${CODE_USAGE?}
 
-    local -a subnets
-    if [ $# -gt 0 ]; then
-        e=${CODE_SUCCESS}
-        local subnet
-        for subnet in $@; do
-            case ${subnet} in
-                private) subnets+=( ${subnet} ) ;;
-                public)  subnets+=( ${subnet} ) ;;
-                *) e=${CODE_USAGE};;
-            esac
-        done
-    else
-        e=${CODE_SUCCESS}
-        subnets+=( private public )
-    fi
+    #site nexpose test getHardware '$.privateIpAddress'
+    #site nexpose test getHardware '$.*[152]'
 
-    if [ $e -eq ${CODE_SUCCESS} ]; then
-        local nw cidr gw
-        local -i count total vlan
-        for subnet in ${subnets[@]}; do
-            case ${subnet} in
-                private|public)
-                    while read line; do
-                        read gw nw cidr count vlan <<< "${line}"
-                        ((total+=count))
-                        cpf "%15s/%s @ vlan:%-6s -> %-15s (%s, %s hosts)\n" \
-                            "${nw}" "${cidr}" "${vlan}" "${gw}" "${subnet}" "${count}"
-                    done < <(
-                        softlayer "Account::get${subnet^}Subnets" |
-                            :util:json -a gateway networkIdentifier cidr usableIpAddressCount networkVlanId
-                    )
-                ;;
-            esac
-        done
-        if [ -t 1 ]; then
-            cpf "\nTotal addressable IPv4 addresses in the %{y:%s} space: %{@int:%s}\n" "$(:util:join / subnets)" "${total}"
-        fi
+    #. https://control.softlayer.com/network/vlans
+    #site softlayer query Network_Vlan::getObject
+
+    #. https://control.softlayer.com/network/vlans/114973
+    #site softlayer query Network_Vlan::getSubnets id=114973 path='$..networkIdentifier'
+
+    if [ $# -gt 1 ]; then
+        {
+            echo "/* vim:syntax=json */"
+            :softlayer:query "${@}" | :util:json
+        } | vimcat
+        e=${CODE_SUCCESS?}
     fi
 
     return $e
 }
+#. }=-
+#. }=-

@@ -4,6 +4,7 @@
 The site LDAP module
 [core:docstring]
 
+#. LDAP -={
 #. https://access.redhat.com/site/documentation/en-US/Red_Hat_Directory_Server/8.2/html-single/Administration_Guide/index.html#Managing_Replication-Replicating-Password-Attributes
 g_MAXDATA=20380119031407Z
 
@@ -19,6 +20,7 @@ core:requires ENV USER_REGEX
 core:requires ENV USER_UDN
 core:requires ENV USER_USERNAME
 
+#. ldap:host -={
 function :ldap:host() {
     #. <arguments> = -1:
     #.    Returns a random LDAP host from the pool
@@ -34,7 +36,7 @@ function :ldap:host() {
     #.
     #. Throws an exception otherwise.
 
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     local user_ldaphost=
     if [ $# -eq 1 ]; then
@@ -42,28 +44,28 @@ function :ldap:host() {
         if [ ${lhi} -lt ${#USER_LDAPHOSTS[@]} ]; then
             if [ ${lhi} -ge 0 ]; then
                 user_ldaphost="${USER_LDAPHOSTS[${lhi}]}"
-                e=${CODE_SUCCESS}
+                e=${CODE_SUCCESS?}
             elif [ ${lhi} -eq -1 ]; then
-                e=${CODE_SUCCESS}
+                e=${CODE_SUCCESS?}
             elif [ ${lhi} -eq -2 ]; then
-                [ ${g_LDAPHOST} -ge 0 ] || g_LDAPHOST=-1
-                user_ldaphost=$(:ldap:host ${g_LDAPHOST})
+                [ ${g_LDAPHOST?} -ge 0 ] || g_LDAPHOST=-1
+                user_ldaphost=$(:ldap:host ${g_LDAPHOST?})
                 e=$?
             fi
         else
             core:raise EXCEPTION_BAD_FN_CALL "BAD_INDEX"
         fi
     elif [ $# -eq 0 ]; then
-        [ ${g_LDAPHOST} -ge 0 ] || g_LDAPHOST=-1
-        user_ldaphost=$(:ldap:host ${g_LDAPHOST})
+        [ ${g_LDAPHOST?} -ge 0 ] || g_LDAPHOST=-1
+        user_ldaphost=$(:ldap:host ${g_LDAPHOST?})
         e=$?
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
 
-    if [ $e -eq ${CODE_SUCCESS} ]; then
+    if [ $e -eq ${CODE_SUCCESS?} ]; then
         if [ ${#user_ldaphost} -eq 0 ]; then
-            user_ldaphost="${USER_LDAPHOSTS[$((${RANDOM}%${#USER_LDAPHOSTS[@]}))]}"
+            user_ldaphost="${USER_LDAPHOSTS[$((${RANDOM?}%${#USER_LDAPHOSTS[@]}))]}"
         fi
         echo ${user_ldaphost}
     else
@@ -77,15 +79,15 @@ function :ldap:host_rw() {
     #. Returns a random LDAP host from the pool, that offer rw functionality
     #. Assumes all hosts are functional
 
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     local user_ldaphost_rw
-    if [ "${g_LDAPHOST}" -lt 0 ]; then
-        user_ldaphost_rw="${USER_LDAPHOSTS_RW[$((${RANDOM}%${#USER_LDAPHOSTS_RW[@]}))]}"
-        e=${CODE_SUCCESS}
-    elif [ ${g_LDAPHOST} -lt ${#USER_LDAPHOSTS_RW[@]} ]; then
-        user_ldaphost_rw="${USER_LDAPHOSTS_RW[${g_LDAPHOST}]}"
-        e=${CODE_SUCCESS}
+    if [ "${g_LDAPHOST?}" -lt 0 ]; then
+        user_ldaphost_rw="${USER_LDAPHOSTS_RW[$((${RANDOM?}%${#USER_LDAPHOSTS_RW[@]}))]}"
+        e=${CODE_SUCCESS?}
+    elif [ ${g_LDAPHOST?} -lt ${#USER_LDAPHOSTS_RW[@]} ]; then
+        user_ldaphost_rw="${USER_LDAPHOSTS_RW[${g_LDAPHOST?}]}"
+        e=${CODE_SUCCESS?}
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -93,11 +95,11 @@ function :ldap:host_rw() {
 
     return $e
 }
-
-#. Authentication -={
+#. }=-
+#. ldap:authentication -={
 declare -g g_PASSWD_CACHED=
 function :ldap:authenticate() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ ${#g_PASSWD_CACHED} -eq 0 ]; then
         g_PASSWD_CACHED="$(:vault:read LDAP)"
@@ -109,20 +111,20 @@ function :ldap:authenticate() {
             echo
         fi
 
-        ldapsearch -x -LLL -h ${ldaphost_rw} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -b ${USER_UDN} >/dev/null 2>&1
+        ldapsearch -x -LLL -h ${ldaphost_rw} -D "uid=${USER_USERNAME?},${USER_UDN?}" -w "${g_PASSWD_CACHED?}" -b ${USER_UDN?} >/dev/null 2>&1
         if [ $? -eq 0 ]; then
             export g_PASSWD_CACHED
-            e=${CODE_SUCCESS}
+            e=${CODE_SUCCESS?}
         else
             g_PASSWD_CACHED=
         fi
     else
-        e=${CODE_SUCCESS}
+        e=${CODE_SUCCESS?}
     fi
     return $e
 }
 #. }=-
-#. Modification -={
+#. ldap:modify -={
 #. LDAP Return Copes
 #. 0   - LDAP_SUCCESS
 #. 1   - LDAP_OPERATIONS_ERROR
@@ -133,7 +135,7 @@ function :ldap:authenticate() {
 
 function ldap:mkldif:usage() { echo "add|modify|replace|delete user|group|netgroup <name> <attr1> <val1> [<val2> [...]] [- <attr2> ...]"; }
 function ldap:mkldif() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -ge 4 ]; then
         vimcat <<< "$(::ldap:mkldif $@)" >&2
@@ -147,7 +149,7 @@ function ::ldap:mkldif() {
     This function generates an ldif; which is suitable for feeding into
     ldapmodify.
 !
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -gt 3 ]; then
         local action=$1
@@ -165,22 +167,22 @@ function ::ldap:mkldif() {
         case $context in
             user)
                 local username=$3
-                dn="uid=${username},${USER_UDN}"
-                e=${CODE_SUCCESS}
+                dn="uid=${username},${USER_UDN?}"
+                e=${CODE_SUCCESS?}
             ;;
             group)
                 local groupname=$3
-                dn="cn=${groupname},${USER_GDN}"
-                e=${CODE_SUCCESS}
+                dn="cn=${groupname},${USER_GDN?}"
+                e=${CODE_SUCCESS?}
             ;;
             netgroup)
                 local netgroupname=$3
-                dn="cn=${netgroupname},${USER_NDN}"
-                e=${CODE_SUCCESS}
+                dn="cn=${netgroupname},${USER_NDN?}"
+                e=${CODE_SUCCESS?}
             ;;
         esac
 
-        if [ $e -eq ${CODE_SUCCESS} ]; then
+        if [ $e -eq ${CODE_SUCCESS?} ]; then
             echo "# vim:syntax=ldif"
             echo "dn: ${dn}"
             echo "changetype: ${change}"
@@ -210,7 +212,7 @@ function ::ldap:mkldif() {
 }
 
 function :ldap:modify() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -ge 3 ]; then
         local context=$1
@@ -224,9 +226,9 @@ function :ldap:modify() {
                             shift 3
                             local ldif="$(::ldap:mkldif ${change} user ${username} ${@})"
                             local ldaphost_rw=$(:ldap:host_rw)
-                            ldapmodify -x -h ${ldaphost_rw} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<< "${ldif}"  >/dev/null 2>&1
+                            ldapmodify -x -h ${ldaphost_rw} -D "uid=${USER_USERNAME?},${USER_UDN?}" -w "${g_PASSWD_CACHED?}" -c <<< "${ldif}"  >/dev/null 2>&1
                             e=$?
-                            if [ $e -ne ${CODE_SUCCESS} ]; then
+                            if [ $e -ne ${CODE_SUCCESS?} ]; then
                                 cpf "%{@comment:#. } LDIF %{@err:Failed} with status code %{@int:$e}:\n" >&2
                                 vimcat <<< "${ldif}" >&2
                             fi
@@ -244,9 +246,9 @@ function :ldap:modify() {
                             shift 3
                             local ldif="$(::ldap:mkldif ${change} group ${groupname} ${@})"
                             local ldaphost_rw=$(:ldap:host_rw)
-                            ldapmodify -x -h ${ldaphost_rw} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -c <<< "${ldif}"  >/dev/null 2>&1
+                            ldapmodify -x -h ${ldaphost_rw} -D "uid=${USER_USERNAME?},${USER_UDN?}" -w "${g_PASSWD_CACHED?}" -c <<< "${ldif}"  >/dev/null 2>&1
                             e=$?
-                            if [ $e -ne ${CODE_SUCCESS} ]; then
+                            if [ $e -ne ${CODE_SUCCESS?} ]; then
                                 cpf "%{@comment:#. } LDIF %{@err:Failed} with status code %{@int:$e}:\n" >&2
                                 vimcat <<< "${ldif}" >&2
                             fi
@@ -269,7 +271,7 @@ function :ldap:add() {
     This function looks at defined _ldap_* variables and performs an ldapadd
     (ldapmodify -a).
 !
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
         if :ldap:authenticate; then
@@ -277,8 +279,8 @@ function :ldap:add() {
             case $context in
                 user)
                     local ldaphost_rw=$(:ldap:host_rw)
-                    ldapmodify -a -x -h ${ldaphost_rw} -D "uid=${USER_USERNAME},${USER_UDN}" -w "${g_PASSWD_CACHED}" -f <(
-                        echo "dn: uid=${dstuid},${USER_UDN}"
+                    ldapmodify -a -x -h ${ldaphost_rw} -D "uid=${USER_USERNAME?},${USER_UDN?}" -w "${g_PASSWD_CACHED?}" -f <(
+                        echo "dn: uid=${dstuid},${USER_UDN?}"
                         unset _ldap_dn
                         for attrs in ${!_ldap_*}; do
                             local -i i
@@ -303,30 +305,30 @@ function :ldap:add() {
     return $e
 }
 #. }=-
-#. Utility -={
+#. ldap:checksum -={
 function ldap:checksum:usage() { echo "[<ldaphostid> <ldaphostid> [<ldaphostid> [...]]]"; }
 function ldap:checksum() {
     core:requires ANY colordiff diff
 
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     local lhi
     local -a ldaphostids
     if [ $# -eq 0 ]; then
-        local -i e=${CODE_SUCCESS}
+        local -i e=${CODE_SUCCESS?}
         ldaphostids=( ${!USER_LDAPHOSTS[@]} )
     elif [ $# -ge 2 ]; then
-        local -i e=${CODE_SUCCESS}
+        local -i e=${CODE_SUCCESS?}
         for lhi in $@; do
             if [ ${lhi} -lt ${#USER_LDAPHOSTS[@]} ]; then
                 ldaphostids+=( ${lhi} )
             else
-                local -i e=${CODE_FAILURE}
+                local -i e=${CODE_FAILURE?}
             fi
         done
     fi
 
-    if [ $e -eq ${CODE_SUCCESS} ]; then
+    if [ $e -eq ${CODE_SUCCESS?} ]; then
         local -A dump
         local md5
         local uidc
@@ -343,7 +345,7 @@ function ldap:checksum() {
             local -A md5s=()
             for lh in ${ldaphosts[@]}; do
                 dump[${lh}]=$(
-                    ldapsearch -x -LLL -E pr=128/noprompt -S dn -h "${lh}" -b "${USER_NDN}"\
+                    ldapsearch -x -LLL -E pr=128/noprompt -S dn -h "${lh}" -b "${USER_NDN?}"\
                         cn="${ngc}*" cn memberNisNetgroup netgroupTriple description |
                             sed -e 's/^dn:.*/\L&/' |
                             grep -v 'pagedresults:' 2>/dev/null
@@ -365,7 +367,7 @@ function ldap:checksum() {
                 fi
             else
                 theme HAS_FAILED "${#md5s[@]} variants in the ${#ldaphosts[@]} hosts"
-                e=${CODE_FAILURE}
+                e=${CODE_FAILURE?}
                 for lh in ${ldaphosts[@]}; do
                     if [ ${lh} != ${ldaphost} ]; then
                         cpf "%{@host:${ldaphost}} vs %{@host:${lh}}...\n"
@@ -383,7 +385,7 @@ function ldap:checksum() {
             local -A md5s=()
             for lh in ${ldaphosts[@]}; do
                 dump[${lh}]=$(
-                    ldapsearch -x -LLL -E pr=128/noprompt -S dn -h "${lh}" -b "${USER_UDN}"\
+                    ldapsearch -x -LLL -E pr=128/noprompt -S dn -h "${lh}" -b "${USER_UDN?}"\
                         uid="${uidc}*" ${USER_LDAP_SYNC_ATTRS[@]} |
                             sed -e 's/^dn:.*/\L&/' |
                             grep -v 'pagedresults:' 2>/dev/null
@@ -405,7 +407,7 @@ function ldap:checksum() {
                 fi
             else
                 theme HAS_FAILED "${#md5s[@]} variants in the ${#ldaphosts[@]} hosts"
-                e=${CODE_FAILURE}
+                e=${CODE_FAILURE?}
                 for lh in ${ldaphosts[@]}; do
                     if [ ${lh} != ${ldaphost} ]; then
                         cpf "%{@host:${ldaphost}} vs %{@host:${lh}}...\n"
@@ -423,10 +425,10 @@ function ldap:checksum() {
     return $e
 }
 #. }=-
-#. Search -={
+#. ldap:search -={
 function :ldap:search.eval() {
     #. This function searches for a single object
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -ge 2 ]; then
         local -i lhi=$1
@@ -437,7 +439,7 @@ function :ldap:search.eval() {
             user)
                 local ldaphost=$(:ldap:host ${lhi})
                 local userdata=$(
-                    ldapsearch -x -LLL -E pr=1024/noprompt -h "${ldaphost}" -b "${USER_UDN}" "uid=${username}" ${@}|grep -vE ^#
+                    ldapsearch -x -LLL -E pr=1024/noprompt -h "${ldaphost}" -b "${USER_UDN?}" "uid=${username}" ${@}|grep -vE ^#
                 )
                 if [ $# -gt 0 ]; then
                     #. User specified which attrs they want:
@@ -490,7 +492,7 @@ function :ldap:search.eval() {
                     done
                 fi
 
-                e=${CODE_SUCCESS}
+                e=${CODE_SUCCESS?}
             ;;
         esac
     fi
@@ -512,9 +514,9 @@ function :ldap:search() {
         local ldaphost=$(:ldap:host ${lhi})
 
         case $2 in
-            user)     bdn=${USER_UDN};;
-            group)    bdn=${USER_GDN};;
-            netgroup) bdn=${USER_NDN};;
+            user)     bdn=${USER_UDN?};;
+            group)    bdn=${USER_GDN?};;
+            netgroup) bdn=${USER_NDN?};;
         esac
 
         if [ ${#bdn} -gt 0 ]; then
@@ -543,7 +545,7 @@ function :ldap:search() {
 
             local awkfields='$4'
             for ((i=6; i<=${awknf}; i+=2)); do
-                awkfields+=",\"${SITE_DELIM}\",\$$i"
+                awkfields+=",\"${SITE_DELIM?}\",\$$i"
             done
 
             #. Script-readable dump
@@ -610,16 +612,16 @@ function ldap:search() {
     if [ $# -gt 1 ]; then
         local bdn
         case $1 in
-            user)     bdn=${USER_UDN};;
-            group)    bdn=${USER_GDN};;
-            netgroup) bdn=${USER_NDN};;
+            user)     bdn=${USER_UDN?};;
+            group)    bdn=${USER_GDN?};;
+            netgroup) bdn=${USER_NDN?};;
         esac
 
         if [ ${#bdn} -gt 0 ]; then
             local data=$(:ldap:search -2 $@)
             e=$?
 
-            if [ ${e} -eq ${CODE_SUCCESS} ]; then
+            if [ ${e} -eq ${CODE_SUCCESS?} ]; then
                 #. Look for filter tokens
                 local -a filter
                 local -a display
@@ -636,14 +638,14 @@ function ldap:search() {
                     fi
                 done
 
-                while IFS="${SITE_DELIM}" read ${display[@]}; do
+                while IFS="${SITE_DELIM?}" read ${display[@]}; do
                     for attr in ${display[@]}; do
                         local value=${!attr}
                         if [ ${#value} -gt 0 ]; then
                             cpf "%{@key:%-32s}%{@val:%s}\n" "${attr}" "${value}"
                         else
                             cpf "%{@key:%-32s}%{@err:%s}\n" "${attr}" "ERROR"
-                            e=${CODE_FAILURE}
+                            e=${CODE_FAILURE?}
                         fi
                     done
                     cpf
@@ -656,7 +658,8 @@ function ldap:search() {
 
     return $e
 }
-
+#. }=-
+#. ldap:ngverify -={
 function ldap:ngverify() {
     #. NOTE
     #. If any of the specified attributes are missing, every attribute will
@@ -666,12 +669,12 @@ function ldap:ngverify() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 0 ]; then
-        local bdn=${USER_NDN}
+        local bdn=${USER_NDN?}
         local data=$(:ldap:search -2 netgroup cn nisNetgroupTriple)
         e=$?
-        if [ ${e} -eq ${CODE_SUCCESS} ]; then
+        if [ ${e} -eq ${CODE_SUCCESS?} ]; then
             #. Look for filter tokens
-            while IFS="${SITE_DELIM}" read cn nisNetgroupTripleRaw; do
+            while IFS="${SITE_DELIM?}" read cn nisNetgroupTripleRaw; do
                 local -i hits=0
                 IFS='|||' read -a nisNetgroupTriples <<< "${nisNetgroupTripleRaw}"
                 for nisNetgroupTriple in ${nisNetgroupTriples[@]}; do
@@ -695,4 +698,5 @@ function ldap:ngverify() {
 
     return $e
 }
+#. }=-
 #. }=-

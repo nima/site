@@ -5,7 +5,6 @@ Core GNUPG module
 [core:docstring]
 
 #. GNUPG -={
-
 core:requires gpg2
 
 core:requires ENV SITE_PROFILE
@@ -13,7 +12,7 @@ core:requires ENV USER_USERNAME
 core:requires ENV USER_FULLNAME
 core:requires ENV USER_EMAIL
 
-#. private -={
+#. gpg:keypath -={
 function ::gpg:keypath() {
     #. Prints:
     #. . -> <path>
@@ -22,16 +21,16 @@ function ::gpg:keypath() {
     #. Returns:
     #. CODE_SUCCESS if keys exists
     #. CODE_FAILURE if keys don't exist
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
         local -a data
         local gpgkid="${1}"
-        local -r gpgkp="${HOME}/.gnupg/${USER_USERNAME}.${SITE_PROFILE%%@*}"
+        local -r gpgkp="${HOME?}/.gnupg/${USER_USERNAME?}.${SITE_PROFILE%%@*}"
         case ${gpgkid}:${#gpgkid} in
             '.':1)
                 data=( ${gpgkp} )
-                e=${CODE_SUCCESS}
+                e=${CODE_SUCCESS?}
             ;;
             '*':1)
                 local -a files=( ${gpgkp}.* )
@@ -39,7 +38,7 @@ function ::gpg:keypath() {
                     for file in ${files[@]}; do
                         gpgkid=$(
                             basename ${file} |
-                                sed -n -e "s/${USER_USERNAME}.${SITE_PROFILE%%@*}.\(.*\).sec/\1/p"
+                                sed -n -e "s/${USER_USERNAME?}.${SITE_PROFILE%%@*}.\(.*\).sec/\1/p"
                         )
                         if [ ${#gpgkid} -eq 10 ]; then
                             data=( $(::gpg:keypath ${gpgkid}) )
@@ -51,7 +50,7 @@ function ::gpg:keypath() {
             ;;
             *:10)
                 if [ -e ${gpgkp}.${gpgkid}.sec -a -e ${gpgkp}.${gpgkid}.pub ]; then
-                    e=${CODE_SUCCESS}
+                    e=${CODE_SUCCESS?}
                     data=( ${gpgkp} ${gpgkid} )
 
                     gpg2 --no-default-keyring \
@@ -70,15 +69,16 @@ function ::gpg:keypath() {
 
     return $e
 }
-
+#. }=-
+#. gpg:kid -={
 function ::gpg:kid() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -le 1 ]; then
         local gpgkp
         gpgkp=( $(::gpg:keypath "${1:-*}") )
         e=$?
-        [ $e -ne ${CODE_SUCCESS} ] || echo "${gpgkp[1]}"
+        [ $e -ne ${CODE_SUCCESS?} ] || echo "${gpgkp[1]}"
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -87,9 +87,9 @@ function ::gpg:kid() {
 }
 #. }=-
 
-#. decrypt -={
+#. gpg:decrypt -={
 function :gpg:decrypt() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 2 ]; then
         local input="${1}"
@@ -115,9 +115,9 @@ function :gpg:decrypt() {
     return $e
 }
 #. }=-
-#. encrypt -={
+#. gpp:encrypt -={
 function :gpg:encrypt() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 2 ]; then
         local input="${1}"
@@ -143,9 +143,9 @@ function :gpg:encrypt() {
     return $e
 }
 #. }=-
-#. create -={
+#. gpg:create -={
 function :gpg:create() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 0 ]; then
         local -a data
@@ -188,13 +188,13 @@ Expire-Date: 0
                             mv ${gpgkp}.pub ${gpgkp}.${gpgkid}.pub
                             mv ${gpgkp}.conf ${gpgkp}.${gpgkid}.conf
                             echo ${gpgkid}
-                            e=${CODE_SUCCESS}
+                            e=${CODE_SUCCESS?}
                         fi
                     fi
                 fi
             fi
 
-            if [ $e -ne ${CODE_SUCCESS} ]; then
+            if [ $e -ne ${CODE_SUCCESS?} ]; then
                 rm -f ${gpgkp}.sec
                 rm -f ${gpgkp}.pub
                 rm -f ${gpgkp}.conf
@@ -208,25 +208,25 @@ Expire-Date: 0
 }
 
 function gpg:create() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 0 ]; then
         local gpgkp
         gpgkp=( $(::gpg:keypath '*') )
         e=$?
         if [ ${#gpgkp[@]} -eq 0 ]; then
-            cpf "Generating an RSA/ELG-E GPG key for %{@user:%s}@%{@profile:%s}..." "${USER_USERNAME}" "${SITE_PROFILE%%@*}"
+            cpf "Generating an RSA/ELG-E GPG key for %{@user:%s}@%{@profile:%s}..." "${USER_USERNAME?}" "${SITE_PROFILE%%@*}"
             local gpgkid
             gpgkid=$(:gpg:create)
             e=$?
-            if [ $e -eq ${CODE_SUCCESS} ]; then
+            if [ $e -eq ${CODE_SUCCESS?} ]; then
                 theme HAS_PASSED "${gpgkid}"
             else
                 theme HAS_FAILED
             fi
         elif [ ${#gpgkp[@]} -eq 2 ]; then
             theme HAS_WARNED "KEY_EXISTS:${gpgkp[1]}"
-            e=${CODE_FAILURE}
+            e=${CODE_FAILURE?}
         else
             core:raise EXCEPTION_BAD_FN_CALL
         fi
@@ -235,9 +235,9 @@ function gpg:create() {
     return $e
 }
 #. }=-
-#. delete -={
+#. gpg:delete -={
 function :gpg:delete() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
         local gpgkid=$1
@@ -264,7 +264,7 @@ function :gpg:delete() {
             rm -f ${gpgkp}.pub
             rm -f ${gpgkp}.conf
 
-            e=${CODE_SUCCESS}
+            e=${CODE_SUCCESS?}
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -275,7 +275,7 @@ function :gpg:delete() {
 
 function gpg:delete:usage() { echo "<gpg-key-id>"; }
 function gpg:delete() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 ]; then
         local gpgkid=$1
@@ -283,7 +283,7 @@ function gpg:delete() {
 
         :gpg:delete ${gpgkid}
         e=$?
-        if [ $e -eq ${CODE_SUCCESS} ]; then
+        if [ $e -eq ${CODE_SUCCESS?} ]; then
             theme HAS_PASSED "${gpgkid}"
         else
             theme HAS_FAILED "${gpgkid}"
@@ -293,9 +293,9 @@ function gpg:delete() {
     return $e
 }
 #. }=-
-#. list -={
+#. gpg:list -={
 function :gpg:list() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 1 ]; then
         local -a data
@@ -303,7 +303,7 @@ function :gpg:list() {
         e=$?
         if [ ${#data[@]} -eq 2 ]; then
             echo "${data[@]}"
-            e=${CODE_SUCCESS}
+            e=${CODE_SUCCESS?}
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -313,7 +313,7 @@ function :gpg:list() {
 }
 function gpg:list:usage() { echo "[<gpg-key-id>]"; }
 function gpg:list() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -le 1 ]; then
         local data
@@ -322,7 +322,7 @@ function gpg:list() {
 
         read gpgkp gpgkid <<< "${data[@]}"
         cpf "Inspecting GPG Key..."
-        if [ $e -eq ${CODE_SUCCESS} ]; then
+        if [ $e -eq ${CODE_SUCCESS?} ]; then
             theme HAS_PASSED "${gpgkid}"
         else
             theme HAS_FAILED "NO_KEYS"
