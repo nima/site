@@ -1,11 +1,8 @@
 export MAKEFLAGS := --no-print-directory --warn-undefined-variables
 
-BIN_PY27  := python2.7
-BIN_VENV  := virtualenv
-BIN_RBENV := rbenv
-REQUIRED  := ${BIN_PY27} ${BIN_VENV} ${BIN_RBENV}
+REQUIRED  := make sed awk
+
 EXTERN_D  := ${HOME}/.site/var
-export BIN_PY27 BIN_VENV BIN_RBENV
 export EXTERN_D
 
 .DEFAULT: help
@@ -17,11 +14,6 @@ export EXTERN_D
 #. defined via xplm.
 VENV_PKGS :=
 export VENV_PKGS
-
-RBENV_ROOT=${EXTERN_D}/rbenv
-RBENV_VERSION := 2.1.1
-RBENV_GEMSETS="${RBENV_ROOT}/gemset global"
-export RBENV_ROOT RBENV_VERSION RBENV_GEMSETS
 
 ifeq ($(wildcard .install),)
 STATUS := "UNINSTALLED"
@@ -63,12 +55,12 @@ install: require sanity .install
 	@
 	@printf "Preparing ${EXTERN_D}..."
 	@mkdir -p /var/tmp/site/var
-	@mkdir -p /var/tmp/site/var/cache
-	@mkdir -p /var/tmp/site/var/run
-	@mkdir -p /var/tmp/site/var/log
-	@mkdir -p /var/tmp/site/var/tmp
-	@mkdir -p /var/tmp/site/var/lib
 	@ln -sf /var/tmp/site/var ${EXTERN_D}
+	@mkdir -p ${EXTERN_D}/cache
+	@mkdir -p ${EXTERN_D}/run
+	@mkdir -p ${EXTERN_D}/log
+	@mkdir -p ${EXTERN_D}/tmp
+	@mkdir -p ${EXTERN_D}/lib
 	@ln -sf $(PWD)/share/extern.makefile ${EXTERN_D}/Makefile
 	@echo "DONE"
 	@
@@ -122,7 +114,7 @@ uninstall: unsanity
 	@echo "Uninstallation complete!"
 purge:
 	@test ! -d ${EXTERN_D} || $(MAKE) -f $(PWD)/share/extern.makefile -C ${EXTERN_D} purge
-	test ! -d ~/.site || find ~/.site -type l -exec rm -f {} \;
+	@test ! -d ~/.site || find ~/.site -type l -exec rm -f {} \;
 	@#test ! -d ~/.site || find ~/.site -depth -type d -empty -exec rmdir {} \;
 	rm -rf /var/tmp/site/
 	rm -f .install

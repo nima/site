@@ -29,8 +29,6 @@ if [ $# -eq 1 ]; then
             run sudo apt-get install -qq make                      ;((EXIT|=$?))
             run sudo apt-get install -qq coreutils bash sed gawk   ;((EXIT|=$?))
             run sudo apt-get install -qq git                       ;((EXIT|=$?))
-            run sudo apt-get install -qq python python-virtualenv  ;((EXIT|=$?))
-            run sudo apt-get install -qq rbenv                     ;((EXIT|=$?))
             run sudo apt-get install -qq haveged                   ;((EXIT|=$?))
             run sudo install -d /var/tmp -m 1777                   ;((EXIT|=$?))
             run sudo install -m 0644\

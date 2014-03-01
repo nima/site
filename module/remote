@@ -533,7 +533,7 @@ function remote:mon:usage() { echo "<hgd:*> @$(echo ${!USER_MON_CMDGRPREMOTE[@]}
 function remote:mon() {
     local -i e=${CODE_DEFAULT?}
 
-    core:requires PYTHON paramiko concurrent
+    core:requires PYTHON paramiko futures
     core:requires socat
 
     if [ $# -ge 2 ]; then
@@ -627,8 +627,7 @@ function remote:mon() {
                         rcmd="${USER_MON_CMDGRPREMOTE[${2:1}]}"
                         lcmd="${USER_MON_CMDGRPLOCAL[${2:1}]}"
                     else
-                        shift 1
-                        rcmd=${@}
+                        rcmd=${@:2}
                     fi
 
                     if [ ${#rcmd} -gt 0 ]; then

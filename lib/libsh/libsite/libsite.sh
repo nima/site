@@ -43,19 +43,28 @@ PATH+=:${SITE_CORE_LIBEXEC}
 PATH+=:${SITE_USER_LIBEXEC}
 export PATH
 
-#. Python
-VENV_ROOT=${SITE_USER_VAR?}/venv
+#. Ruby -={
+#. rbenv
+RBENV_ROOT=${SITE_USER_VAR}/rbenv
+RBENV_VERSION=2.1.1
+export RBENV_ROOT RBENV_VERSION
+#. }=-
+#. Python -={
 PYTHONPATH+=:${SITE_CORE_LIBPY}
 PYTHONPATH+=:${SITE_USER_LIBPY}
 export PYTHONPATH
 
-#. Ruby
-RBENV_ROOT=${SITE_USER_VAR}/rbenv
-RBENV_VERSION=2.1.1
-RBENV_GEMSET_FILE="${RBENV_ROOT}/.rbenv-gemsets"
-export RBENV_ROOT RBENV_VERSION RBENV_GEMSET_FILE
-#export RBENV_GEMSETS="${RBENV_ROOT}/gemset global"
-RBENV_RUBY=${RBENV_ROOT}/shims/ruby
+#. pyenv
+PYENV_ROOT=${SITE_USER_VAR}/pyenv
+PYENV_VERSION=2.7.6
+export PYENV_ROOT PYENV_VERSION
+#. }=-
+#. Perl -={
+#. plenv
+PLENV_ROOT=${SITE_USER_VAR}/plenv
+PLENV_VERSION=5.18.2
+export PLENV_ROOT PLENV_VERSION
+#. }=-
 
 #. shunit2 and shflags
 export SHUNIT2=${SITE_USER_LIBEXEC}/shunit2

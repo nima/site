@@ -4,9 +4,9 @@ import libsite
 import os, sys, getpass
 import paramiko, base64
 import binascii, socket, errno
+import futures
 from select import select
 from sha import sha
-from concurrent import futures
 from threading import Thread, Lock
 
 from time import sleep
