@@ -76,24 +76,12 @@ declare -A USER_MODULES
 export USER_MODULES
 
 declare -g -A CORE_MODULES=(
-    [help]=1
-    [tutorial]=0
-    [softlayer]=1
-    [pagerduty]=1
-    [hgd]=1
-    [remote]=1
-    [git]=1
-    [ng]=1
-    [dns]=1
-    [net]=1
-    [ldap]=1
-    [unit]=1
-    [mongo]=1
-    [util]=1
-    [gpg]=1
-    [vault]=1
-    [tunnel]=1
-    [xplm]=1
+    [unit]=1       [util]=1      [help]=1      [tutorial]=0   [hgd]=1    [git]=1
+    [dns]=1        [net]=1       [tunnel]=1    [remote]=1
+    [xplm]=1       [rb]=1        [py]=1        [pl]=1
+    [gpg]=1        [vault]=1
+    [ng]=1         [ldap]=1      [mongo]=1
+    [softlayer]=1  [pagerduty]=1
 )
 
 source ${SITE_USER_ETC}/site.conf

@@ -220,7 +220,7 @@ function :xplm:install() {
                     echo .gems > ${RBENV_ROOT?}/.rbenv-gemsets
                 ;;
                 pl)
-                    mkdir ${PERL_CPANM_HOME?}
+                    mkdir -p ${PERL_CPANM_HOME?}
                 ;;
             esac
             #. }=-
