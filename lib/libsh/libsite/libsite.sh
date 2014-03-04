@@ -106,7 +106,7 @@ unset  CDPATH
 export SITE_DEADMAN=${SITE_USER_CACHE}/deadman
 export SITE_IN_COLOR=1
 export SITE_DATE_FORMAT="%x-%X"
-source ${SITE_CORE_MOD?}/cpf
+source ${SITE_CORE_MOD?}/cpf.sh
 #. }=-
 #. 1.7  Error Code Constants -={
 true
@@ -215,9 +215,9 @@ function core:softimport() {
         local module=$1
         if [ -z "${g_SITE_IMPORTED_EXIT[${module}]}" ]; then
             if [ ${USER_MODULES[${module}]-9} -eq 1 ]; then
-                if [ -f ${SITE_USER_MOD}/${module} ]; then
-                    if ( source ${SITE_USER_MOD}/${module} >/tmp/site.${module}.ouch 2>&1 ); then
-                        source ${SITE_USER_MOD}/${module}
+                if [ -f ${SITE_USER_MOD}/${module}.sh ]; then
+                    if ( source ${SITE_USER_MOD}/${module}.sh >/tmp/site.${module}.ouch 2>&1 ); then
+                        source ${SITE_USER_MOD}/${module}.sh
                         e=${CODE_IMPORT_GOOOD?}
                     else
                         e=${CODE_IMPORT_ERROR?}
@@ -227,9 +227,9 @@ function core:softimport() {
                     e=${CODE_IMPORT_UNDEF?}
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
-                if [ -f ${SITE_CORE_MOD}/${module} ]; then
-                    if ( source ${SITE_CORE_MOD}/${module} >/tmp/site.${module}.ouch 2>&1 ); then
-                        source ${SITE_CORE_MOD}/${module}
+                if [ -f ${SITE_CORE_MOD}/${module}.sh ]; then
+                    if ( source ${SITE_CORE_MOD}/${module}.sh >/tmp/site.${module}.ouch 2>&1 ); then
+                        source ${SITE_CORE_MOD}/${module}.sh
                         e=${CODE_IMPORT_GOOOD?}
                     else
                         e=${CODE_IMPORT_ERROR?}
@@ -289,13 +289,13 @@ function core:docstring() {
 
         e=2 #. No such module
         if [ ${USER_MODULES[${module}]-9} -eq 1 ]; then
-            if [ -f ${SITE_USER_MOD}/${module} ]; then
-                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_USER_MOD}/${module}
+            if [ -f ${SITE_USER_MOD}/${module}.sh ]; then
+                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_USER_MOD}/${module}.sh
                 e=$?
             fi
         elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
-            if [ -f ${SITE_CORE_MOD}/${module} ]; then
-                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_CORE_MOD}/${module}
+            if [ -f ${SITE_CORE_MOD}/${module}.sh ]; then
+                sed -ne '/^:<<\['${FUNCNAME}'\]/,/\['${FUNCNAME}'\]/{n;p;q}' ${SITE_CORE_MOD}/${module}.sh
                 e=$?
             fi
         elif [ ${CORE_MODULES[${module}]-9} -eq 0 -o ${USER_MODULES[${module}]-9} -eq 0 ]; then

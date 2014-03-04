@@ -211,11 +211,11 @@ function testCoverage() {
             cpf "%{@profile:${profile}}: %{!module:${module}} %{r:-=[}\n"
             for context in private internal public; do
                 local regex=$(printf "${fnregexes[${context}]}" ${module})
-                local -i count=$(grep -cE "${regex}" ${module})
+                local -i count=$(grep -cE "${regex}" ${module}.sh)
                 cpf "     %{m:${context}}:%{!module:${module}}:%{@int:${count} functions}\n"
                 if [ $count -gt 0 ]; then
                     local -a fns=(
-                        $(grep -oE "${regex}" ${module} |
+                        $(grep -oE "${regex}" ${module}.sh |
                             sed -e "s/^function :\{0,2\}${module}:\([^.()]\+\)\(\.[a-z]\+\)\?()/\1/")
                     )
                     for fn in ${fns[@]}; do
@@ -428,8 +428,9 @@ function ::unit:test() {
     for profile in ${!profiles[@]}; do
         if [ -d ${profiles[${profile}]} ]; then
             cd ${profiles[${profile}]}
-            local module script
-            for module in *; do
+            local modulesh module script
+            for modulesh in *; do
+                module=${modulesh/.sh/}
                 if [ ${#g_MODULES[@]} -eq 0 -o ${g_MODULES[${module}]--1} -eq 1 ]; then
                     g_MODE="prime"
                     cpf "%{@comment:${profile}.${module}}.%{r:${g_MODE?} -=[}\n";
@@ -451,7 +452,7 @@ function ::unit:test() {
                             cat "${script}" > ${g_RUNTIME_SCRIPT?}
                         fi
                         source ${g_RUNTIME_SCRIPT?}
-                        SHUNIT_PARENT="${SITE_CORE_MOD?}/unit" source ${SHUNIT2?}
+                        SHUNIT_PARENT="${SITE_CORE_MOD?}/unit.sh" source ${SHUNIT2?}
                     )
                     local -i ep=$?
 
@@ -499,7 +500,7 @@ function unit:test() {
     local -i e=${CODE_DEFAULT?}
 
     if [ "${CITM_HOST:-false}" == "d41d8cd98f00b204e9800998ecf8427e" ]; then
-        local valid=1
+        e=${CODE_SUCCESS?}
 
         local module
         if [ $# -gt 0 ]; then
@@ -508,12 +509,12 @@ function unit:test() {
                     g_MODULES[${module}]=1
                 else
                     g_MODULES[${module}]=0
-                    valid=0
+                    e=${CODE_FAILURE?}
                 fi
             done
         fi
 
-        if [ ${valid} -eq 1 ]; then
+        if [ $e -eq ${CODE_SUCCESS?} ]; then
             if [ -e "${SHUNIT2?}" ]; then
                 cpf "%{@comment:#############################################################################}\n"
                 #. Only regenerate the script if it doesn't exist, or if it is
