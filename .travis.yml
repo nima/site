@@ -28,11 +28,12 @@ env:
     - CONTEXT=execute MODULE=gpg      #. nima/site#5
     - CONTEXT=execute MODULE=vault    #. nima/site#17  gpg
     - CONTEXT=execute MODULE=help     #. nima/site#19
+    - CONTEXT=execute MODULE=xplm     #. nima/site#29
     - CONTEXT=installer MODULE=-
 
-#matrix:
-#  allow_failures:
-#    - env: CONTEXT=execute MODULE=tutorial
+matrix:
+  allow_failures:
+    - env: CONTEXT=execute MODULE=xplm
 
 before_install:
   - sudo apt-get update -qq
