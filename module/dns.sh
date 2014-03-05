@@ -7,12 +7,20 @@ Core DNS module
 #. DNS -={
 core:import util
 
-#. <fqdn>     server.services.company.com.au
-#. <shn>      server
-#. <qdn>      server.services
-#. <usdn>            services
-#. <qsdn>            services.company.com.au
-#. <dn>                       company.com.au
+#. Glossary
+#.  <hgd>      host-group-directives
+#.  <hnh>      hostname hint; either a <shn>, or a <qdn>
+#.  <sdh>      subdomain hint
+#.  <hcs>      host-connection-string
+#.  <lhi>      ldap-host index
+
+#. DNS Glossary
+#.  <fqdn>     server.services.company.com.au |fully qualified domain name
+#.  <shn>      server                         |short host name
+#.  <qdn>      server.services                |(partially) qualified domain name
+#.  <usdn>            services                |unqualified sub-domain name
+#.  <qsdn>            services.company.com.au |qualified sub-domain name
+#.  <dn>                       company.com.au |domain name
 
 #. dns:resolve() -={
 function :dns:resolve() {
@@ -28,8 +36,12 @@ function :dns:resolve() {
             e=$?
         ;;
         2:a)
-            resolved=$(dig +short ${qdn%%.}. A|head -n1)
-            if [ ${#resolved} -eq 0 ]; then
+            resolved=$(
+                dig +short +retry=1 +time=2 ${qdn%%.}. A 2>/dev/null |
+                grep -v ^';' |
+                head -n1
+            )
+            if [ ${PIPESTATUS[0]} -ne 0 -o ${#resolved} -eq 0 ]; then
                 resolved="$(
                     getent hosts |
                         grep -E "\<${qdn}\>" |
@@ -43,7 +55,11 @@ function :dns:resolve() {
             fi
         ;;
         2:c)
-            resolved=$(dig +short ${qdn%%.}. CNAME|head -n1)
+            resolved=$(
+                dig +short +retry=1 +time=2 ${qdn%%.}. CNAME 2>/dev/null |
+                grep -v ^';' |
+                head -n1
+            )
             [ ${#resolved} -eq 0 ] || e=${CODE_SUCCESS?}
         ;;
         *)
@@ -64,7 +80,7 @@ function :dns:subdomains() {
         local -a sdns
         local tldid=$1
         case ${tldid}:$2 in
-            .:full)
+            _:full)
                 for tldid in ${!USER_TLDS[@]}; do
                     for sdn in $(eval "echo -n \${USER_SUBDOMAIN_${tldid}[@]}"); do
                         sdns+=( ${sdn}.${USER_TLDS[${tldid}]} )
@@ -72,14 +88,14 @@ function :dns:subdomains() {
                 done
                 e=${CODE_SUCCESS?}
             ;;
-            [a-z]:full)
+            *:full)
                 local sdn
                 for sdn in $(eval "echo -n \${USER_SUBDOMAIN_${tldid}[@]}"); do
                     sdns+=( ${sdn}.${USER_TLDS[${tldid}]} )
                 done
                 e=${CODE_SUCCESS?}
             ;;
-            [a-z]:short)
+            *:short)
                 sdns=( $(eval "echo -n \${USER_SUBDOMAIN_${tldid}[@]}") )
                 e=${CODE_SUCCESS?}
             ;;
@@ -102,7 +118,7 @@ function dns:subdomains() {
     if [ $# -eq 0 ]; then
         local data
         local rt=short
-        [ ${tldid} != '.' ] || rt=full
+        [ ${tldid} != '_' ] || rt=full
         data="$(:dns:subdomains ${tldid} ${rt})"
         e=$?
         [ $e -ne ${CODE_SUCCESS?} ] || echo "${data}"
@@ -131,80 +147,97 @@ function :dns:inspect.csv() {
         local tldid
         local resolved
         local -a results
+        local -i hit=0
 
         #. <hnh> = <fqdn> ?
         resolved=$(:dns:resolve ${hnh} ${qt})
         if [ $? -eq ${CODE_SUCCESS?} ]; then
-            for tldid in ${!USER_TLDS[@]}; do
-                local -i hit=0
-                local dn="${USER_TLDS[${tldid}]}"
+            #. If the hnh does not end with a period
+            if [ ${hnh} == ${hnh%.} ]; then
+                for tldid in ${!USER_TLDS[@]}; do
+                    local dn="${USER_TLDS[${tldid}]}"
 
-                #. 1. <hnh> = <shn>.<usdn>.<dn> ?
-                fqdn=${hnh}
-                local -a qsdns=( $(:dns:subdomains ${tldid} full) )
-                for qsdn in ${qsdns[@]}; do
-                    shn=${fqdn%.${qsdn}}
-                    if [ ${shn} != ${fqdn} ]; then
-                        hit=1
-                        usdn=${qsdn%.${dn}}
-                        results+=(
-                            "${qt},${hnh},fqdn,${tldid},${usdn},${dn},${fqdn},${resolved},1"
-                        )
-                    fi
-                done
-
-                #. 6. <hnh> = <shn>.<usdn> ?
-                qdn=${hnh}
-                local -a usdns=( $(:dns:subdomains ${tldid} short) )
-                for usdn in ${usdns[@]}; do
-                    shn=${qdn%.${usdn}}
-                    if [ ${shn} != ${qdn} ]; then
-                        hit=1
-                        fqdn=${qdn}.${dn}
-                        results+=(
-                            "${qt},${hnh},qdn,${tldid},${usdn},${dn},${fqdn},${resolved},6"
-                        )
-                    fi
-                done
-
-                #. 7. <hnh> = <shn> ?
-                shn=${hnh}
-                local -a qsdns=( $(:dns:subdomains ${tldid} full) )
-                for qsdn in ${qsdns[@]}; do
-                    fqdn=${shn}.${qsdn}
-                    local resolves
-                    resolves=$(:dns:resolve ${fqdn} ${qt});
-                    if [ $? -eq ${CODE_SUCCESS?} ]; then
-                        hit=1
-                        fqdn=${shn}.${qsdn}
-                        usdn=${qsdn%.${dn}}
-                        results+=(
-                            "${qt},${hnh},shn,${tldid},${usdn},${dn},${fqdn},${resolves},7"
-                        )
-                    fi
-                done
-
-                #. 2. <hnh> = <shn>.<dn> ?
-                fqdn=${hnh}
-                if [ ${hit} -eq 0 ]; then
-                    shn=${fqdn%.${dn}}
-                    if [ ${shn} != ${fqdn} ]; then
-                        hit=1
-                        results+=(
-                            "${qt},${hnh},fqdn,${tldid},,${dn},${fqdn},${resolved},2"
-                        )
-                    fi
-                fi
-            done
-
-            if [ ${#results[@]} -eq 0 ]; then
-                #. 3. <hnh> = <ext> ?
-                if [ ${hit} -eq 0 ]; then
+                    #. 1. <hnh> = <shn>.<usdn>.<dn> ?
                     fqdn=${hnh}
-                    results+=(
-                        "${qt},${hnh},ext,-,-,-,${fqdn},${resolved},3"
-                    )
-                fi
+                    local -a qsdns=( $(:dns:subdomains ${tldid} full) )
+                    for qsdn in ${qsdns[@]}; do
+                        shn=${fqdn%.${qsdn}}
+                        if [ ${shn} != ${fqdn} ]; then
+                            hit=1
+                            usdn=${qsdn%.${dn}}
+                            results+=(
+                                "${qt},${hnh},fqdn,${tldid},${usdn},${dn},${fqdn},${resolved},1"
+                            )
+                        fi
+                    done
+
+                    #. 6. <hnh> = <shn>.<usdn>{.<dn>} ?
+                    qdn=${hnh}
+                    local -a usdns=( $(:dns:subdomains ${tldid} short) )
+                    for usdn in ${usdns[@]}; do
+                        shn=${qdn%.${usdn}}
+                        if [ ${shn} != ${qdn} ]; then
+                            hit=1
+                            fqdn=${qdn}.${dn}
+                            results+=(
+                                "${qt},${hnh},qdn,${tldid},${usdn},${dn},${fqdn},${resolved},6"
+                            )
+                        fi
+                    done
+
+                    #. 7. <hnh> = <shn>{.<qsdn>} ?
+                    shn=${hnh}
+                    local -a qsdns=( $(:dns:subdomains ${tldid} full) )
+                    for qsdn in ${qsdns[@]}; do
+                        fqdn=${shn}.${qsdn}
+                        local resolves
+                        resolves=$(:dns:resolve ${fqdn} ${qt});
+                        if [ $? -eq ${CODE_SUCCESS?} ]; then
+                            hit=1
+                            fqdn=${shn}.${qsdn}
+                            usdn=${qsdn%.${dn}}
+                            results+=(
+                                "${qt},${hnh},shn,${tldid},${usdn},${dn},${fqdn},${resolves},7"
+                            )
+                        fi
+                    done
+
+                    #. 9. <hnh> = <shn>{.<dn>} ?
+                    if [ ${hit} -eq 0 ]; then
+                        fqdn=${shn}.${dn}
+                        local resolves
+                        resolves=$(:dns:resolve ${fqdn} ${qt});
+                        if [ $? -eq ${CODE_SUCCESS?} ]; then
+                            hit=1
+                            fqdn=${shn}.${dn}
+                            usdn=
+                            results+=(
+                                "${qt},${hnh},shn,${tldid},${usdn},${dn},${fqdn},${resolves},9"
+                            )
+                        fi
+                    fi
+
+                    #. 2. <hnh> = <shn>.<dn> ?
+                    fqdn=${hnh}
+                    if [ ${hit} -eq 0 ]; then
+                        shn=${fqdn%.${dn}}
+                        if [ ${shn} != ${fqdn} ]; then
+                            hit=1
+                            results+=(
+                                "${qt},${hnh},fqdn,${tldid},,${dn},${fqdn},${resolved},2"
+                            )
+                        fi
+                    fi
+                done
+            fi
+
+            #. 3. <hnh> = <ext> ?
+            if [ ${#results[@]} -eq 0 -a ${hit} -eq 0 ]; then
+                hit=1
+                fqdn=${hnh}
+                results+=(
+                    "${qt},${hnh},ext,-,-,-,${fqdn},${resolved},3"
+                )
             fi
         else
             qdn=${hnh}
@@ -213,7 +246,7 @@ function :dns:inspect.csv() {
                 local -i hit=0
                 local dn="${USER_TLDS[${tldid}]}"
 
-                #. 4. <hnh> = <shn>.<usdn> (= <qdn>) ?
+                #. 4. <hnh> = <shn>.<usdn>{.<dn>} = <qdn>{.<dn>} ?
                 local -a usdns=( $(:dns:subdomains ${tldid} short) )
                 for usdn in ${usdns[@]}; do
                     shn=${qdn%.${usdn}}
@@ -229,7 +262,7 @@ function :dns:inspect.csv() {
                     fi
                 done
 
-                #. 5. <hnh> = <shn> ?
+                #. 5. <hnh> = <shn>{<usdn>.<dn>} ?
                 if [ ${hit} -eq 0 ]; then
                     shn=${qdn}
                     local -a usdns=( $(:dns:subdomains ${tldid} short) )
@@ -244,6 +277,22 @@ function :dns:inspect.csv() {
                         fi
                     done
                 fi
+
+                #. 8. <hnh> = <shn>{.<dn>} ?
+                if [ ${hit} -eq 0 ]; then
+                    fqdn=${shn}.${dn}
+                    local resolves
+                    resolves=$(:dns:resolve ${fqdn} ${qt});
+                    if [ $? -eq ${CODE_SUCCESS?} ]; then
+                        hit=1
+                        fqdn=${shn}.${dn}
+                        usdn=
+                        results+=(
+                            "${qt},${hnh},shn,${tldid},${usdn},${dn},${fqdn},${resolves},8"
+                        )
+                    fi
+                fi
+
             done
         fi
 
@@ -290,7 +339,7 @@ function :dns:lookup.csv() {
                 local csv qt hnh qual tldid usdn dn fqdn resolved qid
                 for csv in ${results[@]}; do
                     IFS=, read qt hnh qual tldid usdn dn fqdn resolved qid <<< "${csv}"
-                    if [ "${tldidstr/[.${tldid}]/}" != "${tldidstr}" ]; then
+                    if [ "${tldidstr/[_${tldid}]/}" != "${tldidstr}" ]; then
                         if [ "${record}" == "${qt}" ]; then
                             echo ${csv}
                             e=${CODE_SUCCESS?}
@@ -326,9 +375,9 @@ function dns:lookup() {
             for csv in "${data[@]}"; do
                 iface="lo"
                 IFS=, read qt hnh_ qual tldid_ usdn dn fqdn resolved qid <<< "${csv}"
-                [ ${tldid_} == '.' ] || iface="${USER_IFACE[${tldid_}]}"
+                [ ${tldid_} == '_' ] || iface="${USER_IFACE[${tldid_}]}"
 
-                if [[ "${tldid}" == "${tldid_}" || "${tldid}" == '.' ]]; then
+                if [[ "${tldid}" == "${tldid_}" || "${tldid}" == '_' ]]; then
                     local qdn="${fqdn%.${dn}}"
                     if [ "${qt}" == 'c' ]; then
                         cpf "%{@ip:%-48s}" "${qdn}"
@@ -355,7 +404,7 @@ function dns:lookup() {
 function dns:tldids() {
     local -i e=${CODE_DEFAULT?}
 
-    if [[ $# -eq 0 || $# -eq 1 && "$1" == '.' ]]; then
+    if [[ $# -eq 0 || $# -eq 1 && "$1" == '_' ]]; then
         e=${CODE_SUCCESS?}
         for tldid in ${!USER_TLDS[@]}; do
             cpf "%{@tldid:%s}: %{@host:%s}\n" ${tldid} ${USER_TLDS[${tldid}]}
@@ -381,22 +430,28 @@ function :dns:get() {
     local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 3 ]; then
-        e=${CODE_SUCCESS?}
         local -r tldid=$1
         local -r format=$2
         local -r hnh=$3
-        local -r shn=${hnh%%.*}
-        local csv qt hnh_ qual tldid_ usdn dn fqdn resolved qid
-        while read csv; do
-            IFS=, read qt hnh_ qual tldid_ usdn dn fqdn resolved qid <<< "${csv}"
-            case ${format} in
-                fqdn)     echo "${fqdn}";;
-                qdn)      echo "${fqdn%.${dn}}";;
-                usdn)     echo "${usdn}";;
-                resolved) echo "${resolved}";;
-                *)        core:raise EXCEPTION_BAD_FN_CALL;;
-            esac
-        done < <(:dns:lookup.csv ${tldid} a ${hnh})
+
+        local buffer
+        buffer=$(:dns:lookup.csv ${tldid} a ${hnh})
+        e=$?
+
+        if [ $e -eq ${CODE_SUCCESS?} ]; then
+            local csv qt hnh_ qual tldid_ usdn dn fqdn resolved qid
+            while read csv; do
+                IFS=, read qt hnh_ qual tldid_ usdn dn fqdn resolved qid <<< "${csv}"
+                case ${format} in
+                    fqdn)     echo "${fqdn}";;
+                    qdn)      echo "${fqdn%.${dn}}";;
+                    usdn)     echo "${usdn}";;
+                    tldid)    echo "${tldid_}";;
+                    resolved) echo "${resolved}";;
+                    *)        core:raise EXCEPTION_BAD_FN_CALL;;
+                esac
+            done <<< "${buffer}"
+        fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -413,7 +468,8 @@ function :dns:iscname() {
         local fqdn="${2}"
         local resolved
         resolved=$(:dns:get ${tldid} resolved ${fqdn})
-        if [ $? -eq 0 ]; then
+        if [ $? -eq ${CODE_SUCCESS?} ]; then
+            #. If it didn't resolve to an IP address...
             if [ "${resolved//[0-9]/}" != '...' ]; then
                 e=${CODE_SUCCESS?}
             fi

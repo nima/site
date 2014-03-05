@@ -22,7 +22,7 @@ function testCoreDnsSubdomainsInternal() {
     local -a sdns
     local -a results
 
-    sdns=( $(:dns:subdomains . full) )
+    sdns=( $(:dns:subdomains _ full) )
     assertTrue 1.1 $?
     results=(
         unit-tests.mgmt.site
@@ -79,17 +79,17 @@ function testCoreDnsSubdomainsPublic() {
     core:import dns
 
     local data
-    data=( $(core:wrapper dns subdomains -T.) )
+    data=( $(core:wrapper dns subdomains -T _) )
     assertTrue   1.1 $?
     assertEquals 1.2 6 ${#data[@]}
 
     local data
-    data=( $(core:wrapper dns subdomains -Tm) )
+    data=( $(core:wrapper dns subdomains -T m) )
     assertTrue   2.1 $?
     assertEquals 2.2 3 ${#data[@]}
 
     local data
-    data=( $(core:wrapper dns subdomains -Tp) )
+    data=( $(core:wrapper dns subdomains -T p) )
     assertTrue   3.1 $?
     assertEquals 3.2 3 ${#data[@]}
 }
@@ -217,13 +217,13 @@ function testCoreDnsGetInternal() {
     core:import dns
 
     local data
-    data=$(:dns:get . usdn www.google.com)
+    data=$(:dns:get _ usdn www.google.com.)
     assertTrue   1.1 $?
-    data=$(:dns:get . qdn www.google.com)
+    data=$(:dns:get _ qdn www.google.com.)
     assertTrue   1.2 $?
-    data=$(:dns:get . fqdn www.google.com)
+    data=$(:dns:get _ fqdn www.google.com.)
     assertTrue   1.3 $?
-    data=$(:dns:get . resolved www.google.com)
+    data=$(:dns:get _ resolved www.google.com.)
     assertTrue   1.4 $?
 }
 #. }=-
@@ -233,9 +233,9 @@ function testCoreDnsFqdnPublic() {
 
     local data
 
-    data=$(core:wrapper dns fqdn www.google.com)
+    data=$(core:wrapper dns fqdn www.google.com.)
     assertTrue   1.1 $?
-    assertEquals 1.2 "www.google.com" "${data}"
+    assertEquals 1.2 "www.google.com." "${data}"
 }
 #. }=-
 #. testCoreDnsQdnPublic -={
@@ -264,7 +264,7 @@ function testCoreDnsUsdnPublic() {
 function testCoreDnsIscnameInternal() {
     core:import dns
 
-    :dns:iscname . www.google.com
+    :dns:iscname _ www.google.com
     assertFalse  1.1 $?
 }
 #. }=-
@@ -272,7 +272,7 @@ function testCoreDnsIscnameInternal() {
 function testCoreDnsIsarecordInternal() {
     core:import dns
 
-    :dns:isarecord . www.google.com
+    :dns:isarecord _ www.google.com
     assertTrue   1.1 $?
 }
 #. }=-
