@@ -38,7 +38,7 @@ function test_1_0_CoreTunnelStartPublic() {
 function test_1_1_CoreTunnelStartInternal() {
     core:import tunnel
 
-    :tunnel:start host-8c.unit-tests.mgmt.site
+    :tunnel:start host-8c.unit-tests.mgmt.site 22
     assertEquals "0x2" ${CODE_E01?} $?
 }
 

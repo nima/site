@@ -12,41 +12,31 @@ core:import util
 core:requires ssh
 core:requires netstat
 
-declare -rg g_CP_PREFIX="${SITE_USER_RUN?}/ssh-sm"
+: ${SITE_USER_SSH_CONTROLPATH:=${SITE_USER_RUN?}/site-ssh-mux.sock}
 
 #. tunnel:status -={
 function :tunnel:pid() {
     local -i e=${CODE_FAILURE?}
 
-    local -r qdn="${1}"
-    local -r controlpath=${g_CP_PREFIX?}@${qdn}
-    if [ -e "${controlpath}" ]; then
-        local raw
-        raw=$(
-            ssh -qo 'ControlMaster=no' -S "${controlpath}" ${qdn} -O check 2>&1 |
-                tr -d '\r\n'
-        )
-        e=$?
+    if [ $# -eq 0 ]; then
+        if [ -e "${SITE_USER_SSH_CONTROLPATH}" ]; then
+            local raw
+            raw=$(
+                ssh ${g_SSH_OPTS} -o 'ControlMaster=no'\
+                    -S "${SITE_USER_SSH_CONTROLPATH}" -O check NULL 2>&1 |
+                    tr -d '\r\n'
+            )
+            e=$?
 
-        if [ $e -eq 0 ]; then
-            echo "${raw}" |
-                sed -e 's/Master running (pid=\(.*\))$/\1/'
+            if [ $e -eq 0 ]; then
+                echo "${raw}" |
+                    sed -e 's/Master running (pid=\(.*\))$/\1/'
+            fi
+        else
+            e=${CODE_SUCCESS?} #. No tunnel
         fi
     else
-        e=${CODE_SUCCESS?} #. No tunnel
-    fi
-
-    return $e
-}
-function :tunnel:list() {
-    local -i e=${CODE_FAILURE?}
-
-    if [ $# -eq 1 ]; then
-        local -i pid=$1
-        netstat -ntlp 2>/dev/null|
-            awk '$1~/^tcp$/&&$7~/^'${pid}'.ssh$/{print$4}' |
-            awk -F: '{print$2}'
-        e=$?
+        core:raise EXCEPTION_BAD_FN_CALL
     fi
 
     return $e
@@ -54,28 +44,25 @@ function :tunnel:list() {
 function tunnel:status() {
     local -i e=${CODE_DEFAULT?}
 
-    if [ $# -eq 1 ]; then
-        local -r qdn=${1}
-        cpf "Checking ssh control master to %{@host:${qdn}}..."
-
-        local portstr
+    if [ $# -eq 0 ]; then
+        cpf "Checking ssh control master..."
 
         local pid
-        pid=$(:tunnel:pid ${qdn})
+        pid=$(:tunnel:pid)
         e=$?
 
         if [ $e -eq ${CODE_SUCCESS?} ]; then
-            local -a ports
-            ports=( $(:tunnel:list ${pid} ) )
-            portstr=$(:util:join , ports)
-        fi
+            theme HAS_AUTOED $e "${pid:-NO_TUNNEL}"
 
-        theme HAS_AUTOED $e "${pid:-NO_TUNNEL}:${portstr:-NO_PORTS}"
-    elif [ $# -eq 0 ]; then
-        for socket in ${g_CP_PREFIX?}*; do
-            tunnel:status ${socket##*@}
-        done
-        e=${CODE_SUCCESS?}
+            while read line; do
+                IFS='[: ]' read lh1 lport lh2 rport rhost <<< "${line}"
+                cpf "Tunnel from %{@int:${lport}} to %{@host:${rhost}}:%{@int:${rport}}\n"
+            done < <(
+                ps -fC ssh |
+                    awk '$0~/ssh\.conf/{print$0}' |
+                    grep -oE 'localhost:[^ ]+ .*'
+            )
+        fi
     fi
 
     return $e
@@ -86,16 +73,16 @@ function tunnel:status() {
 function :tunnel:start() {
     local -i e=${CODE_FAILURE?}
 
-    if [ $# -eq 1 ]; then
+    if [ $# -eq 2 ]; then
         local -i pid
-        local -r qdn=${1}
-        local -r controlpath=${g_CP_PREFIX?}@${qdn}
-        if [ -S "${controlpath}" ]; then
-            pid=$(:tunnel:pid ${qdn})
+        local -r hcs=${1}
+        local -ir port=${2}
+        if [ -S "${SITE_USER_SSH_CONTROLPATH}" ]; then
+            pid=$(:tunnel:pid ${hcs})
             [ $? -ne ${CODE_SUCCESS?} ] || e=${CODE_E01?}
         else
-            if ssh -qno 'ControlMaster=yes' -fNS "${controlpath}" ${qdn}; then
-                pid=$(:tunnel:pid ${qdn})
+            if ssh ${g_SSH_OPTS} -n -fNS "${SITE_USER_SSH_CONTROLPATH}" -p ${port} ${USER_USERNAME}@${hcs}; then
+                pid=$(:tunnel:pid ${hcs})
                 e=$?
             fi
         fi
@@ -106,22 +93,22 @@ function :tunnel:start() {
     return $e
 }
 
-function tunnel:start:usage() { echo "<qdn>"; }
+function tunnel:start:usage() { echo "<hcs> [<port:22>]"; }
 function tunnel:start() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 ]; then
-        local -r qdn=${1}
-        cpf "Starting ssh control master to %{@host:${qdn}}..."
+        local -r hcs=${1}
+        local -ri port=${2:-22}
+        cpf "Starting ssh control master to %{@host:${hcs}}..."
         local -i pid
-        local -r controlpath=${g_CP_PREFIX?}@${qdn}
-        if [ -S "${controlpath}" ]; then
-            pid=$(:tunnel:pid ${qdn})
+        if [ -S "${SITE_USER_SSH_CONTROLPATH}" ]; then
+            pid=$(:tunnel:pid ${hcs})
             e=${CODE_SUCCESS?}
             theme HAS_WARNED "ALREADY_RUNNING:${pid}"
         else
-            if :tunnel:start ${qdn}; then
-                pid=$(:tunnel:pid ${qdn})
+            if :tunnel:start ${hcs} ${port}; then
+                pid=$(:tunnel:pid ${hcs})
                 e=$?
             fi
             theme HAS_AUTOED $e ${pid}
@@ -137,13 +124,12 @@ function :tunnel:stop() {
 
     if [ $# -eq 1 ]; then
         local -i pid=0
-        local -r qdn="${1}"
-        local -r controlpath=${g_CP_PREFIX?}@${qdn}
-        if [ -e "${controlpath}" ]; then
-            pid=$(:tunnel:pid ${qdn})
+        local -r hcs="${1}"
+        if [ -e "${SITE_USER_SSH_CONTROLPATH}" ]; then
+            pid=$(:tunnel:pid ${hcs})
             if [ $? -eq ${CODE_SUCCESS?} ]; then
-                ssh -qno 'ControlMaster=no'\
-                    -fNS "${controlpath}" ${qdn} -O stop >/dev/null 2>&1
+                ssh ${g_SSH_OPTS} -no 'ControlMaster=no'\
+                    -fNS "${SITE_USER_SSH_CONTROLPATH}" ${hcs} -O stop >/dev/null 2>&1
                 e=$?
             fi
         else
@@ -157,18 +143,17 @@ function :tunnel:stop() {
     return $e
 }
 
-function tunnel:stop:usage() { echo "<qdn>"; }
+function tunnel:stop:usage() { echo "<hcs>"; }
 function tunnel:stop() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 ]; then
-        local -r qdn="${1}"
-        cpf "Stopping ssh control master to %{@host:${qdn}}..."
+        local -r hcs="${1}"
+        cpf "Stopping ssh control master to %{@host:${hcs}}..."
 
-        local -r controlpath=${g_CP_PREFIX?}@${qdn}
-        if [ -e "${controlpath}" ]; then
+        if [ -e "${SITE_USER_SSH_CONTROLPATH}" ]; then
             local -i pid
-            pid=$(:tunnel:stop "${qdn}")
+            pid=$(:tunnel:stop "${hcs}")
             e=$?
             theme HAS_AUTOED $e ${pid}
         else
@@ -185,16 +170,14 @@ function :tunnel:create() {
     local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 5 ]; then
-        local qdn="${1}"
+        local hcs="${1}"
         local laddr="${2}"
         local lport="${3}"
         local raddr="${4}"
         local rport="${5}"
-        local -r controlpath=${g_CP_PREFIX?}@${qdn}
-        if [ -S ${controlpath} ]; then
+        if [ -S ${SITE_USER_SSH_CONTROLPATH} ]; then
             if ! :net:localportping ${lport}; then
-                ssh -qo 'ControlMaster=no' -O forward -S "${controlpath}"\
-                    -fNL "${laddr}:${lport}:${raddr}:${rport}" ${qdn}
+                ssh ${g_SSH_OPTS} -fNL "${laddr}:${lport}:${raddr}:${rport}" ${hcs}
                 e=$?
             else
                 e=${CODE_E01?}
@@ -215,34 +198,37 @@ string local  localhost "local-addr"  l
 string remote localhost "remote-addr" r
 !
 }
-function tunnel:create:usage() { echo "<qdn> <local-port> <remote-port>"; }
+function tunnel:create:usage() {
+    echo "<hcs> [-l|--local-addr <local-addr>] <local-port> [-r|--remote-addr <remote-addr>] <remote-port> [<port>]";
+}
 function tunnel:create() {
     local -i e=${CODE_DEFAULT?}
 
     local raddr=${FLAGS_remote:-localhost}; unset FLAGS_remote
     local laddr=${FLAGS_local:-localhost};  unset FLAGS_local
 
-    if [ $# -eq 3 ]; then
-        local -r qdn=${1}
+    if [ $# -eq 3 -o $# -eq 4 ]; then
+        local -r hcs=${1}
         local -i lport=${2}
         local -i rport=${3}
+        local -i port=${4:-22}
         local pid
-        pid=$(:tunnel:pid ${qdn})
+        pid=$(:tunnel:pid ${hcs})
         e=$?
         if [ $e -eq ${CODE_SUCCESS?} -a ${#pid} -eq 0 ]; then
-            if :tunnel:start ${qdn}; then
-                pid=$(:tunnel:pid ${qdn})
+            if :tunnel:start ${hcs} ${port}; then
+                pid=$(:tunnel:pid ${hcs} ${port})
+                e=$?
             fi
         fi
 
-        cpf "Creating ssh tunnel %{@host:${qdn}} ["
-        e=$?
+        cpf "Creating ssh tunnel %{@host:${hcs}} ["
         if [ ${e} -eq ${CODE_SUCCESS?} -a ${#pid} -gt 0 ]; then
             cpf "%{@ip:${laddr?}}:%{@int:${lport}}"
             cpf "%{r:<--->}"
             cpf "%{@ip:${raddr?}}:%{@int:${rport}}"
             cpf "] ..."
-            :tunnel:create ${qdn} ${laddr} ${lport} ${raddr} ${rport}
+            :tunnel:create ${hcs} ${laddr} ${lport} ${raddr} ${rport}
             e=$?
             if [ $e -ne ${CODE_E01?} ]; then
                 theme HAS_AUTOED $e
