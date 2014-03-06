@@ -14,14 +14,14 @@ function testCoreNetPortpersistInternal() {
 
     local -A scanned
     for tcpPort in ${tcpPorts[@]}; do
-        :net:portpersist . localhost ${tcpPort} 1
+        :net:portpersist _ localhost ${tcpPort} 1
         assertTrue 0x1 $?
         scanned[${tcpPort}]=1
     done
 
     for tcpPort in {16..32}; do
         if [ ${scanned[${tcpPort}]-0} -eq 0 ]; then
-            :net:portpersist . localhost ${tcpPort} 1
+            :net:portpersist _ localhost ${tcpPort} 1
             assertFalse 0x2 $?
         fi
     done

@@ -6,6 +6,32 @@ Core networking module
 #. Network Utilities -={
 core:import dns
 
+function :net:fix() {
+    #. input  10.1.2.123/24
+    #. output 10.1.2.0/24
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local ip mask
+        IFS=/ read ip mask <<< "${1}"
+
+        local ip_bits=$(:net:s2h "${ip}")
+        local mask_bits=$(:net:b2nm "${mask}")
+
+        local nw_hex
+        ((nw_hex = ip_bits & mask_bits))
+
+        local nw=$(:net:h2s $nw_hex)
+        printf "%s/%s\n" "${nw}" "${mask}"
+
+        e=${CODE_SUCCESS?}
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
 #. net:b2nm -={
 #. IPv4: Bits to Netmask
 function :net:b2nm() {
@@ -198,9 +224,14 @@ function :net:localportping() {
 
     if [ $# -eq 1 ]; then
         local -i lport=$1
-        netstat -ntl |
+        local output
+        output=$(netstat -ntl |
             awk 'BEGIN{e=1};$4~/^127.0.0.1:'${lport}'$/{e=0};END{exit(e)}'
-        e=$?
+        )
+        if [ ${#output} -gt 0 ]; then
+            echo "${output}"
+            e=${CODE_SUCCESS?}
+        fi
     fi
 
     return $e
@@ -239,17 +270,20 @@ function :net:portping() {
     core:requires socat
 
     local -i e=${CODE_FAILURE?}
-    if [ $# -eq 3 ]; then
-        local tldid=$1
-        local qdn=$2
-        local port=$3
+    if [ $# -eq 3 -o $# -eq 4 ]; then
+        local tldid="$1"
+        local qdn="$2"
+        local port="$3"
+        local ssh_proxy="$4"
         local cmd="nc -zqw1 ${qdn} ${port}"
         cmd="socat /dev/null TCP:${qdn}:${port},connect-timeout=1"
-        if [ ${tldid} != '.' ]; then
-            local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
+        if [ ${tldid} != '_' ]; then
             local tld=${USER_TLDS[${tldid}]}
+
+            #. DEPRECATED: USER_SSH_PROXY
+            #local ssh_proxy=${USER_SSH_PROXY[${tldid}]}
             if [ ${#ssh_proxy} -gt 0 ]; then
-                ssh ${USER_USERNAME?}@${ssh_proxy} ${cmd} >/dev/null 2>&1
+                ssh ${g_SSH_OPTS} ${ssh_proxy} ${cmd} >/dev/null 2>&1
                 e=$?
             else
                 eval ${cmd} >/dev/null 2>&1
@@ -277,22 +311,16 @@ function net:portping() {
         cpf "Testing TCP connectivity to %{@host:%s}:%{@port:%s}..." ${hnh} ${port}
 
         local fqdn
-        local tldid
+        local tldid=${g_TLDID?}
+        #. If the name supplied does not end with a `.':
         if [ "${hnh:$((${#hnh}-1))}" != '.' ]; then
-            tldid=$(:dns:qualified ${hnh})
-            if [ $? -ne ${CODE_SUCCESS?} ]; then
-                tldid=${g_TLDID?}
-                fqdn=$(:dns:get ${tldid} fqdn ${hnh})
-                if [ $? -ne ${CODE_SUCCESS?} ]; then
-                    theme HAS_FAILED "INVALID_FQDN"
-                    e=${CODE_FAILURE?}
-                fi
-            else
-                tldid='.'
-                fqdn=${hnh}
+            fqdn=$(:dns:get ${tldid} fqdn ${hnh})
+            if [ $? -eq ${CODE_FAILURE?} ]; then
+                e=${CODE_FAILURE?}
+                theme HAS_FAILED "INVALID_FQDN"
             fi
         else
-            tldid='.'
+            tldid='_'
             fqdn=${hnh}
         fi
 
