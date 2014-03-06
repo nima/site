@@ -26,20 +26,24 @@ We use moons to illustrate code-complete status.
 
 Here are the currently developing/developed site modules:
 
-| Core Module   | Code-Complete           | Description                                                         |
-| ------------- | ----------------------- | ------------------------------------------------------------------- |
-| unit          | :waning_gibbous_moon:   | Core Unit-Testing module                                            |
-| util          | :full_moon:             | Core utilities module                                               |
-| help          | :full_moon:             | Core help module                                                    |
-| hgd           | :waning_gibbous_moon:   | Core HGD (Host-Group Directive) module                              |
-| net           | :full_moon:             | Core networking module                                              |
-| gpg           | :full_moon:             | Core GNUPG module                                                   |
-| vault         | :full_moon:             | Core vault and secrets management module                            |
-| remote        | :waning_gibbous_moon:   | The site remote access/execution module (ssh, ssh/sudo, tmux, etc.) |
-| git           | :full_moon:             | Auxiliary Git helper module                                         |
-| dns           | :full_moon:             | Core DNS module                                                     |
-| tunnel        | :full_moon:             | Secure shell tunnelling wrapper                                     |
-| tutorial      | :waning_crescent_moon:  | The site module aims to serve as a tutorial for new site users      |
+| Core Module   | Code-Complete           | Description                                                             |
+| ------------- | ----------------------- | -------------------------------------------------------------------     |
+| unit          | :waning_gibbous_moon:   | Core Unit-Testing module                                                |
+| util          | :full_moon:             | Core utilities module                                                   |
+| help          | :full_moon:             | Core help module                                                        |
+| hgd           | :waning_gibbous_moon:   | Core HGD (Host-Group Directive) module                                  |
+| net           | :full_moon:             | Core networking module                                                  |
+| gpg           | :full_moon:             | Core GNUPG module                                                       |
+| vault         | :full_moon:             | Core vault and secrets management module                                |
+| remote        | :waning_gibbous_moon:   | The site remote access/execution module (ssh, ssh/sudo, tmux, etc.)     |
+| git           | :full_moon:             | Auxiliary Git helper module                                             |
+| dns           | :full_moon:             | Core DNS module                                                         |
+| tunnel        | :full_moon:             | Secure shell tunnelling wrapper                                         |
+| rb            | :waning_gibbous_moon:   | Interface to Ruby sandbox via `xplm`                                    |
+| py            | :waning_gibbous_moon:   | Interface to Python sandbox via `xplm`                                  |
+| pl            | :waning_gibbous_moon:   | Interface to Perl sandbox via `xplm` (via `rbenv`, `pyenv`, and `plenv' |
+| xplm          | :waning_gibbous_moon:   | Interface to Ruby, Python, and Perl sandboxes                           |
+| tutorial      | :waning_crescent_moon:  | The site module aims to serve as a tutorial for new site users          |
 
 And here is their relationship with one-another; i.e., the dependecy graph of the core primary site modules:
 ![Module Dependencies](https://dl.dropboxusercontent.com/u/68796871/projects/Site/dependencies.png)
