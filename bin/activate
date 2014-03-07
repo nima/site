@@ -61,12 +61,13 @@ function profile_activate() {
 
 function main() {
     local -i e=0
+
     if [ $# -eq 1 ]; then
         local profile="${1}"
         if ! profile_exists "${profile}"; then
             profile_create "${1}"
             e=$?
-            echo "#. New profile ${profile} created: $e"
+            #echo "#. New profile ${profile} created: $e"
         fi
 
         if [ $e -eq 0 ]; then
@@ -76,18 +77,20 @@ function main() {
                 if [ "${profile}" != "${active}" ]; then
                     profile_activate "${profile}"
                     e=$?
-                    echo "#. Active profile changed from ${active} to ${profile}: $e"
+                    #echo "#. Active profile changed from ${active} to ${profile}: $e"
                 else
-                    echo "#. Active profile is already ${profile}."
+                    e=0
+                    #echo "#. Active profile is already ${profile}."
                 fi
             else
                 profile_activate "${profile}"
                 e=$?
-                echo "#. Profile ${profile} has been activated: $e"
+                #echo "#. Profile ${profile} has been activated: $e"
             fi
         fi
     else
         profile_active
+        e=$?
     fi
 
     return $e

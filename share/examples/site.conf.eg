@@ -1,8 +1,8 @@
 # vim: tw=0:ts=4:sw=4:et:ft=bash
 
-declare -g -r USER_LOG_LEVEL=DEBUG
+USER_LOG_LEVEL=DEBUG
 
-declare -g -r -A USER_MODULES=(
+USER_MODULES=(
     [mymod]=1
 )
 
@@ -17,17 +17,17 @@ CORE_MODULES[mongo]=0
 #. Let's say our hosts have 2 interfaces in general:
 #. Public, which we will call `p', and management which we will call `m':
 #. First we also define which interface is on subnet:
-declare -g -r -A USER_IFACE=(
-    [.]=lo #. The period is a special tldid which matches all others
+USER_IFACE=(
+    [_]=lo #. The period is a special tldid which matches all others
     [m]=eth0
     [p]=eth1
 )
 #. Next we define which ones are mandatory per host, arbitrary characters
-declare -g -r -a USER_TLDIDS_REQUIRED=( m p )
-#. When unspecified on the commandline, we will default to wildcard (`.')
-declare -g -r    USER_TLDID_DEFAULT=.
+USER_TLDIDS_REQUIRED=( m p )
+#. When unspecified on the commandline, we will default to wildcard (`_')
+USER_TLDID_DEFAULT=_
 #. Now we declare the TLD for these subnets:
-declare -g -r -A USER_TLDS=(
+USER_TLDS=(
     [m]='mgmt.site'          #. Management network
     [p]='site.org'           #. Public network, add more as you please
 )
@@ -48,15 +48,16 @@ declare -g -r -a USER_SUBDOMAIN_p=(
 #USER_LDAPHOSTS=( localhost )
 #USER_LDAPHOSTS_RW=( localhost )
 #USER_LDAP_SYNC_ATTRS=( na )
-#USER_UDN=na
-#USER_GDN=na
-#USER_NDN="ou=netgroup,dc=engineering,dc=company,dc=com"
+#USER_UDN="ou=users,dc=comp,dc=org,dc=au"
+#USER_GDN="ou=groups,dc=comp,dc=org,dc=au"
+#USER_NDN="ou=netgroups,dc=comp,dc=org,dc=au"
+#USER_HDN="ou=hosts,dc=comp,dc=org,dc=au"
+#USER_SDN="ou=subnets,dc=comp,dc=org,dc=au"
 #USER_REGEX="uid=.*"
 #USER_USERNAME="nima.talebi"
 #. }=-
 #. remote:mon -={
 #. These get executed remotely first...
-declare -g -A USER_MON_CMDGRPREMOTE
 USER_MON_CMDGRPREMOTE=(
     [sap2nfs]='IFS=- read -a host <<< "$(hostname -s)"; ls -ld /sapmnt/${host[1]^^}/.'
     [sap2afs]="df -Ph \$(awk '\$1~/^\//{print\$1}' /etc/autofs.d/auto.sap) | awk '\$1~/^nas/{printf(\",%s\",\$6)}'"
@@ -78,7 +79,6 @@ USER_MON_CMDGRPREMOTE=(
 )
 
 #. These get executed locally using the output from the remote in place of %s...
-declare -g -A USER_MON_CMDGRPLOCAL
 USER_MON_CMDGRPLOCAL=(
     [dc]="subnetdb gw=%s dc env"
     [cfran]=':util:date:i2s %s'

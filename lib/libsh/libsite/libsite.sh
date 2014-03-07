@@ -43,11 +43,11 @@ PATH+=:${SITE_CORE_LIBEXEC}
 PATH+=:${SITE_USER_LIBEXEC}
 export PATH
 
+source ${SITE_CORE_LIB}/xplm.conf
 #. Ruby -={
 #. rbenv
 RBENV_ROOT=${SITE_USER_VAR}/rbenv
-RBENV_VERSION=2.1.1
-export RBENV_ROOT RBENV_VERSION
+export RBENV_ROOT
 #. }=-
 #. Python -={
 PYTHONPATH+=:${SITE_CORE_LIBPY}
@@ -56,13 +56,11 @@ export PYTHONPATH
 
 #. pyenv
 PYENV_ROOT=${SITE_USER_VAR}/pyenv
-PYENV_VERSION=2.7.6
 export PYENV_ROOT PYENV_VERSION
 #. }=-
 #. Perl -={
 #. plenv
 PLENV_ROOT=${SITE_USER_VAR}/plenv
-PLENV_VERSION=5.18.2
 export PLENV_ROOT PLENV_VERSION
 #. }=-
 
@@ -72,8 +70,6 @@ export SHFLAGS=${SITE_USER_LIBSH}/shflags
 source ${SHFLAGS?}
 #. }=-
 #. 1.3  User/Profile Configuration -={
-declare -A USER_MODULES
-export USER_MODULES
 
 declare -g -A CORE_MODULES=(
     [unit]=1       [util]=1      [help]=1      [tutorial]=0   [hgd]=1    [git]=1
@@ -84,7 +80,16 @@ declare -g -A CORE_MODULES=(
     [softlayer]=1  [pagerduty]=1
 )
 
+declare -gA USER_MODULES=( )
+declare -gA USER_IFACE
+declare -ga USER_TLDIDS_REQUIRED
+declare -g  USER_TLDID_DEFAULT
+declare -gA USER_TLDS
+declare -gA USER_MON_CMDGRPREMOTE
+declare -gA USER_MON_CMDGRPLOCAL
+declare -g  USER_LOG_LEVEL=INFO
 source ${SITE_USER_ETC}/site.conf
+
 test ! -f ~/.siterc || source ~/.siterc
 : ${USER_TLDS[@]?}
 : ${USER_FULLNAME?}
@@ -99,7 +104,12 @@ declare -i g_CACHED=0
 declare g_FORMAT=ansi
 declare g_DUMP
 
-declare g_TLDID=${USER_TLDID_DEFAULT:-.}
+declare g_TLDID=${USER_TLDID_DEFAULT:-_}
+
+declare -g g_SSH_OPT
+g_SSH_OPTS="-q"
+[ ! -e "${SITE_USER_ETC?}/ssh.conf" ] ||
+    g_SSH_OPTS+=" -F ${SITE_USER_ETC?}/ssh.conf"
 #. }=-
 #. 1.4  Core Configuration -={
 unset  CDPATH
@@ -147,6 +157,7 @@ CODE_IMPORT_UNDEF=${CODE_E03}     #. no such module
 CODE_IMPORT_UNSET=${CODE_E04}     #. no module set
 
 export SITE_DELIM=$(printf "\x07")
+export SITE_DELOM=$(printf "\x08")
 
 CODE_DEFAULT=${CODE_USAGE_FN_LONG?}
 #. }=-
@@ -186,15 +197,14 @@ function core:log() {
         local caller=${FUNCNAME[${fi}]}
     fi
 
-    if [ ${SITE_LOG_NAMES[${USER_LOG_LEVEL}]} -ge ${level} ]; then
-        shift 1
-        declare ts=$(date +"${SITE_DATE_FORMAT}")
+    if [ ${SITE_LOG_NAMES[${USER_LOG_LEVEL?}]} -ge ${level} ]; then
+        declare ts=$(date +"${SITE_DATE_FORMAT?}")
 
         declare msg=$(printf "%s; %5d; %8s[%24s];" "${ts}" "${$--1}" "${code}" "${caller}")
-        [ -e ${SITE_USER_LOG} ] || touch ${SITE_USER_LOG}
+        [ -e ${SITE_USER_LOG?} ] || touch ${SITE_USER_LOG?}
         if [ -f ${SITE_USER_LOG} ]; then
-            chmod 600 ${SITE_USER_LOG}
-            echo "${msg} $@" >> ${SITE_USER_LOG}
+            chmod 600 ${SITE_USER_LOG?}
+            echo "${msg} ${*:2}" >> ${SITE_USER_LOG?}
         fi
         #printf "%s; %5d; %8s[%24s]; $@\n" "${ts}" "$$" "${code}" "$(sed -e 's/ /<-/g' <<< ${FUNCNAME[@]})" >> ${WMII_LOG}
     fi
@@ -216,8 +226,7 @@ function core:softimport() {
         if [ -z "${g_SITE_IMPORTED_EXIT[${module}]}" ]; then
             if [ ${USER_MODULES[${module}]-9} -eq 1 ]; then
                 if [ -f ${SITE_USER_MOD}/${module}.sh ]; then
-                    if ( source ${SITE_USER_MOD}/${module}.sh >/tmp/site.${module}.ouch 2>&1 ); then
-                        source ${SITE_USER_MOD}/${module}.sh
+                    if source ${SITE_USER_MOD}/${module}.sh >/tmp/site.${module}.ouch 2>&1; then
                         e=${CODE_IMPORT_GOOOD?}
                     else
                         e=${CODE_IMPORT_ERROR?}
@@ -228,8 +237,7 @@ function core:softimport() {
                 fi
             elif [ ${CORE_MODULES[${module}]-9} -eq 1 ]; then
                 if [ -f ${SITE_CORE_MOD}/${module}.sh ]; then
-                    if ( source ${SITE_CORE_MOD}/${module}.sh >/tmp/site.${module}.ouch 2>&1 ); then
-                        source ${SITE_CORE_MOD}/${module}.sh
+                    if source ${SITE_CORE_MOD}/${module}.sh >/tmp/site.${module}.ouch 2>&1; then
                         e=${CODE_IMPORT_GOOOD?}
                     else
                         e=${CODE_IMPORT_ERROR?}
@@ -330,7 +338,11 @@ function core:requires() {
     #.     core:requires PERL LWP::Protocol::https
     local -i e=${CODE_SUCCESS}
 
-    local caller="${FUNCNAME[1]}"
+    local caller
+    case "${FUNCNAME[1]}" in
+        source) caller=${FUNCNAME[2]};;
+        *) caller=${FUNCNAME[1]};;
+    esac
     #. TODO: Check if ${caller} is a valid/plausible executable name
     #local caller_is_mod=$(( ${USER_MODULES[${caller/:*/}]-0} + ${CORE_MODULES[${caller/:*/}]-0} ))
     #if [ ${caller_is_mod} -ne 0 ]; then
@@ -405,7 +417,10 @@ function core:requires() {
             if [ $? -eq ${CODE_IMPORT_GOOOD?} ]; then
                 for required in ${@:2}; do
                     if ! :xplm:requires ${plid} ${required}; then
-                        core:log NOTICE "${caller} missing required ruby module ${required}"
+                        core:log NOTICE "${caller} installing required ruby module ${required}"
+                        if ! :xplm:install ${plid} ${required}; then
+                            core:log ERR "${caller} installation of ruby module ${required} FAILED"
+                        fi
                         e=${CODE_FAILURE?}
                     fi
                 done
@@ -653,6 +668,29 @@ function :core:cached() {
 #. 1.11 Execution -={
 : ${USER_USERNAME:=$(whoami)}
 
+function core:tld() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -eq 1 ]; then
+        local tldid="$1"
+        local tld
+
+        if [ "${tldid}" == '_' ]; then
+            tld="${USER_TLDS[${tldid}]}"
+            e=${CODE_SUCCESS?}
+        elif echo ${!USER_TLDS[@]} | grep -qE "\<${tldid}\>"; then
+            tld="${USER_TLDS[${tldid}]}"
+            e=${CODE_SUCCESS?}
+        fi
+
+        [ $e -ne ${CODE_SUCCESS?} ] || echo "${tld}"
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+
 function ::core:execute:internal() {
     local module=$1
     local fn=$2
@@ -668,7 +706,7 @@ function ::core:execute:private() {
 }
 
 function ::core:flags.eval() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     #. Extract the first 2 non-flag tokens as module and function
     #. All remaining tokens are added to the new argv array
@@ -708,7 +746,8 @@ function ::core:flags.eval() {
     if [ ${#module} -gt 0 ]; then
         core:softimport ${module}
         if [ $? -eq ${CODE_IMPORT_GOOOD?} ]; then
-            if [ "$(type -t ${module}:${fn}:shflags)" == "function" ]; then
+            fn="$(:core:complete ${module} ${fn})"
+            if [ "$(type -t "${module}:${fn}:shflags")" == "function" ]; then
                 #. shflags function defined, so let's use it...
                 while read f_type f_long f_default f_desc f_short; do
                     DEFINE_${f_type} "${f_long}" "${f_default}" "${f_desc}" "${f_short}"
@@ -736,7 +775,11 @@ declare -g fn=${fn:-}
         g_LDAPHOST=${FLAGS_ldaphost?}; unset FLAGS_ldaphost
         g_TLDID=${FLAGS_tldid?}; unset FLAGS_tldid
 
-        if [[ ${#g_TLDID} -eq 0 || ${g_TLDID} == '.' || ${#USER_IFACE[${g_TLDID}]} -gt 0 ]]; then
+        if [[ ${#USER_IFACE[${g_TLDID}]} -eq 0 ]]; then
+            core:log ERR "USER_IFACE[${g_TLDID}] has not been defined!"
+        fi
+
+        if [[ ${#g_TLDID} -eq 0 || ${g_TLDID} == '_' || ${#USER_IFACE[${g_TLDID}]} -gt 0 ]]; then
             cat <<!
 #. GLOBAL_OPTS 4/4:
 declare g_HELP=${g_HELP?}
@@ -851,7 +894,7 @@ function ::core:dereference.eval() {
     #. Input: _my_var=something; something=( A B C )
     #. Output: my_var=( A B C )
     if [ ! -t 1 ]; then
-        echo "unset ${1} && eval \$(declare -p ${!1}|sed -e 's/declare -\([a-qs-zA-Z]*\)r*\([a-qs-zA-Z]*\) ${!1}=\(.*\)/declare -\1\2 ${1#_}=\3/')";
+        echo "unset ${1}; eval \$(declare -p ${!1}|sed -e 's/declare -\([a-qs-zA-Z]*\)r*\([a-qs-zA-Z]*\) '${!1}'=\(.*\)/declare -\1\2 ${1#_}=\3/')";
     else
         core:raise EXCEPTION_BAD_FN_CALL \
             "This function must be called in a subshell, and evaled afterwards!"
@@ -915,13 +958,15 @@ function :core:usage() {
     if [ $# -eq 0 ]; then
         #. Usage for site
         cpf "%{wh:usage}%{bl:4}%{@user:${USER_USERNAME}}%{bl:@}%{g:${SITE_PROFILE}}\n"
-        for profile in USER_MODULES CORE_MODULES; do
+        #. FIXME
+        for profile in USER_MODULES USER_MODULES CORE_MODULES; do
             eval $(::core:dereference.eval profile) #. Will create ${profile} array
             for module in ${!profile[@]}; do (
                 local docstring="{no-docstr}"
                 docstring=$(core:docstring ${module})
                 core:softimport ${module}
                 local -i ie=$?
+                local -i ie=${CODE_IMPORT_GOOOD?}
                 if [ $ie -eq ${CODE_IMPORT_ADMIN?} ]; then
                     continue
                 elif [ $ie -eq ${CODE_IMPORT_GOOOD?} ]; then
@@ -1021,7 +1066,7 @@ function :core:complete() {
     local module=$1
     local fn=$2
     for afn in $(declare -F|awk -F'[ :]' '$3~/^'${module}'$/{print$4}'|sort -n); do
-        local AC_${module}_${afn//./_}
+        local AC_${module}_${afn//./_}=1
     done
     local -a completed=( $(eval echo \${!AC_${module}_${fn//./_}*}) )
     if echo ${completed[@]} | grep -qE "\<AC_${module}_${fn//./_}\>"; then
@@ -1075,12 +1120,12 @@ function core:wrapper() {
                             grep --color -E "${regex}" |
                             ${SITE_CORE_LIBEXEC}/ansi2html |
                             mail -a "Content-type: text/html" -s "Site Report [${module} ${completed} ${@}]" ${USER_EMAIL}
-                            e=${PIPESTATUS[3]}
+                        e=${PIPESTATUS[3]}
                     elif [ ${g_FORMAT?} == "html" ]; then
                         :core:execute ${module} ${completed} "${@}" 2>&1 |
                             grep --color -E "${regex}" |
                             ${SITE_CORE_LIBEXEC}/ansi2html
-                            e=${PIPESTATUS[2]}
+                        e=${PIPESTATUS[2]}
                     elif [ -z "${supported_formats[${g_FORMAT}]}" ]; then
                         theme ERR_USAGE "That is not a supported format."
                         e=${CORE_FAILURE}
@@ -1091,8 +1136,12 @@ function core:wrapper() {
                         theme ERR_USAGE "This function does not support that format."
                         e=${CORE_FAILURE}
                     fi
+
+                    if [ $e -eq ${CODE_NOTIMPL?} ]; then
+                        theme ERR_USAGE "This function has not yet been implemented."
+                    fi
                 else
-                    e=${CODE_USAGE_FN_LONG}
+                    e=${CODE_USAGE_FN_LONG?}
                 fi
             elif [ ${#completed[@]} -gt 1 ]; then
                 theme ERR_USAGE "Did you mean one of the following:"
@@ -1126,10 +1175,10 @@ function core:wrapper() {
     esac
 
     case $e in
-        ${CODE_USAGE_MODS})    :core:usage ;;
-        ${CODE_USAGE_SHORT})   :core:usage ${module} ;;
-        ${CODE_USAGE_MOD})     :core:usage ${module} ;;
-        ${CODE_USAGE_FN_LONG}) :core:usage ${module} ${fn} ;;
+        ${CODE_USAGE_MODS?})    :core:usage ;;
+        ${CODE_USAGE_SHORT?})   :core:usage ${module} ;;
+        ${CODE_USAGE_MOD?})     :core:usage ${module} ;;
+        ${CODE_USAGE_FN_LONG?}) :core:usage ${module} ${fn} ;;
         0) : noop;;
     esac
 

@@ -5,6 +5,8 @@ REQUIRED  := make sed awk
 EXTERN_D  := ${HOME}/.site/var
 export EXTERN_D
 
+export VCS_D=${CURDIR}
+
 .DEFAULT: help
 
 #. Site Bootstrap -={
@@ -49,13 +51,12 @@ install: require sanity .install
 	@ln -s ${HOME}/.site/profiles.d/ACTIVE/module ${HOME}/.site/module
 	@ln -s ${HOME}/.site/profiles.d/ACTIVE/libexec ${HOME}/.site/libexec
 	@echo "DONE"
-	@printf "Setting up initial profile...\n"
+	@printf "Setting up initial profile..."
 	@ln -sf $(PWD) $(HOME)/.site/.scm
-	@bin/activate DEFAULT
+	@if ! bin/activate; then bin/activate DEFAULT; bin/activate; fi
 	@
 	@printf "Preparing ${EXTERN_D}..."
-	@mkdir -p /var/tmp/site/var
-	@ln -sf /var/tmp/site/var ${EXTERN_D}
+	@mkdir -p ${EXTERN_D}
 	@mkdir -p ${EXTERN_D}/cache
 	@mkdir -p ${EXTERN_D}/run
 	@mkdir -p ${EXTERN_D}/log
@@ -75,6 +76,7 @@ install: require sanity .install
 	@ln -sf $(PWD)/bin/activate $(HOME)/.site/bin/activate
 	@mkdir -p $(HOME)/bin
 	@ln -sf $(HOME)/.site/bin/site $(HOME)/bin/site
+	@ln -sf $(HOME)/.site/bin/activate $(HOME)/bin/activate
 	@echo "DONE"
 	@
 	@test -f ~/.siterc || touch .initialize
@@ -98,7 +100,6 @@ uninstall: unsanity
 	-rm $(HOME)/.site/etc
 	-rm $(HOME)/.site/module
 	-rm $(HOME)/.site/libexec
-	-rm $(HOME)/.site/var
 	@
 	-rm $(HOME)/bin/site
 	-rm $(HOME)/.site/bin/site
@@ -116,7 +117,7 @@ purge:
 	@test ! -d ${EXTERN_D} || $(MAKE) -f $(PWD)/share/extern.makefile -C ${EXTERN_D} purge
 	@test ! -d ~/.site || find ~/.site -type l -exec rm -f {} \;
 	@#test ! -d ~/.site || find ~/.site -depth -type d -empty -exec rmdir {} \;
-	rm -rf /var/tmp/site/
+	rm -rf $(HOME)/.site/var
 	rm -f .install
 #. }=-
 #. Devel -={

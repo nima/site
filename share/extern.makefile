@@ -58,7 +58,7 @@ purge: $(EXTERN:%=%.purge)
 	rm -f .install
 #. }=-
 
-RBENV_VERSION := 2.1.1  #. WARNING: This must match libsite.sh
+include ${VCS_D}/lib/xplm.conf
 #. rbenv for ruby -={
 .PHONY: rbenv rbenv.install rbenv.uninstall rbenv.purge rbenv.plugins
 RBENV_ROOT=${EXTERN_D}/rbenv
@@ -92,8 +92,6 @@ scm/ruby-build.git:
 	@git clone -q https://github.com/sstephenson/ruby-build.git $@
 	@echo DONE
 #. }=-
-
-PYENV_VERSION := 2.7.6  #. WARNING: This must match libsite.sh
 #. pyenv for python -={
 .PHONY: pyenv pyenv.install pyenv.uninstall pyenv.purge pyenv.plugins
 PYENV_ROOT=${EXTERN_D}/pyenv
@@ -127,8 +125,6 @@ scm/pyenv-virtualenv.git:
 	@git clone -q https://github.com/yyuu/$(@F) $@
 	@echo DONE
 #. }=-
-
-PLENV_VERSION := 5.18.2 #. WARNING: This must match libsite.sh
 #. plenv for perl -={
 .PHONY: plenv plenv.install plenv.uninstall plenv.purge plenv.plugins
 PLENV_ROOT=${EXTERN_D}/plenv
@@ -173,7 +169,7 @@ shflags.uninstall:
 	@-rm -r ${SRC_SHFLAGS}
 shflags.install: ${LIBSH}/shflags
 ${LIBSH}/shflags: ${SRC_SHFLAGS}
-	@ln -sf $(CURDIR)/$</src/shflags $@
+	@ln -sf ${HOME}/.site/var/$</src/shflags $@
 ${SRC_SHFLAGS}: ${TGZ_SHFLAGS}
 	@printf "Untarring $< into $(@D)..."
 	@tar -C $(@D) -xzf $<
@@ -194,7 +190,7 @@ shunit2.uninstall:
 	@-rm -r ${SRC_SHUNIT2}
 shunit2.install: libexec/shunit2
 libexec/shunit2: ${SRC_SHUNIT2}
-	@ln -sf $(CURDIR)/$</src/shunit2 $@
+	@ln -sf ${HOME}/.site/var/$</src/shunit2 $@
 ${SRC_SHUNIT2}: ${TGZ_SHUNIT2}
 	@printf "Untarring $< into $(@D)..."
 	@tar -C $(@D) -xzf $<

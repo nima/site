@@ -7,7 +7,7 @@ The module does X, Y and Z
 [core:docstring]
 
 function :template:funk() {
-    local -i e=${CODE_FAILURE}
+    local -i e=${CODE_FAILURE?}
 
     if [ $# -eq 2 ]; then
         echo "*** main function logic ***"
@@ -21,13 +21,13 @@ function :template:funk() {
 
 function template:funk:usage() { echo "<mandatory> [<optional:default>]"; }
 function template:funk() {
-    local -i e=${CODE_DEFAULT}
+    local -i e=${CODE_DEFAULT?}
 
     if [ $# -le 1 ]; then
         local mandatory=${1}
         local optional="${2:-default}"
         :template:funk "${mandatory}" "${optional}"
-        if [ $e -eq ${CODE_SUCCESS} ]; then
+        if [ $e -eq ${CODE_SUCCESS?} ]; then
             theme HAS_PASSED
         else
             theme HAS_FAILED
