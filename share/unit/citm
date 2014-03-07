@@ -57,6 +57,12 @@ if [ $# -eq 1 ]; then
                     run sudo apt-get install -qq dnsutils          ;((EXIT|=$?))
                 ;;
             esac
+
+            case ${MODULE} in
+                dns|remote)
+                    run sudo apt-get install -qq tmux              ;((EXIT|=$?))
+                ;;
+            esac
         ;;
 
         install)

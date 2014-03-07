@@ -1,7 +1,9 @@
 #!/bin/bash
 #site remote connect -C -T ${0#${0%?}} $@
-source ~/.siterc
-source ~/.site/lib/libsh/libsite/libsite.sh
+
+export SITE_PROFILE=$(${HOME}/.site/bin/activate)
+source ~/.site/.scm/lib/libsh/libsite/libsite.sh
+
 core:import net
 function myssh() {
     local -i e

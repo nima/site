@@ -10,52 +10,139 @@ core:import hgd
 core:import util
 
 core:requires ssh
+core:requires tmux
+core:requires socat
 core:requires netstat
 
-declare -g g_SSH_OPT
-g_SSH_OPTS="-q -o ConnectionAttempts=${USER_SSH_ATTEMPTS:-2} -o ConnectTimeout=${USER_SSH_TIMEOUT:-3} -o PasswordAuthentication=no"
+#.  :remote:sshproxy*() DEPRECATED -={
+#function :remote:sshproxystr() {
+#    core:raise EXCEPTION_DEPRECATED
+#
+#    local -i e=${CODE_FAILURE?}
+#
+#    if [ $# -eq 1 ]; then
+#        local tldid=$1
+#        local sshproxystr="${USER_SSH_PROXY[${tldid}]}"
+#        #. If the given tldid didn't checkout, try the wildcard tldid `_' - that
+#        #. is if it exists:
+#        if [ -z "${sshproxystr}" -a "${tldid}" != '_' ]; then
+#            sshproxystr="${USER_SSH_PROXY[_]}"
+#        fi
+#
+#        if [ -n "${sshproxystr}" ]; then
+#            e=${CODE_SUCCESS?}
+#
+#            echo "${sshproxystr}"
+#        fi
+#    else
+#        core:raise EXCEPTION_BAD_FN_CALL
+#    fi
+#
+#    return $e
+#}
 
-#. remote:connect() -={
+#function :remote:sshproxycmd() {
+#    core:raise EXCEPTION_DEPRECATED
+#
+#    local -i e=${CODE_FAILURE?}
+#
+#    if [ $# -eq 1 ]; then
+#        local ssh_proxy_cmd
+#
+#        local tldid=$1
+#
+#        local sshproxystr
+#        sshproxystr=$(:remote:sshproxystr ${tldid})
+#        if [ $? -eq ${CODE_SUCCESS?} ]; then
+#            local ssh_proxy
+#            if [ "${sshproxystr//[^:]/}" == ':' ]; then
+#                local -i ssh_port
+#                IFS=: read ssh_proxy ssh_port <<< "${sshproxystr}"
+#                #ssh_proxy_cmd="ssh -p ${ssh_port} ${USER_USERNAME?}@${ssh_proxy} nc %h 22"
+#                ssh_proxy_cmd="/usr/bin/ssh -p ${ssh_port} ${USER_USERNAME?}@${ssh_proxy} -W %h:%p"
+#                e=${CODE_SUCCESS?}
+#            elif [ -z "${sshproxystr//[^:]/}" ]; then
+#                ssh_proxy=${sshproxystr}
+#                #ssh_proxy_cmd="ssh ${USER_USERNAME?}@${ssh_proxy} nc %h 22"
+#                ssh_proxy_cmd="/usr/bin/ssh ${USER_USERNAME?}@${ssh_proxy} -W %h:%p"
+#                e=${CODE_SUCCESS?}
+#            else
+#                core:log ERR "Invalid proxy string (${sshproxystr})!"
+#                e=${CODE_FAILURE?}
+#            fi
+#        fi
+#
+#        [ -z "${ssh_proxy_cmd}" ] || echo "${ssh_proxy_cmd}"
+#    else
+#        core:raise EXCEPTION_BAD_FN_CALL
+#    fi
+#
+#    return ${e}
+#}
+
+#function :remote:sshproxyopts() {
+#    core:raise EXCEPTION_DEPRECATED
+#
+#    local -i e=${CODE_FAILURE?}
+#
+#    if [ $# -eq 1 ]; then
+#        local ssh_options
+#
+#        local tldid=$1
+#
+#        local sshproxystr
+#        sshproxystr=$(:remote:sshproxystr ${tldid})
+#        if [ $? -eq ${CODE_SUCCESS?} ]; then
+#            local ssh_proxy_cmd
+#            if [ "${sshproxystr//[^:]/}" == ':' -o -z "${sshproxystr//[^:]/}" ]; then
+#                ssh_proxy_cmd=$(:remote:sshproxycmd ${tldid})
+#                ssh_options="-o Ciphers=arcfour -o ProxyCommand='${ssh_proxy_cmd}'"
+#                e=${CODE_SUCCESS?}
+#            else
+#                core:log ERR "Invalid proxy string (${sshproxystr})!"
+#                e=${CODE_FAILURE?}
+#            fi
+#        fi
+#
+#        [ -z "${ssh_options}" ] || echo "${ssh_options}"
+#    else
+#        core:raise EXCEPTION_BAD_FN_CALL
+#    fi
+#
+#    return ${e}
+#}
+#. }=-
+
+#.   remote:connect() -={
 function :remote:connect() {
     local -i e=${CODE_FAILURE?}
 
     if [ $# -ge 2 ]; then
         local tldid="$1"
-        local qdn="$2"
+        local hcs="$2"
 
-        local ssh_opts
+        local ssh_options
         if [ $# -eq 2 ]; then
             #. User wants to ssh into a shell
-            ssh_opts="${g_SSH_OPTS?} -ttt"
+            ssh_options="${g_SSH_OPTS?} -ttt"
         elif [ $# -ge 3 ]; then
-            #. User wants to ssh and execute a command
-            ssh_opts="${g_SSH_OPTS?} -T"
+            if [ "$3" == "sudo" ]; then
+                #. User wants to ssh and execute a command via sudo
+                ssh_options="${g_SSH_OPTS?} -T"
+            else
+                #. User wants to ssh and execute a command
+                ssh_options="${g_SSH_OPTS?} -T"
+            fi
         else
             #. User is confused, and so we will follow.
             core:raise EXCEPTION_BAD_FN_CALL
         fi
+#       #. DEPRECATED
+#       ssh_options+=" $(:remote:sshproxyopts ${tldid})"
 
-        local ssh_proxy
-        [ ${tldid} == '.' ] || ssh_proxy=${USER_SSH_PROXY[${tldid}]}
-        if [ ${#ssh_proxy} -eq 0 ]; then
-            if [ $# -gt 2 ]; then
-                ssh ${ssh_opts} ${USER_USERNAME?}@${qdn} "${@:3}"
-                e=$?
-            else
-                ssh ${ssh_opts} ${USER_USERNAME?}@${qdn}
-                e=$?
-            fi
-        else
-            if [ $# -gt 2 ]; then
-                ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME?}@${ssh_proxy}\
-                    nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME?}@${qdn} "${@:3}"
-                e=$?
-            else
-                ssh ${ssh_opts} -o ProxyCommand="ssh ${USER_USERNAME?}@${ssh_proxy}\
-                    nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME?}@${qdn}
-                e=$?
-            fi
-        fi
+        export TERM=vt100
+        eval "ssh ${ssh_options} ${hcs} ${*:3}"
+        e=$?
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -63,43 +150,65 @@ function :remote:connect() {
     return $e
 }
 
-function remote:connect:usage() { echo "[-T|--tldid <tldid>] <hnh> [<cmd> [<args> [...]]]"; }
+function remote:connect:shflags() {
+    cat <<!
+boolean resolve   false  "resolve-first"  r
+!
+}
+function remote:connect:usage() { echo "<hnh> [<cmd> [<args> [...]]]"; }
 function remote:connect() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -ge 1 ]; then
-        local hnh=$1
         local tldid=${g_TLDID?}
 
-        local -a data
-        [ ! -t 1 ] || cpf "Resolving %{@host:%s} in %{@tldid:%s}..." "${hnh}" "${tldid}"
-        data=( $(:dns:lookup.csv ${tldid} a ${hnh}) )
+        local hnh=$1
+        local -i resolve=${FLAGS_resolve:-0}; ((resolve=~resolve+2)); unset FLAGS_resolve
+        [ "${hnh: -1}" != '.' ] || resolve=0
 
-        local qt hnh_ qual tldid_ usdn dn fqdn resolved qid
-        if [ ${#data[@]} -eq 1 ]; then
-            IFS=, read qt hnh_ qual tldid_ usdn dn fqdn resolved qid <<< "${data[0]}"
-            [ ! -t 1 ] || theme HAS_PASSED "${fqdn}/${resolved}"
-        elif [ ${#data[@]} -gt 1 ]; then
-            [ ! -t 1 ] || theme ERR "Too many matches to the <hnh> \`${hnh}'"
-            e=${CODE_FAILURE?}
+        local hcs qdn qt hnh_ qual tldid_ usdn dn fqdn resolved qid
+        [ ! -t 1 ] || cpf "Resolving %{@host:%s} in %{@tldid:%s}..." "${hnh}" "${tldid}"
+        if [ ${resolve} -eq 1 ]; then
+            local -a data=( $(:dns:lookup.csv ${tldid} a ${hnh}) )
+
+            if [ ${#data[@]} -eq 1 ]; then
+                IFS=, read qt hnh_ qual tldid_ usdn dn fqdn resolved qid <<< "${data[0]}"
+                [ ! -t 1 ] || theme HAS_PASSED "${fqdn}/${resolved}"
+
+                qdn="${fqdn%.${dn}}"
+                [ ! -t 1 ] || cpf "Connecting to %{@host:%s}.%{@tldid:%s}...\n"\
+                    "${qdn}" "${tldid}"
+
+                hcs=${fqdn}
+            elif [ ${#data[@]} -gt 1 ]; then
+                [ ! -t 1 ] || theme ERR "Too many matches to the <hnh> \`${hnh}'"
+                e=${CODE_FAILURE?}
+            else
+                [ ! -t 1 ] || theme ERR "Failed to resolve any host matching \`${hnh}'"
+                e=${CODE_FAILURE?}
+            fi
         else
-            [ ! -t 1 ] || theme ERR "Failed to resolve any host matching \`${hnh}'"
-            e=${CODE_FAILURE?}
+            hcs=${hnh}
+            [ ! -t 1 ] || theme HAS_WARNED "SKIPPED/${hcs}"
         fi
 
-        if [ ${#data[@]} -eq 1 ]; then
-            local qdn="${fqdn%.${dn}}"
-            [ ! -t 1 ] || cpf "Connecting as@to %{@user:%s}@%{@host:%s}.%{@tldid:%s}...\n"\
-                "${USER_USERNAME?}" "${qdn}" "${tldid}"
+        if [ $e -ne ${CODE_FAILURE?} ]; then
+#           #. DEPRECATED
+#           local sshproxystr=$(:remote:sshproxystr ${tldid})
+#           if [ $? -eq ${CODE_SUCCESS?} ]; then
+#               #. If bouncing, use the FQDN as we don't know if the remote host
+#               #. will resolve like out local site host:
+#               local hcs=${fqdn}
+#           fi
 
             if [ $# -eq 1 ]; then
-                :remote:connect ${tldid} ${qdn}
+                :remote:connect ${tldid} ${hcs}
                 e=$?
             else
-                :remote:connect ${tldid} ${qdn} "${@:2}"
+                :remote:connect ${tldid} ${hcs} "${@:2}"
                 e=$?
                 if [ $e -eq 255 ]; then
-                    [ ! -t 1 ] || theme HAS_FAILED "Failed to connect to \`${qdn}'"
+                    [ ! -t 1 ] || theme HAS_FAILED "Failed to connect to \`${hcs}'"
                 elif [ $e -ne ${CODE_SUCCESS?} ]; then
                     [ ! -t 1 ] || theme HAS_WARNED "Connection terminated with error code \`$e'"
                 fi
@@ -110,7 +219,7 @@ function remote:connect() {
     return $e
 }
 #. }=-
-#. remote:copy() -={
+#.   remote:copy() -={
 # TODO - if fqdn is sent, work out tldid backwards?
 function :remote:copy:cached() { echo 3600; }
 function :remote:copy:cachefile() { echo $4; }
@@ -122,22 +231,15 @@ function :remote:copy() {
 
     if [ $# -eq 4 ]; then
         local tldid=$1
-        local qdn=$2
+        local hcs=$2
         local src=$3
         local dst=$4
 
-        local ssh_proxy
-        [ ${tldid} == '.' ] || ssh_proxy=${USER_SSH_PROXY[${tldid}]}
-
-        local scp_opts="${g_SSH_OPTS?}"
-        if [ ${#ssh_proxy} -eq 0 ]; then
-            scp ${scp_opts} ${USER_USERNAME?}@${qdn}:${src} ${dst}
-            e=$?
-        else
-            scp ${scp_opts} -o ProxyCommand="ssh ${USER_USERNAME?}@${ssh_proxy}\
-                nc %h.${USER_TLDS[${tldid}]} 22" ${USER_USERNAME?}@${qdn}:${src} ${dst}
-            e=$?
-        fi
+        local ssh_options="${g_SSH_OPTS?}"
+#       #. DEPRECATED
+#       ssh_options+=" $(:remote:sshproxyopts ${tldid})"
+        eval "scp ${ssh_options} ${hcs}:${src} ${dst}"
+        e=$?
     else
         core:raise EXCEPTION_BAD_FN_CALL
     fi
@@ -176,7 +278,7 @@ function remote:copy() {
     return $e
 }
 #. }=-
-#. remote:sudo() -={
+#.   remote:sudo() -={
 function ::remote:pipewrap() {
     #. This function acts mostly as a transparent pipe; data in -> data out.
     #.
@@ -187,20 +289,16 @@ function ::remote:pipewrap() {
     #. terminal and sends it to the ssh process directly.
     #.
     #. Credits: https://code.google.com/p/sshsudo/
-    local password="${1}"
-    local lockFile="${2}";
+    local passwd="${1}"
+    local lckfile="${2}"
 
-    echo "${password}"
+    printf '%s\n' "${passwd}"
 
     #. The function will exit when output pipe is closed,
-    while [ -e $lockFile ]; do
+    while [ -e ${lckfile} ]; do
         # i.e., the ssh process
         read -t 1 line
-        if [ $? -eq 0 ]; then
-            # successfully read
-            #echo $line
-            : jej
-        fi
+        [ $? -ne 0 ] || echo "${line}"
     done
 }
 
@@ -210,25 +308,25 @@ function :remote:sudo() {
     core:import vault
 
     if [ $# -ge 3 ]; then
-        local passwd
         local tldid="$1"
-        local qdn="$2"
+        local hcs="$2"
 
         local sudo_opts=
         local lckfile=$(mktemp)
 
+        local passwd
         passwd="$(:vault:read SUDO)"
         if [ $? -eq ${CODE_SUCCESS?} ]; then
-            ::remote:pipewrap "${passwd}" "${lckfile}" | (
-                local prompt="$(printf ".\r")"
-                :remote:connect ${tldid} ${qdn} sudo -p "${prompt}" -S "${@:3}"
+            local prompt="$(printf "\r")"
+            eval ::remote:pipewrap '${passwd}' '${lckfile}' | (
+                :remote:connect ${tldid} ${hcs} sudo -p "${prompt}" -S "${@:3}"
                 e=$?
                 rm -f ${lckfile}
                 exit $e
             )
             e=$?
         else
-            :remote:connect ${tldid} ${qdn} sudo -S "${@:3}"
+            :remote:connect ${tldid} ${hcs} sudo -S "${@:3}"
             e=$?
         fi
     else
@@ -245,18 +343,29 @@ function remote:sudo() {
     if [ $# -ge 2 ]; then
         local -r hnh="$1"
         local -r tldid="${g_TLDID?}"
+        [ ! -t 1 ] || cpf "Resolving %{@host:%s} in %{@tldid:%s}..." "${hnh}" "${tldid}"
 
         local -a data
-        [ ! -t 1 ] || cpf "Resolving %{@host:%s} in %{@tldid:%s}..." "${hnh}" "${tldid}"
         data=( $(:dns:lookup.csv ${tldid} a ${hnh}) )
 
         local qt hnh_ qual tldid_ usdn dn fqdn resolved qid
         if [ ${#data[@]} -eq 1 ]; then
             IFS=, read qt hnh_ qual tldid_ usdn dn fqdn resolved qid <<< "${data[0]}"
+            [ ! -t 1 ] || theme HAS_PASSED "${fqdn}"
 
-            local qdn=${fqdn%.${dn}}
-            [ ! -t 1 ] || theme INFO "Sudoing at ${qdn}.${tldid}..."
-            :remote:sudo ${tldid} ${qdn} "${@:2}"
+            local hcs=${fqdn}
+#           #. DEPRECATED
+#           local sshproxystr=$(:remote:sshproxystr ${tldid})
+#           if [ $? -eq ${CODE_SUCCESS?} ]; then
+#               #. If bouncing, use the FQDN as we don't know if the remote host
+#               #. will resolve like out local site host:
+#               local hcs=${fqdn}
+#           fi
+
+            [ ! -t 1 ] || theme INFO "SUDOing \`${*:2}'"
+            :remote:sudo ${tldid} ${hcs} "${@:2}"
+        else
+            [ ! -t 1 ] || theme HAS_FAILED "${hnh}"
         fi
         e=$?
     fi
@@ -264,7 +373,7 @@ function remote:sudo() {
     return $e
 }
 #. }=-
-#. remote:tmux() -={
+#.   remote:tmux() -={
 function remote:cluster:alert() {
     cat <<!
 DEPR This function has been deprecated in favour of tmux.
@@ -383,7 +492,8 @@ function ::remote:tmux() {
 
         local -a hosts=( $(:hgd:resolve ${tldid} ${hgd}) )
         if [ ${#hosts[@]} -gt 0 ]; then
-            tmux new-session -d -s "${session}"
+            local cmd="tmux new-session -d -s '${session}'"
+            eval ${cmd}
             if [ $? -eq 0 ]; then
                 local tab
                 local -i pid
@@ -403,14 +513,16 @@ function ::remote:tmux() {
                             tmux select-window -t "${session}:${tab}"
                         fi
                     else
-                        tmux rename-window -t "${session}:0" "${tab}"
+                        tmux rename-window -t "${session}" "${tab}"
                         tmux select-window -t "${session}:${tab}"
                     fi
                     ((otid=tid))
 
                     [ ${lpid} -eq 0 ] || tmux split-window -h
                     cpf "Connection %{g:${tab}}:%{@int:${pid}} to %{@host:${hosts[${pid}]}}..."
-                    tmux send-keys -t "${lpid}" "${SITE_CORE_BIN?}/ssh ${hosts[${pid}]}" C-m
+                    #if [[ ${hosts[${pid}]} =~ /
+                    tmux send-keys -t "${lpid}" "site remote connect '${hosts[${pid}]}'" C-m
+                    #tmux send-keys -t "${lpid}" "${SITE_CORE_BIN?}/ssh ${hosts[${pid}]}" C-m
                     #XXX tmux send-keys -t "${lpid}" "ss${tldid} ${hosts[${pid}]}" C-m
                     tmux select-layout -t "${session}:${tab}" tiled >/dev/null
                     theme HAS_PASSED "${tab}:${pid}"
@@ -432,10 +544,10 @@ function ::remote:tmux() {
                 tmux attach-session -t "${session}"
                 [ $? -ne 0 ] || e=${CODE_SUCCESS?}
             else
-                theme HAS_WARNED "empty HGD resolution" >&2
+                core:log WARN "Empty HGD resolution"
             fi
         else
-            theme HAS_FAILED "tmux new-session -d -s '${session}'" >&2
+            core:log ERR "Failed to execute cmd \`${cmd}'"
         fi
     else
         core:raise EXCEPTION_BAD_FN_CALL
@@ -495,7 +607,7 @@ function remote:tmux() {
     return $e
 }
 #. }=-
-#. remote:mon() -={
+#.   remote:mon() -={
 #. Deprecated Mon Serial Execution
 function ::remote:serialmon() {
     local -i e=${CODE_FAILURE?}
@@ -526,6 +638,7 @@ function remote:mon:shflags() {
     cat <<!
 integer timeout   8     "timeout"      t
 integer threads   32    "threads"      h
+integer attempts  3     "attempts"     a
 boolean sudo      false "run-as-root"  s
 !
 }
@@ -533,12 +646,18 @@ function remote:mon:usage() { echo "<hgd:*> @$(echo ${!USER_MON_CMDGRPREMOTE[@]}
 function remote:mon() {
     local -i e=${CODE_DEFAULT?}
 
-    core:requires PYTHON paramiko futures
-    core:requires socat
+    #core:requires PYTHON futures
+    #core:requires PYTHON paramiko
+
+    core:requires RUBY gpgme
+    core:requires RUBY net-ssh
+    core:requires RUBY net-ssh-multi
+    core:requires RUBY net-ssh-gateway
 
     if [ $# -ge 2 ]; then
-        local -i timeout=${FLAGS_timeout:-3}; unset FLAGS_timeout
-        local -i threads=${FLAGS_threads:-64}; unset FLAGS_threads
+        local -i timeout=${FLAGS_timeout:-8}; unset FLAGS_timeout
+        local -i threads=${FLAGS_threads:-32}; unset FLAGS_threads
+        local -i attempts=${FLAGS_attempts:-3}; unset FLAGS_attempts
         local -i sudo=${FLAGS_sudo:-0}; ((sudo=~sudo+2)); unset FLAGS_sudo
 
         local -r hgd="$1"
@@ -557,6 +676,7 @@ function remote:mon() {
             e=${CODE_FAILURE?}
 
             cpf "Processing..."
+            local qdn ip
             local -a qdns
             qdns=( $(:hgd:resolve ${tldid} ${hgd}) )
             e=$?
@@ -574,14 +694,24 @@ function remote:mon() {
                 if [ ${threads} -gt 1 ]; then
                     local script=
 
-                    if [ ${sudo} -eq 1 ]; then
-                        script="${SITE_CORE_LIBEXEC?}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME?}:SUDO@${csv_hosts} ${rcmd}"
-                    else
-                        script="${SITE_CORE_LIBEXEC?}/ssh ${threads} ${timeout} mod_hgd=${USER_USERNAME?}@${csv_hosts} ${rcmd}"
-                    fi
+                    ::xplm:loadvirtenv rb
+                    script="${SITE_CORE_LIBEXEC?}/ssh.rb ${threads} 1 ${timeout} mod_hgd=${csv_hosts} ${rcmd}"
                     #echo "#. DEBUG: ${script}" >&2
 
-                    eval "$(USER_TLD=${USER_TLDS[${tldid}]} USER_SSH_PROXY=${USER_SSH_PROXY[${tldid}]} ${script})"
+#                   local sshproxystr=$(:remote:sshproxystr ${tldid})
+#                   local ssh_proxy_host=${sshproxystr%:*}
+#                   local ssh_proxy_port=22
+#                   [ "${sshproxystr//[^:]/}" != ':' ] || ssh_proxy_port=${sshproxystr#*:}
+#                   local data="$(
+#                       SSH_PROXY_HOST=${ssh_proxy_host}\
+#                       SSH_PROXY_PORT=${ssh_proxy_port}\
+#                       TLD=${USER_TLDS[${tldid}]} ${script}
+#                   )"
+
+                    local sid
+                    [ ${sudo} -eq 0 ] || sid=SUDO
+                    local data="$(SUDO=${sid} TLD=${USER_TLDS[${tldid}]} ${script})"
+                    eval "${data}"
 
                     local qdn
                     for qdn in ${qdns[@]}; do

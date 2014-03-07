@@ -7,13 +7,38 @@ function testCoreRemoteImport() {
 }
 
 #. Remote -={
+
+#. testCoreRemoteSshproxystrInternal DEPRECATED -={
+#function testCoreRemoteSshproxystrInternal() {
+#    core:import remote
+#
+#    :remote:sshproxystr _ >${stdoutF?} 2>${stderrF?}
+#    assertFalse 1.1 $?
+#}
+#. }=-
+#. testCoreRemoteSshproxyoptsInternal DEPRECATED -={
+#function testCoreRemoteSshproxyoptsInternal() {
+#    core:import remote
+#
+#    :remote:sshproxyopts _ >${stdoutF?} 2>${stderrF?}
+#    assertFalse 1.1 $?
+#}
+#. }=-
+#. testCoreRemoteSshproxycmdInternal DEPRECATED -={
+#function testCoreRemoteSshproxycmdInternal() {
+#    core:import remote
+#
+#    :remote:sshproxycmd _ >${stdoutF?} 2>${stderrF?}
+#    assertFalse 1.1 $?
+#}
+#. }=-
 #. testCoreRemoteConnectInternal -={
 function testCoreRemoteConnectInternal() {
     core:import remote
 
     local hn1 hn2
     hn1=$(hostname -f)
-    hn2=$(:remote:connect . host-8c.unit-tests.mgmt.site -- hostname -f)
+    hn2=$(:remote:connect _ host-8c.unit-tests.mgmt.site -- hostname -f)
     assertTrue   1.1 $?
     assertEquals 1.2 "${hn1}" "${hn2}"
 }
@@ -24,7 +49,7 @@ function testCoreRemoteConnectPublic() {
 
     local hn1 hn2
     hn1=$(hostname -f)
-    hn2=$(core:wrapper remote connect -T. host-8c.unit-tests.mgmt.site -- hostname -f)
+    hn2=$(core:wrapper remote connect -T _ host-8c.unit-tests.mgmt.site -- hostname -f)
     assertTrue   1.1 $?
     assertEquals 1.2 "${hn1}" "${hn2}"
 }
@@ -35,7 +60,7 @@ function testCoreRemoteCopyInternal() {
 
     rm -f ${SITE_USER_CACHE}/hosts
 
-    :remote:copy . host-8c.unit-tests.mgmt.site\
+    :remote:copy _ host-8c.unit-tests.mgmt.site\
         /etc/hosts\
         ${SITE_USER_CACHE}/hosts
     assertTrue 1.1 $?
@@ -63,8 +88,8 @@ function testCoreRemoteCopyPublic() {
 
     rm -f ${SITE_USER_CACHE}/hosts
 
-    core:wrapper remote copy -T. host-8c.unit-tests.mgmt.site\
-        /etc/hosts ${SITE_USER_CACHE}/hosts  >${stdoutF?} 2>${stderrF?}
+    core:wrapper remote copy -T _ host-8c.unit-tests.mgmt.site\
+        /etc/hosts ${SITE_USER_CACHE}/hosts >${stdoutF?} 2>${stderrF?}
     assertTrue 1.1 $?
 
     [ -f ${SITE_USER_CACHE}/hosts ]
@@ -87,7 +112,7 @@ function testCoreRemoteSudoInternal() {
     core:import remote
 
     local who
-    who=$(:remote:sudo . host-8f.api whoami)
+    who=$(:remote:sudo _ host-8f.api whoami)
     assertTrue   1.1 $?
     assertEquals 1.2 "root" "${who}"
 }
@@ -97,7 +122,7 @@ function testCoreRemoteSudoPublic() {
     core:import remote
 
     local who
-    who=$(core:wrapper remote sudo -T. host-8f.api whoami)
+    who=$(core:wrapper remote sudo -T _ host-8f.api whoami)
     assertTrue   1.1 $?
     assertEquals 1.2 "root" "${who}"
 }
