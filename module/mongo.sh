@@ -13,13 +13,13 @@ core:requires mongo
 function :mongo:query() {
     local -i e=${CODE_FAILURE?}
 
-    if [ $# -gt 1 ]; then
+    if [ $# -gt 2 ]; then
         local db=$1
-        shift 1
+        local collection=$2
 
         local -a filters
         local -a display
-        for kvp in $@; do
+        for kvp in ${@:3}; do
             if [[ ${kvp} =~ [^=]+=.+ ]]; then
                 filters+=( "${kvp//=*}: ${kvp##*=}" )
             else
@@ -31,7 +31,7 @@ function :mongo:query() {
             #"load(\"${SITE_CORE_LIBJS?}/mongo/helper.js\")"
             local -a jseval=(
                 "var filters = { $(:util:join ', ' filters) }"
-                "var data = db.nodes.find(filters, { _id: 0 }).toArray()"
+                "var data = db.${collection}.find(filters, { _id: 0 }).toArray()"
                 "printjson(data)"
             )
 
@@ -53,4 +53,8 @@ function :mongo:query() {
     return $e
 }
 #. }=-
+
+function mongo:host() {
+    :mongo:query ${SITE_PROFILE} host "$@"
+}
 #. }=-
