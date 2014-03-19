@@ -68,7 +68,7 @@ function :vault:create() {
     return $e
 }
 
-function vault:create:usage() { echo "[<vault-path:~/.secrets>]"; }
+function vault:create:usage() { echo "[<vault-path:${g_VAULT}>]"; }
 function vault:create() {
     local -i e=${CODE_DEFAULT?}
 
@@ -223,9 +223,14 @@ function :vault:read() {
         core:raise EXCEPTION_BAD_FN_CALL
     fi
 
-    :gpg:decrypt "${vault}" - |
-        awk 'BEGIN{e=1};$1~/^\<'${sid}'\>/{print$2;e=0};END{exit(e)}'
-    e=$?
+    local secret
+    secret="$(:gpg:decrypt "${vault}" - | sed -ne "s/^${sid}\> \+\(.*\)\$/\1/p")"
+    if [ ${#secret} -gt 0 ]; then
+        printf '%s' "${secret}"
+        e=${CODE_SUCCESS?}
+    else
+        core:log WARNING "No such sid: ${secret}"
+    fi
 
     return $e
 }
@@ -235,21 +240,21 @@ function vault:read() {
     local -i e=${CODE_DEFAULT?}
 
     if [ $# -eq 1 -o $# -eq 2 ]; then
-        local secret="${1}"
+        local sid="${1}"
         local vault="${2:-${g_VAULT?}}"
 
-        [ ! -t 1 ] || cpf "Checking for secret id %{r:%s}..." "${secret}"
+        [ ! -t 1 ] || cpf "Checking for secret id %{r:%s}..." "${sid}"
 
-        local -a secrets
-        secrets=$(:vault:read "${vault}" "${secret}")
+        local secret
+        secret="$(:vault:read "${vault}" "${sid}")"
         e=$?
 
-        if [ $e -eq 0 -a ${#secrets[@]} -eq 1 ]; then
+        if [ $e -eq 0 ]; then
             if [ -t 1 ]; then
-                printf "${secrets[0]}" | xclip -i
+                printf "%s" "${secret}" | xclip -i
                 theme HAS_PASSED "COPIED_TO_CLIPBOARD"
             else
-                printf "${secrets[0]}"
+                printf "%s" "${secret}"
             fi
         else
             theme HAS_FAILED "NO_SUCH_SECRET_ID"
