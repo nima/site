@@ -1,8 +1,9 @@
 export MAKEFLAGS := --no-print-directory --warn-undefined-variables
 
-REQUIRED  := make sed awk
+REQUIRED := make sed awk
 
-EXTERN_D  := ${HOME}/.site/var
+#. === SITE_USER_VAR
+EXTERN_D := ${HOME}/.site/var
 export EXTERN_D
 
 export VCS_D=${CURDIR}

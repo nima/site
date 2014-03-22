@@ -28,7 +28,8 @@ export SITE_UNIT_FILES=${SITE_CORE}/share/unit/tests
 export SITE_USER=${HOME}/.site
 export SITE_USER_VAR=${SITE_USER}/var
 export SITE_USER_RUN=${SITE_USER}/var/run
-export SITE_USER_CACHE=${SITE_USER}/var/cache/
+export SITE_USER_SCM=${SITE_USER}/var/scm
+export SITE_USER_CACHE=${SITE_USER}/var/cache
 export SITE_USER_ETC=${SITE_USER}/etc
 export SITE_USER_LOG=${SITE_USER}/var/log/site.log
 export SITE_USER_TMP=${SITE_USER}/var/tmp
@@ -43,12 +44,14 @@ PATH+=:${SITE_CORE_LIBEXEC}
 PATH+=:${SITE_USER_LIBEXEC}
 export PATH
 
-source ${SITE_CORE_LIB}/xplm.conf
+export RBENV_VERSION=2.1.1
 #. Ruby -={
 #. rbenv
 RBENV_ROOT=${SITE_USER_VAR}/rbenv
-export RBENV_ROOT
+export RBENV_ROOT RBENV_VERSION
 #. }=-
+
+export PYENV_VERSION=3.4.0
 #. Python -={
 PYTHONPATH+=:${SITE_CORE_LIBPY}
 PYTHONPATH+=:${SITE_USER_LIBPY}
@@ -58,6 +61,8 @@ export PYTHONPATH
 PYENV_ROOT=${SITE_USER_VAR}/pyenv
 export PYENV_ROOT PYENV_VERSION
 #. }=-
+
+export PLENV_VERSION=5.18.2
 #. Perl -={
 #. plenv
 PLENV_ROOT=${SITE_USER_VAR}/plenv

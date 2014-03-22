@@ -2,6 +2,10 @@
 
 :<<[core:docstring]
 This modules handles everything Python!
+
+You will need to install the dependencies; on Debian:
+
+    sudo apt-get install libreadline-dev libbz2-dev zlib1g-dev libssl-dev
 [core:docstring]
 
 #. XPLM->Python -={
@@ -23,6 +27,16 @@ function py:install() {
     local -i e=${CODE_DEFAULT?}
 
     xplm:install py "$@"
+    e=$?
+
+    return $e
+}
+#. }=-
+#. py:purge -={
+function py:purge() {
+    local -i e=${CODE_DEFAULT?}
+
+    xplm:purge py "$@"
     e=$?
 
     return $e
@@ -54,6 +68,7 @@ function py:repl() {
     local -i e=${CODE_DEFAULT?}
 
     xplm:repl py "$@"
+    e=$?
 
     return $e
 }

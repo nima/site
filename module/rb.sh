@@ -28,6 +28,16 @@ function rb:install() {
     return $e
 }
 #. }=-
+#. rb:purge -={
+function rb:purge() {
+    local -i e=${CODE_DEFAULT?}
+
+    xplm:purge rb "$@"
+    e=$?
+
+    return $e
+}
+#. }=-
 #. rb:shell -={
 function rb:shell() {
     local -i e=${CODE_DEFAULT?}
@@ -54,6 +64,7 @@ function rb:repl() {
     local -i e=${CODE_DEFAULT?}
 
     xplm:repl rb "$@"
+    e=$?
 
     return $e
 }

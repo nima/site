@@ -13,16 +13,13 @@ ifneq (${DLA},)
 flycatcher:
 	@echo "Do not run make here unless you know what you're doing."
 
-EXTERN_XPLM := rbenv plenv pyenv
-
 EXTERN := shflags shunit2
-EXTERN += ${EXTERN_XPLM}
 EXTERN += vimpager jsontool
 
-LIBSH   := lib/libsh
-LIBRB   := lib/librb
-LIBPY   := lib/libpy
-LIBPL   := lib/libpl
+LIBSH  := lib/libsh
+LIBRB  := lib/librb
+LIBPY  := lib/libpy
+LIBPL  := lib/libpl
 
 #. Installation -={
 .PHONY: prepare install $(EXTERN:%=%.install)
@@ -56,107 +53,6 @@ purge: $(EXTERN:%=%.purge)
 	rm -rf lib
 	rm -rf libexec
 	rm -f .install
-#. }=-
-
-include ${VCS_D}/lib/xplm.conf
-#. rbenv for ruby -={
-.PHONY: rbenv rbenv.install rbenv.uninstall rbenv.purge rbenv.plugins
-RBENV_ROOT=${EXTERN_D}/rbenv
-export RBENV_ROOT RBENV_VERSION
-
-rbenv.install: rbenv
-rbenv.uninstall:
-	@rm -f libexec/rbenv
-rbenv.purge: rbenv.uninstall
-	@rm -rf rbenv
-	@rm -rf scm/rbenv.git
-	@rm -rf scm/ruby-build.git
-
-rbenv: libexec/rbenv rbenv.plugins
-libexec/rbenv: scm/rbenv.git
-	@printf "Installing $(@F) executable..."
-	@ln -s ${EXTERN_D}/$</bin/${@F} $@
-	@echo DONE
-scm/rbenv.git:
-	@printf "Cloning $(@F)..."
-	@git clone -q https://github.com/sstephenson/rbenv.git $@
-	@echo DONE
-
-rbenv.plugins: rbenv/plugins rbenv/plugins/ruby-build
-rbenv/plugins:
-	@mkdir -p $@
-	@$(foreach m,$(wildcard scm/rbenv.git/plugins/*),ln -s ${EXTERN_D}/$m $@/$(notdir $m);)
-rbenv/plugins/ruby-build: scm/ruby-build.git; @ln -s ${EXTERN_D}/$< $@
-scm/ruby-build.git:
-	@printf "Cloning $(@F)..."
-	@git clone -q https://github.com/sstephenson/ruby-build.git $@
-	@echo DONE
-#. }=-
-#. pyenv for python -={
-.PHONY: pyenv pyenv.install pyenv.uninstall pyenv.purge pyenv.plugins
-PYENV_ROOT=${EXTERN_D}/pyenv
-export PYENV_ROOT PYENV_VERSION
-
-pyenv.install: pyenv
-pyenv.uninstall:
-	@rm -f libexec/pyenv
-pyenv.purge: pyenv.uninstall
-	@rm -rf pyenv
-	@rm -rf scm/pyenv.git
-	@rm -rf scm/python-build.git
-
-pyenv: libexec/pyenv pyenv.plugins
-libexec/pyenv: scm/pyenv.git
-	@printf "Installing $(@F) executable..."
-	@ln -s ${EXTERN_D}/$</bin/${@F} $@
-	@echo DONE
-scm/pyenv.git:
-	@printf "Cloning $(@F)..."
-	@git clone -q https://github.com/yyuu/$(@F) $@
-	@echo DONE
-
-pyenv.plugins: pyenv/plugins pyenv/plugins/pyenv-virtualenv
-pyenv/plugins:
-	@mkdir -p $@
-	@$(foreach m,$(wildcard scm/pyenv.git/plugins/*),ln -s ${EXTERN_D}/$m $@/$(notdir $m);)
-pyenv/plugins/pyenv-virtualenv: scm/pyenv-virtualenv.git; @ln -s ${EXTERN_D}/$< $@
-scm/pyenv-virtualenv.git:
-	@printf "Cloning $(@F)..."
-	@git clone -q https://github.com/yyuu/$(@F) $@
-	@echo DONE
-#. }=-
-#. plenv for perl -={
-.PHONY: plenv plenv.install plenv.uninstall plenv.purge plenv.plugins
-PLENV_ROOT=${EXTERN_D}/plenv
-export PLENV_ROOT PLENV_VERSION
-
-plenv.install: plenv
-plenv.uninstall:
-	@rm -f libexec/plenv
-plenv.purge: plenv.uninstall
-	@rm -rf plenv
-	@rm -rf scm/plenv.git
-	@rm -rf scm/perl-build.git
-
-plenv: libexec/plenv plenv.plugins
-libexec/plenv: scm/plenv.git
-	@printf "Installing $(@F) executable..."
-	@ln -s ${EXTERN_D}/$</bin/${@F} $@
-	@echo DONE
-scm/plenv.git:
-	@printf "Cloning $(@F)..."
-	@git clone -q https://github.com/tokuhirom/$(@F) $@
-	@echo DONE
-
-plenv.plugins: plenv/plugins plenv/plugins/perl-build
-plenv/plugins:
-	@mkdir -p $@
-	@$(foreach m,$(wildcard scm/plenv.git/plugins/*),ln -s ${EXTERN_D}/$m $@/$(notdir $m);)
-plenv/plugins/perl-build: scm/perl-build.git; @ln -s ${EXTERN_D}/$< $@
-scm/perl-build.git:
-	@printf "Cloning $(@F)..."
-	@git clone -q git://github.com/tokuhirom/Perl-Build.git $@
-	@echo DONE
 #. }=-
 
 #. shflags -={

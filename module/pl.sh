@@ -28,6 +28,16 @@ function pl:install() {
     return $e
 }
 #. }=-
+#. pl:purge -={
+function pl:purge() {
+    local -i e=${CODE_DEFAULT?}
+
+    xplm:purge pl "$@"
+    e=$?
+
+    return $e
+}
+#. }=-
 #. pl:shell -={
 function pl:shell() {
     local -i e=${CODE_DEFAULT?}
@@ -54,6 +64,7 @@ function pl:repl() {
     local -i e=${CODE_DEFAULT?}
 
     xplm:repl pl "$@"
+    e=$?
 
     return $e
 }
