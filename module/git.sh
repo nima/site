@@ -342,6 +342,27 @@ function git:gource() {
     return $e
 }
 #. }=-
+function git:remail() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -eq 3 ]; then
+        local fullname="$1"
+        local newname="$2"
+        local newmail="$3"
+
+        git filter-branch --commit-filter "
+if [ \"\$GIT_COMMITTER_NAME\" = \"${fullname}\" ];
+then
+        GIT_COMMITTER_NAME=\"${newname}\";
+        GIT_AUTHOR_NAME=\"${newname}\";
+        GIT_COMMITTER_EMAIL=\"${newmail}\";
+        GIT_AUTHOR_EMAIL=\"${newmail}\";
+        git commit-tree \"\$@\";
+else
+        git commit-tree \"\$@\";
+fi" HEAD
+    fi
+}
 
 #. Debugging/Academic -={
 function _:git:add:usage() { echo "<git-repo-dir> <file>"; }
