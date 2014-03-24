@@ -13,7 +13,7 @@ function testCoreHgdMultiPublic() {
     core:import hgd
 
     local session=${FUNCNAME}
-    core:wrapper hgd save -T. ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
+    core:wrapper hgd save -T _ ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:save.0' $?
     grep -qE "\<${session}\>" ${SITE_USER_CACHE}/hgd.conf
     assertTrue 'hgd:save.1' $?
@@ -53,7 +53,7 @@ function testCoreHgdMultiInternal() {
     core:import hgd
 
     local session=${FUNCNAME}
-    :hgd:save . ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
+    :hgd:save _ ${session} '|(#10.1.2.3/29)' >${stdoutF?} 2>${stderrF?}
     assertTrue 'hgd:save.0' $?
     grep -qE "\<${session}\>" ${SITE_USER_CACHE}/hgd.conf
     assertTrue 'hgd:save.1' $?

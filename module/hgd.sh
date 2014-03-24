@@ -58,7 +58,7 @@ function ::hgd:explode() {
             ;;
             '@')
                 local host
-                host="$(:dns:qdn ${tldid} ${hgdn})"
+                host="$(:dns:get ${tldid} fqdn ${hgdn})"
                 if [ $? -eq ${CODE_SUCCESS?} ]; then
                     echo "${host}"
                 else
@@ -81,36 +81,48 @@ function ::hgd:explode() {
                     IFS=/ read subnet netmask <<< "${hgdn}"
                     if [ -n "${subnet}" -a -n "${netmask}" ]; then
                         :net:hosts ${subnet}/${netmask}
-                        [ $? -eq ${CODE_SUCCESS?} ] || e=${CODE_FAILURE?}
+                        e=${PIPESTATUS[0]}
                     fi
                 elif [ "${hgdn//[^\/]/}" == "" ]; then
                     echo ${hgdn}
                 fi
             ;;
             .|/)
-                local kn
                 local -a hosts
-                for kh in ${HOME?}/.ssh/known_hosts; do
-                    if [ -e "${kh}" ]; then
-                        if [ ${hgdc} == '.' ]; then
-                            hosts=(
-                                $(awk -F'[, ]' '$1~/'${hgdn}'\>$/{print$1}' ${kh})
-                            )
-                        elif [ ${hgdc} == ${hgdl} ]; then
-                            hosts=(
-                                $(awk -F'[, ]' '$1~'${hgd}'{print$1}' ${kh})
-                            )
-                        else
-                            e=${CODE_FAILURE?}
-                        fi
+                if [ ${hgdc} == '.' ]; then
+                    hosts=(
+                        $(awk -F'[ ]+' '$2~/'${hgdn}'\>$/{print$2}' <(getent hosts))
+                    )
+                elif [ ${hgdc} == ${hgdl} ]; then
+                    hosts=(
+                        $(awk -F'[ ]+' '$2~'${hgd}'{print$2}' <(getent hosts))
+                    )
+                else
+                    e=${CODE_FAILURE?}
+                fi
 
-                        if [ ${#hosts[@]} -gt 0 ]; then
-                            echo ${hosts[@]}
-                        else
-                            e=${CODE_FAILURE?}
+                local -a khs=( ${HOME?}/.ssh/known_hosts )
+                if [ $e -ne ${CODE_FAILURE?} ]; then
+                    for kh in ${#khs[@]}; do
+                        if [ -r "${kh}" ]; then
+                            if [ ${hgdc} == '.' ]; then
+                                hosts+=(
+                                    $(awk -F'[, ]' '$1~/'${hgdn}'\>$/{print$1}' ${kh})
+                                )
+                            elif [ ${hgdc} == ${hgdl} ]; then
+                                hosts+=(
+                                    $(awk -F'[, ]' '$1~'${hgd}'{print$1}' ${kh})
+                                )
+                            fi
                         fi
+                    done
+
+                    if [ ${#hosts[@]} -gt 0 ]; then
+                        printf "%s\n" ${hosts[@]} | sort -u
+                    else
+                        e=${CODE_FAILURE?}
                     fi
-                done
+                fi
             ;;
             *) e=${CODE_FAILURE?};;
         esac
@@ -126,7 +138,7 @@ function ::hgd:resolve() {
     local -A buffers
 
     if [ $# -eq 2 ]; then
-        local tldid=$1
+        local tldid="$1"
         local eq="$2"
         local buf
         buf=$(sets "${eq}")
@@ -138,7 +150,7 @@ function ::hgd:resolve() {
                 if [ $? -eq 0 ]; then
                     buffers[${hgd}]="${buf}"
                 else
-                    theme ERR "Failed to resolve ${hgd}"
+                    core:log WARNING "Failed to resolve ${hgd}"
                     e=${CODE_FAILURE?}
                     break
                 fi
@@ -178,7 +190,7 @@ function :hgd:resolve() {
         elif [[ ${2:0:1} =~ ^[a-zA-Z0-9]$ ]]; then
             local session="$2"
             local -a buflist
-            buflist=( $(awk -F '\t' '$1~/^'${session}'$/&&$2~/^('${tldid}'|\.)$/{print$0}' ${g_HGD_CACHE?}) )
+            buflist=( $(awk -F '\t' '$1~/^'${session}'$/&&$2~/^('${tldid}'|\_)$/{print$0}' ${g_HGD_CACHE?}) )
             if [ $? -eq ${CODE_SUCCESS?} -a ${#buflist[@]} -gt 3 ]; then
                 e=${CODE_SUCCESS?}
                 echo ${buflist[@]:4}
@@ -226,15 +238,21 @@ function hgd:resolve() {
     local tldid=${g_TLDID?}
     if [ $# -eq 1 ]; then
         local eq=$1
-        local -a resolved
-        resolved=$(:hgd:resolve "${tldid}" "${eq}")
-        e=$?
-        if [ $e -eq ${CODE_SUCCESS?} ]; then
-            for token in ${resolved[@]}; do
-                cpf '%{b:%s}\n' ${token}
-            done | sort -n
+        local tld
+        if tld=$(core:tld "${tldid}"); then
+            local -a resolved
+            resolved=$(:hgd:resolve "${tldid}" "${eq}")
+            e=$?
+            if [ $e -eq ${CODE_SUCCESS?} ]; then
+                for token in ${resolved[@]}; do
+                    cpf '%{b:%s}\n' ${token}
+                done | sort #| sort -n -t. -k1,1n -k2,2n -k3,3n -k4,4n -r
+            else
+                theme ERR_USAGE "Bad formula or zero matches with equation \`${eq}' and TLDID ${tldid}"
+            fi
         else
-            theme ERR_USAGE "Bad formula or zero matches with equation: ${eq}"
+            e=${CODE_FAILURE?}
+            theme ERR_USAGE "Invalid TLDID ${tldid}"
         fi
     fi
 
@@ -271,11 +289,16 @@ function hgd:save() {
     local tldid=${g_TLDID?}
     if [ $# -eq 2 ]; then
         local session="$1"
-        local hgd="$2"
-        if :hgd:save "${tldid}" "${session}" "${hgd}"; then
-            e=${CODE_SUCCESS?}
+        if [ -z "${session//[-a-zA-Z0-9]/}" ]; then
+            local hgd="$2"
+            if :hgd:save "${tldid}" "${session}" "${hgd}"; then
+                e=${CODE_SUCCESS?}
+            else
+                theme ERR_USAGE "There is no <hgd> cached by that session name."
+                e=${CODE_FAILURE?}
+            fi
         else
-            theme ERR_USAGE "There is no <hgd> cached by that session name."
+            theme ERR_USAGE "That's not a valid session name."
             e=${CODE_FAILURE?}
         fi
     fi
