@@ -33,8 +33,8 @@ class MHKP(paramiko.AutoAddPolicy):
 
     def missing_host_key(self, client, hostname, key):
         client._host_keys.add(hostname, key.get_name(), key)
-        if client._host_keys_filename is not None:
-            client.save_host_keys(client._host_keys_filename)
+        #if client._host_keys_filename is not None:
+        #    client.save_host_keys(client._host_keys_filename)
         return None
 
 class EssEssHache:
@@ -67,18 +67,19 @@ class EssEssHache:
         try:
             data = (qdn, [], [], 1)
             try:
-                ssh_proxy = os.environ.get('USER_SSH_PROXY', None)
-                tld = os.environ.get('USER_TLD', None)
-                #sys.stdout.write("%s=%s\n" % ('ssh_proxy', ssh_proxy))
+                ssh_proxy_host = os.environ.get('SSH_PROXY_HOST', None)
+                ssh_proxy_port = os.environ.get('SSH_PROXY_PORT', '22')
+                tld = os.environ.get('TLD', None)
+                #sys.stdout.write("%s=%s\n" % ('ssh_proxy_host', ssh_proxy_host))
                 #sys.stdout.write("%s=%s\n" % ('tld', tld))
 
-                if not ssh_proxy:
+                if not ssh_proxy_host:
                     client.connect(qdn, username=username, timeout=self._timeout)
                 else:
-                    #sys.stderr.write("#. >>> Queued up %s via proxy %s\n" % (qdn, ssh_proxy))
+                    #sys.stderr.write("#. >>> Queued up %s via proxy %s\n" % (qdn, ssh_proxy_host))
                     proxy_command = paramiko.ProxyCommand(
-                        "ssh %s@%s nc %s.%s 22" % (
-                            username, ssh_proxy, qdn, tld
+                        "ssh -p %s %s@%s nc %s.%s 22" % (
+                            ssh_proxy_port, username, ssh_proxy_host, qdn, tld
                         )
                     )
                     client.connect(qdn, username=username, sock=proxy_command, timeout=self._timeout)
