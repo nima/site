@@ -20,49 +20,44 @@ function run() {
     return $e
 }
 
+declare -g -A PACKAGES=(
+    [ALL]=make,coreutils,bash,sed,gawk,git,haveged
+    [gpg,vault,remote]=gnupg2,pwgen,xclip
+    [net]=iproute,net-tools,netcat,socat
+    [dns,remote]=dnsutils
+    [remote]=tmux,socat
+)
+
+function apt_get_install_for() {
+    local module="${1}"
+
+    local mcsv
+    local buffer
+    local -a pkgcsv="${PACKAGES[ALL]}"
+    for mcsv in ${!PACKAGES[@]}; do
+        buffer=",${mcsv},"
+        if [ "${buffer/,${module},/}" != "${buffer}" ]; then
+            pkgcsv+=",${PACKAGES[${mcsv}]}"
+        fi
+    done
+
+    local -a packages
+    IFS=, read -a packages <<< "${pkgcsv}"
+    run sudo apt-get install ${packages[@]}
+}
+
 declare -g EXIT=9
 echo "#. travis[$1].${CONTEXT?}(${MODULE?}) -=["
 if [ $# -eq 1 ]; then
     case $1 in
         before_install)
             EXIT=0
-            run sudo apt-get install -qq make                      ;((EXIT|=$?))
-            run sudo apt-get install -qq coreutils bash sed gawk   ;((EXIT|=$?))
-            run sudo apt-get install -qq git                       ;((EXIT|=$?))
-            run sudo apt-get install -qq haveged                   ;((EXIT|=$?))
             run sudo install -d /var/tmp -m 1777                   ;((EXIT|=$?))
             run sudo install -m 0644\
                 share/unit/files/apt.conf\
                 /etc/apt/apt.conf.d/99SiteUnitTest                 ;((EXIT|=$?))
 
-            case ${MODULE} in
-                gpg|vault|remote)
-                    run sudo apt-get install -qq gnupg2            ;((EXIT|=$?))
-                    run sudo apt-get install -qq pwgen             ;((EXIT|=$?))
-                    run sudo apt-get install -qq xclip             ;((EXIT|=$?))
-                ;;
-            esac
-
-            case ${MODULE} in
-                net)
-                    run sudo apt-get install -qq iproute           ;((EXIT|=$?))
-                    run sudo apt-get install -qq net-tools         ;((EXIT|=$?))
-                    run sudo apt-get install -qq netcat            ;((EXIT|=$?))
-                    run sudo apt-get install -qq socat             ;((EXIT|=$?))
-                ;;
-            esac
-
-            case ${MODULE} in
-                dns|remote)
-                    run sudo apt-get install -qq dnsutils          ;((EXIT|=$?))
-                ;;
-            esac
-
-            case ${MODULE} in
-                dns|remote)
-                    run sudo apt-get install -qq tmux              ;((EXIT|=$?))
-                ;;
-            esac
+            apt_get_install_for ${MODULE}                          ;((EXIT|=$?))
         ;;
 
         install)
