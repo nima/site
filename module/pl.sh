@@ -69,4 +69,14 @@ function pl:repl() {
     return $e
 }
 #. }=-
+#. pl:run -={
+function pl:run() {
+    local -i e=${CODE_DEFAULT?}
+
+    xplm:run pl "$@"
+    e=$?
+
+    return $e
+}
+#. }=-
 #. }=-

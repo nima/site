@@ -73,4 +73,14 @@ function py:repl() {
     return $e
 }
 #. }=-
+#. py:run -={
+function py:run() {
+    local -i e=${CODE_DEFAULT?}
+
+    xplm:run py "$@"
+    e=$?
+
+    return $e
+}
+#. }=-
 #. }=-

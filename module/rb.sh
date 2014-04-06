@@ -69,4 +69,14 @@ function rb:repl() {
     return $e
 }
 #. }=-
+#. rb:run -={
+function rb:run() {
+    local -i e=${CODE_DEFAULT?}
+
+    xplm:run rb "$@"
+    e=$?
+
+    return $e
+}
+#. }=-
 #. }=-

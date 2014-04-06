@@ -45,6 +45,8 @@ function ::xplm:loadvirtenv() {
     if [ $# -eq 1 -o $# -eq 2 ]; then
         case $1 in
             rb)
+                unset GEM_PATH
+                unset GEM_HOME
                 export RBENV_GEMSET_FILE="${RBENV_ROOT?}/.rbenv-gemsets"
             ;;
             pl)
@@ -62,6 +64,9 @@ function ::xplm:loadvirtenv() {
 
                 if [ -x "${interpreter}" ]; then
                     eval "$(${virtenv} init -)" >/dev/null 2>&1
+                    #if [ $1 == "rb" ]; then
+                    #    PATH+=":$(ruby -e 'puts Gem.dir')/bin"
+                    #fi
                     ${virtenv} rehash
                     ${virtenv} shell ${version}
                     e=$?
@@ -350,6 +355,13 @@ function :xplm:install() {
                     fi
                     ln -sf ${SITE_USER_SCM?}/${virtenv}-build.git\
                         ${RBENV_ROOT?}/plugins/${virtenv}-build
+
+                    local bundler="git://github.com/carsomyr/rbenv-bundler.git"
+                    if [ ! -e ${SITE_USER_SCM?}/${virtenv}-bundler.git ]; then
+                        git clone -q ${build} ${SITE_USER_SCM?}/${virtenv}-bundler.git
+                    fi
+                    ln -sf ${SITE_USER_SCM?}/${virtenv}-bundler.git\
+                        ${RBENV_ROOT?}/plugins/${virtenv}-bundler
                 ;;
                 py)
                     #. Note that pyenv ships with pyenv-build, but we need to
@@ -606,10 +618,11 @@ function :xplm:shell() {
             rb|py|pl)
                 if ::xplm:loadvirtenv "${plid}" "${version}"; then
                     echo "Ctrl-D to exit environment"
-                    cd ${g_PROLANG_ROOT[${plid}]}
+                    #cd ${g_PROLANG_ROOT[${plid}]}
                     bash --rcfile <(
                         cat <<!VIRTENV
                         unset PROMPT_COMMAND
+                        export HISTFILE=~/.bash_history_${plid}
                         export PS1="site:${plid}-${version}> "
 !VIRTENV
                     ) -i
@@ -633,6 +646,51 @@ function xplm:shell() {
         case "${plid}" in
             py|pl|rb)
                 :xplm:shell "${plid}" "${version}"
+                e=$?
+            ;;
+            *)
+                theme HAS_FAILED "Unknown/unsupported language ${plid}"
+                e=${CODE_FAILURE?}
+            ;;
+        esac
+    fi
+
+    return $e
+}
+#. }=-
+#.   xplm:run -={
+function :xplm:run() {
+    local -i e=${CODE_FAILURE?}
+
+    if [ $# -gt 2 ]; then
+        local plid="${1}"
+        local version="${2}"
+        local script="${@:3}"
+        case ${plid} in
+            rb|py|pl)
+                if ::xplm:loadvirtenv "${plid}" "${version}"; then
+                    eval '${script}'
+                    e=$?
+                fi
+            ;;
+        esac
+    else
+        core:raise EXCEPTION_BAD_FN_CALL
+    fi
+
+    return $e
+}
+function xplm:run:usage() { echo "<plid> <script>"; }
+function xplm:run() {
+    local -i e=${CODE_DEFAULT?}
+
+    if [ $# -ge 2 ]; then
+        local plid="$1"
+        case "${plid}" in
+            py|pl|rb)
+                local script="${@:2}"
+                local version="${g_PROLANG_VERSION[${plid}]}"
+                :xplm:run "${plid}" "${version}" "${script}"
                 e=$?
             ;;
             *)
