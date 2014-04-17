@@ -182,7 +182,7 @@ Expire-Date: 0
                             awk -F '[ /]+' '$1~/^sec/{print$3}'
                 )
                 if [ ${PIPESTATUS[0]} -eq 0 ]; then
-                    if gpg -q --batch --import ${gpgkp}.sec; then
+                    if gpg -q --batch --allow-secret-key-import --import ${gpgkp}.sec; then
                         if gpg -q --batch --import ${gpgkp}.pub; then
                             mv ${gpgkp}.sec ${gpgkp}.${gpgkid}.sec
                             mv ${gpgkp}.pub ${gpgkp}.${gpgkid}.pub
