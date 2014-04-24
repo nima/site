@@ -243,7 +243,7 @@ function softlayer:host() {
                 ;;
                 2:dump)
                     local -a fqdns
-                    fqdns=( $(:dns:fqdn ${tldid} ${hnh}) )
+                    fqdns=( $(:dns:get ${tldid} fqdn ${hnh}) )
                     if [ ${#fqdns[@]} -gt 0 ]; then
                         e=${CODE_SUCCESS?}
                         for fqdn in ${fqdns[@]}; do
@@ -256,7 +256,7 @@ function softlayer:host() {
                     fi
                 ;;
                 3:power)
-                    fqdns=( $(:dns:fqdn ${tldid} ${hnh}) )
+                    fqdns=( $(:dns:get ${tldid} fqdn ${hnh}) )
                     if [ ${#fqdns[@]} -gt 0 ]; then
                         fqdn=${fqdns[0]}
                     else
