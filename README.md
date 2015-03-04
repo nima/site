@@ -1,3 +1,7 @@
+# FORKED & DEPRECATED BY SCHTUNT/SIMBOL
+Please note that https://github.com/nima/site has been deprecated in favour of https://github.com/schtunt/simbol; this project is no longer maintained.
+
+---
 [![views](https://sourcegraph.com/api/repos/github.com/nima/site/counters/views.png)](https://sourcegraph.com/github.com/nima/site)
 [![authors](https://sourcegraph.com/api/repos/github.com/nima/site/badges/authors.png)](https://sourcegraph.com/github.com/nima/site)
 [![status](https://sourcegraph.com/api/repos/github.com/nima/site/badges/status.png)](https://sourcegraph.com/github.com/nima/site)
